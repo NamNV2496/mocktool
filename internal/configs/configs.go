@@ -5,7 +5,8 @@ import (
 )
 
 type AppConfig struct {
-	HTTPPort string `env:"http_port" envDefault:":8080"`
+	HTTPPort       string `env:"http_port" envDefault:":8081"`
+	FowardHTTPPort string `env:"foward_http_port" envDefault:":8080"`
 }
 
 type MongoDB struct {

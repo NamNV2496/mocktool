@@ -5,6 +5,7 @@ import (
 
 	"github.com/namnv2496/mocktool/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -25,26 +26,27 @@ func NewFeatureRepository(db *mongo.Database) IFeatureRepository {
 
 /* ---------- queries ---------- */
 
-func (r *FeatureRepository) ListAll(ctx context.Context) ([]domain.Feature, error) {
+func (_self *FeatureRepository) ListAll(ctx context.Context) ([]domain.Feature, error) {
 	var result []domain.Feature
-	err := r.FindMany(ctx, bson.M{}, &result)
+	err := _self.FindMany(ctx, bson.M{}, &result)
 	return result, err
 }
 
-func (r *FeatureRepository) ListActive(ctx context.Context) ([]domain.Feature, error) {
+func (_self *FeatureRepository) ListActive(ctx context.Context) ([]domain.Feature, error) {
 	var result []domain.Feature
-	err := r.FindMany(ctx, bson.M{"is_active": true}, &result)
+	err := _self.FindMany(ctx, bson.M{"is_active": true}, &result)
 	return result, err
 }
 
-func (r *FeatureRepository) Create(ctx context.Context, f *domain.Feature) error {
-	return r.Insert(ctx, f)
+func (_self *FeatureRepository) Create(ctx context.Context, f *domain.Feature) error {
+	f.ID = primitive.NewObjectID()
+	return _self.Insert(ctx, f)
 }
 
-func (r *FeatureRepository) Update(
+func (_self *FeatureRepository) Update(
 	ctx context.Context,
 	id int64,
 	update bson.M,
 ) error {
-	return r.UpdateByID(ctx, id, update)
+	return _self.UpdateByID(ctx, id, update)
 }

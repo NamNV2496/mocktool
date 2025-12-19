@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/namnv2496/mocktool/internal/domain"
@@ -39,6 +40,7 @@ func (r *ScenarioRepository) ListByFeature(
 }
 
 func (r *ScenarioRepository) Create(ctx context.Context, s *domain.Scenario) error {
+	s.ID = primitive.NewObjectID()
 	return r.Insert(ctx, s)
 }
 

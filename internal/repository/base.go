@@ -50,21 +50,21 @@ func now() time.Time {
 
 /* ---------- basic ops ---------- */
 
-func (r *BaseRepository) Insert(ctx context.Context, doc interface{}) error {
-	_, err := r.col.InsertOne(ctx, doc)
+func (_self *BaseRepository) Insert(ctx context.Context, doc interface{}) error {
+	_, err := _self.col.InsertOne(ctx, doc)
 	return err
 }
 
-func (r *BaseRepository) FindByID(ctx context.Context, id int64, out interface{}) error {
-	return r.col.FindOne(ctx, bson.M{"_id": id}).Decode(out)
+func (_self *BaseRepository) FindByID(ctx context.Context, id int64, out interface{}) error {
+	return _self.col.FindOne(ctx, bson.M{"_id": id}).Decode(out)
 }
 
-func (r *BaseRepository) FindMany(
+func (_self *BaseRepository) FindMany(
 	ctx context.Context,
 	filter bson.M,
 	out interface{},
 ) error {
-	cursor, err := r.col.Find(ctx, filter)
+	cursor, err := _self.col.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -73,14 +73,14 @@ func (r *BaseRepository) FindMany(
 	return cursor.All(ctx, out)
 }
 
-func (r *BaseRepository) UpdateByID(
+func (_self *BaseRepository) UpdateByID(
 	ctx context.Context,
 	id int64,
 	update bson.M,
 ) error {
 	update["updated_at"] = now()
 
-	_, err := r.col.UpdateOne(
+	_, err := _self.col.UpdateOne(
 		ctx,
 		bson.M{"_id": id},
 		bson.M{"$set": update},

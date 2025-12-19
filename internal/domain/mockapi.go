@@ -4,18 +4,20 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type MockAPI struct {
-	ID          int64     `bson:"_id" json:"id"`
-	Name        string    `bson:"name" json:"name"`
-	Description string    `bson:"description" json:"description"`
-	IsActive    bool      `bson:"is_active" json:"is_active"`
-	Path        string    `bson:"path" json:"path"`         // path
-	HashCode    string    `bson:"hashcode" json:"hashcode"` // hashcode of (path + input)
-	Output      bson.Raw  `bson:"output" json:"output"`     // json response
-	CreatedAt   time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt   time.Time `bson:"updated_at" json:"updated_at"`
+	ID          primitive.ObjectID `bson:"_id" json:"id"`
+	Name        string             `bson:"name" json:"name"`
+	Description string             `bson:"description" json:"description"`
+	IsActive    bool               `bson:"is_active" json:"is_active"`
+	Path        string             `bson:"path" json:"path"`             // path
+	RegexPath   string             `bson:"regex_path" json:"regex_path"` // regex_path
+	HashInput   string             `bson:"hash_input" json:"hash_input"` // hashcode of input
+	Output      bson.Raw           `bson:"output" json:"output"`         // json response
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt   time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 func (_self MockAPI) ToMap() bson.M {
@@ -32,9 +34,11 @@ func (_self MockAPI) ToMap() bson.M {
 	if _self.Path != "" {
 		update["path"] = _self.Path
 	}
-
-	if _self.HashCode != "" {
-		update["hashcode"] = _self.HashCode
+	if _self.RegexPath != "" {
+		update["regex_path"] = _self.RegexPath
+	}
+	if _self.HashInput != "" {
+		update["hash_input"] = _self.HashInput
 	}
 
 	if _self.Output != nil {

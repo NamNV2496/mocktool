@@ -2,16 +2,20 @@ package controller
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
+	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -24,6 +28,7 @@ type MockController struct {
 	FeatureRepo  repository.IFeatureRepository
 	ScenarioRepo repository.IScenarioRepository
 	MockAPIRepo  repository.IMockAPIRepository
+	trie         usecase.ITrie
 }
 
 func NewMockController(
@@ -31,7 +36,7 @@ func NewMockController(
 	featureRepo repository.IFeatureRepository,
 	scenarioRepo repository.IScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
-
+	trie usecase.ITrie,
 ) IMockController {
 
 	return &MockController{
@@ -39,6 +44,7 @@ func NewMockController(
 		FeatureRepo:  featureRepo,
 		ScenarioRepo: scenarioRepo,
 		MockAPIRepo:  mockAPIRepo,
+		trie:         trie,
 	}
 }
 
@@ -48,7 +54,7 @@ func (_self *MockController) StartHttpServer() error {
 	c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
 	c.Use(middleware.Recover())       // recover panics as errors for proper error handling
 	// Routes
-	v1 := c.Group("/api/v1")
+	v1 := c.Group("/api/v1/mocktool")
 	v1.GET("/features", _self.GetFeatures)                // list all features
 	v1.POST("/features", _self.CreateNewFeature)          // create new feature
 	v1.PUT("/features/{feature_id}", _self.UpdateFeature) // update or inactive
@@ -61,6 +67,8 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)         // create new scenario
 	v1.PUT("/mockapis/{api_id}", _self.UpdateMockAPIByScenario) // update or inactive scenario
 
+	c.GET("/forward/*", _self.responseMockData)
+
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err
@@ -69,6 +77,27 @@ func (_self *MockController) StartHttpServer() error {
 }
 
 // handler
+func (_self *MockController) responseMockData(c echo.Context) error {
+	var request entity.APIRequest
+	if err := c.Bind(&request); err != nil {
+		return err
+	}
+	request.Path = c.Request().RequestURI
+	// Bind query parameters
+	request.FeatureName = c.Param("feature_name")
+	response := _self.trie.Search(request)
+	if response == nil {
+		io.Copy(c.Response().Writer, strings.NewReader("not found"))
+		return nil
+	}
+	output, ok := response.Output.(string)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "invalid response output type")
+	}
+	io.Copy(c.Response().Writer, strings.NewReader(output))
+	return nil
+}
+
 /* ---------- GET /features ---------- */
 
 func (_self *MockController) GetFeatures(c echo.Context) error {

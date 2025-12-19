@@ -6,6 +6,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/controller"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -31,6 +32,8 @@ func InvokeServer(invokers ...any) *fx.App {
 			fx.Annotate(repository.NewMockAPIRepository, fx.As(new(repository.IMockAPIRepository))),
 
 			fx.Annotate(controller.NewMockController, fx.As(new(controller.IMockController))),
+			fx.Annotate(controller.NewFowardController, fx.As(new(controller.IFowardController))),
+			fx.Annotate(usecase.NewTrie, fx.As(new(usecase.ITrie))),
 
 			repository.NewMongoConnect,
 		),
@@ -45,6 +48,10 @@ func InvokeServer(invokers ...any) *fx.App {
 func startServer(
 	lc fx.Lifecycle,
 	mockController controller.IMockController,
+	forwardController controller.IFowardController,
 ) error {
+	go func() {
+		forwardController.StartHttpServer()
+	}()
 	return mockController.StartHttpServer()
 }

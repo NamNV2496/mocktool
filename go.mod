@@ -8,6 +8,7 @@ require (
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.14.0
+	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/spf13/cobra v1.10.2
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/fx v1.24.0

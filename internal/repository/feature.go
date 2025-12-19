@@ -13,6 +13,7 @@ type IFeatureRepository interface {
 	ListAll(ctx context.Context) ([]domain.Feature, error)
 	Create(ctx context.Context, f *domain.Feature) error
 	Update(ctx context.Context, id int64, update bson.M) error
+	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 }
 type FeatureRepository struct {
 	*BaseRepository

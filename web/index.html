@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock API Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mock API Manager</h1>
+            <p class="subtitle">Manage your features, scenarios, and mock APIs</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="features">Features</button>
+            <button class="tab-btn" data-tab="scenarios">Scenarios</button>
+            <button class="tab-btn" data-tab="mockapis">Mock APIs</button>
+        </div>
+
+        <!-- Features Tab -->
+        <div id="features" class="tab-content active">
+            <div class="section-header">
+                <h2>Features</h2>
+                <button class="btn btn-primary" onclick="showCreateFeatureModal()">+ New Feature</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Active</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="features-table-body">
+                        <tr>
+                            <td colspan="5" class="loading">Loading features...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Scenarios Tab -->
+        <div id="scenarios" class="tab-content">
+            <div class="section-header">
+                <h2>Scenarios</h2>
+                <div class="filter-group">
+                    <select id="scenario-feature-filter" class="filter-select">
+                        <option value="">Select a feature...</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showCreateScenarioModal()">+ New Scenario</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Active</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scenarios-table-body">
+                        <tr>
+                            <td colspan="6" class="loading">Select a feature to view scenarios</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Mock APIs Tab -->
+        <div id="mockapis" class="tab-content">
+            <div class="section-header">
+                <h2>Mock APIs</h2>
+                <div class="filter-group">
+                    <select id="mockapi-feature-filter" class="filter-select">
+                        <option value="">Select a feature...</option>
+                    </select>
+                    <select id="mockapi-scenario-filter" class="filter-select">
+                        <option value="">Select a scenario...</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showCreateMockAPIModal()">+ New Mock API</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Scenario</th>
+                            <th>Name</th>
+                            <th>Path</th>
+                            <th>Active</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mockapis-table-body">
+                        <tr>
+                            <td colspan="7" class="loading">Select a scenario to view mock APIs</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Creating/Editing Feature -->
+    <div id="feature-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="feature-modal-title">Create Feature</h3>
+                <span class="close" onclick="closeModal('feature-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="feature-id">
+                <div class="form-group">
+                    <label for="feature-name">Feature Name</label>
+                    <input type="text" id="feature-name" placeholder="Enter feature name" required>
+                </div>
+                <div class="form-group">
+                    <label for="feature-description">Description</label>
+                    <textarea id="feature-description" placeholder="Enter description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="feature-active" checked>
+                        Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('feature-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveFeature()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Creating/Editing Scenario -->
+    <div id="scenario-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="scenario-modal-title">Create Scenario</h3>
+                <span class="close" onclick="closeModal('scenario-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="scenario-id">
+                <div class="form-group">
+                    <label for="scenario-feature">Feature</label>
+                    <select id="scenario-feature" required>
+                        <option value="">Select a feature...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="scenario-name">Scenario Name</label>
+                    <input type="text" id="scenario-name" placeholder="Enter scenario name" required>
+                </div>
+                <div class="form-group">
+                    <label for="scenario-description">Description</label>
+                    <textarea id="scenario-description" placeholder="Enter description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="scenario-active" checked>
+                        Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('scenario-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveScenario()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Creating/Editing Mock API -->
+    <div id="mockapi-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="mockapi-modal-title">Create Mock API</h3>
+                <span class="close" onclick="closeModal('mockapi-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="mockapi-id">
+                <div class="form-group">
+                    <label for="mockapi-feature">Feature</label>
+                    <select id="mockapi-feature" required>
+                        <option value="">Select a feature...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-scenario">Scenario</label>
+                    <select id="mockapi-scenario" required>
+                        <option value="">Select a scenario...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-name">API Name</label>
+                    <input type="text" id="mockapi-name" placeholder="Enter API name" required>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-path">Path</label>
+                    <input type="text" id="mockapi-path" placeholder="/api/example" required>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-regex-path">Regex Path (Optional)</label>
+                    <input type="text" id="mockapi-regex-path" placeholder="/api/users/[0-9]+">
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-hash-input">Hash Input - JSON (Optional)</label>
+                    <textarea id="mockapi-hash-input" placeholder='{"userId": 123, "action": "login"}' rows="4"></textarea>
+                    <small style="color: #718096; font-size: 0.85rem;">JSON object to generate unique hash for request matching. Keys are automatically sorted for consistent hashing.</small>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-output">Response Output - JSON (Required)</label>
+                    <textarea id="mockapi-output" placeholder='{"message": "success", "data": {...}}' rows="8" required></textarea>
+                    <small style="color: #718096; font-size: 0.85rem;">JSON response to return when this mock API is matched</small>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mockapi-active" checked>
+                        Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mockapi-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveMockAPI()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

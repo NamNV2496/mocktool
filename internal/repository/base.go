@@ -6,6 +6,7 @@ import (
 
 	"github.com/namnv2496/mocktool/internal/configs"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -86,4 +87,45 @@ func (_self *BaseRepository) UpdateByID(
 		bson.M{"$set": update},
 	)
 	return err
+}
+
+func (_self *BaseRepository) UpdateByObjectID(
+	ctx context.Context,
+	id primitive.ObjectID,
+	update bson.M,
+) error {
+	update["updated_at"] = now()
+
+	_, err := _self.col.UpdateOne(
+		ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": update},
+	)
+	return err
+}
+
+func (_self *BaseRepository) UpdateOne(
+	ctx context.Context,
+	filter bson.M,
+	update bson.M,
+) error {
+	_, err := _self.col.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func (_self *BaseRepository) UpdateMany(
+	ctx context.Context,
+	filter bson.M,
+	update bson.M,
+) error {
+	_, err := _self.col.UpdateMany(ctx, filter, update)
+	return err
+}
+
+func (_self *BaseRepository) FindOne(
+	ctx context.Context,
+	filter bson.M,
+	out interface{},
+) error {
+	return _self.col.FindOne(ctx, filter).Decode(out)
 }

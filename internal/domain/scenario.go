@@ -9,6 +9,7 @@ import (
 
 type Scenario struct {
 	ID          primitive.ObjectID `bson:"_id" json:"id"`
+	FeatureName string             `bson:"feature_name" json:"feature_name"`
 	Name        string             `bson:"name" json:"name"`
 	Description string             `bson:"description" json:"description"`
 	IsActive    bool               `bson:"is_active" json:"is_active"`

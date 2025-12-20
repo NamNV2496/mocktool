@@ -67,8 +67,8 @@ func NewTrie(
 		newAPINode.hashInput = api.HashInput
 		newAPINode.method = api.Method
 		newAPINode.output = api.Output
-
-		node.children[api.Path] = newAPINode
+		key := api.Path + hashInputKey(api.HashInput)
+		node.children[key] = newAPINode
 	}
 	return &Trie{
 		root:        root,
@@ -97,7 +97,8 @@ func (_self *Trie) Insert(request entity.APIRequest) error {
 	newAPINode.method = request.Method
 	newAPINode.output = request.Output
 
-	node.children[request.Path] = newAPINode
+	key := request.Path + hashInputKey(request.HashInput)
+	node.children[key] = newAPINode
 	return nil
 }
 
@@ -114,7 +115,8 @@ func (_self *Trie) Remove(request entity.APIRequest) {
 	} else {
 		node = childNode
 	}
-	delete(node.children, request.Path)
+	key := request.Path + hashInputKey(request.HashInput)
+	delete(node.children, key)
 }
 
 func (_self *Trie) RemoveScenario(featureName, scenarioName string) {
@@ -205,6 +207,32 @@ func compareBsonRaw(a, b bson.Raw) bool {
 	return bytes.Equal(sortedA, sortedB)
 }
 
+func hashInputKey(input bson.Raw) string {
+	formattedA := formatBsonOrJSON(input)
+
+	println("Comparing A:", formattedA)
+
+	// Try to unmarshal as BSON first, then fall back to JSON
+	var docA map[string]any
+
+	// Try BSON first for 'a', fall back to JSON
+	if err := bson.Unmarshal(input, &docA); err != nil {
+		// Try as JSON
+		if err := json.Unmarshal(input, &docA); err != nil {
+			println("Error unmarshaling 'a':", err.Error(), "Data:", string(input))
+			return ""
+		}
+	}
+
+	// Marshal with sorted keys for canonical comparison
+	sortedA, err := json.Marshal(sortMapKeys(docA))
+	if err != nil {
+		println("Error marshaling sortedA:", err.Error())
+		return ""
+	}
+	return string(sortedA)
+}
+
 // sortMapKeys recursively sorts map keys for canonical representation
 func sortMapKeys(m map[string]any) map[string]any {
 	result := make(map[string]any, len(m))
@@ -231,7 +259,8 @@ func (_self *Trie) Search(request entity.APIRequest) *entity.APIResponse {
 		node = childNode
 	}
 	// try with correct path
-	if childNode, ok := node.children[request.Path]; ok {
+	key := request.Path + hashInputKey(request.HashInput)
+	if childNode, ok := node.children[key]; ok {
 		matchMethod := childNode.method == request.Method
 		matchInput := compareBsonRaw(childNode.hashInput, request.HashInput)
 		if matchMethod && matchInput {

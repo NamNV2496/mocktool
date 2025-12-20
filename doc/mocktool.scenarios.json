@@ -1,0 +1,30 @@
+[{
+  "_id": {
+    "$oid": "694580412e6d69582e30a66b"
+  },
+  "feature_name": "test_feature",
+  "name": "happy_case",
+  "description": "",
+  "is_active": false,
+  "created_at": {
+    "$date": "2025-12-19T16:41:37.528Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:10:42.208Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "694580552e6d69582e30a66c"
+  },
+  "feature_name": "test_feature",
+  "name": "unhappy_case",
+  "description": "",
+  "is_active": true,
+  "created_at": {
+    "$date": "2025-12-19T16:41:57.298Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:10:42.211Z"
+  }
+}]

@@ -1,0 +1,56 @@
+[{
+  "_id": {
+    "$oid": "694580822e6d69582e30a66d"
+  },
+  "feature_name": "test_feature",
+  "scenario_name": "happy_case",
+  "name": "testAPI",
+  "description": "",
+  "is_active": true,
+  "path": "/api/v1/test",
+  "regex_path": "",
+  "hash_input": {
+    "id": 123,
+    "name": "test"
+  },
+  "hash_value": "17031540538161738135",
+  "output": {
+    "name": "happy case",
+    "id": 123
+  },
+  "created_at": {
+    "$date": "2025-12-19T16:42:42.828Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:08:49.448Z"
+  },
+  "method": "GET"
+},
+{
+  "_id": {
+    "$oid": "694580a02e6d69582e30a66e"
+  },
+  "feature_name": "test_feature",
+  "scenario_name": "unhappy_case",
+  "name": "testAPI",
+  "description": "",
+  "is_active": true,
+  "path": "/api/v1/test",
+  "regex_path": "",
+  "hash_input": {
+    "id": 123,
+    "name": "test"
+  },
+  "hash_value": "",
+  "output": {
+    "name": "unhappy case",
+    "id": 123
+  },
+  "created_at": {
+    "$date": "2025-12-19T16:43:12.162Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:09:03.149Z"
+  },
+  "method": "GET"
+}]

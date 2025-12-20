@@ -1,0 +1,14 @@
+[{
+  "_id": {
+    "$oid": "000000000000000000000000"
+  },
+  "name": "test_feature",
+  "description": "namnv test",
+  "is_active": true,
+  "created_at": {
+    "$date": "2025-12-18T18:45:55.943Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-18T18:45:55.943Z"
+  }
+}]

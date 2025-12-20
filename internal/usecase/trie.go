@@ -3,6 +3,8 @@ package usecase
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 
 	"github.com/namnv2496/mocktool/internal/entity"
@@ -208,29 +210,29 @@ func compareBsonRaw(a, b bson.Raw) bool {
 }
 
 func hashInputKey(input bson.Raw) string {
-	formattedA := formatBsonOrJSON(input)
-
-	println("Comparing A:", formattedA)
-
 	// Try to unmarshal as BSON first, then fall back to JSON
 	var docA map[string]any
 
-	// Try BSON first for 'a', fall back to JSON
+	// Try BSON first, fall back to JSON
 	if err := bson.Unmarshal(input, &docA); err != nil {
 		// Try as JSON
 		if err := json.Unmarshal(input, &docA); err != nil {
-			println("Error unmarshaling 'a':", err.Error(), "Data:", string(input))
-			return ""
+			// Return empty hash if both fail
+			hash := sha256.Sum256(input)
+			return hex.EncodeToString(hash[:])
 		}
 	}
 
 	// Marshal with sorted keys for canonical comparison
 	sortedA, err := json.Marshal(sortMapKeys(docA))
 	if err != nil {
-		println("Error marshaling sortedA:", err.Error())
-		return ""
+		hash := sha256.Sum256(input)
+		return hex.EncodeToString(hash[:])
 	}
-	return string(sortedA)
+
+	// Generate SHA-256 hash and return as hex string
+	hash := sha256.Sum256(sortedA)
+	return "-" + hex.EncodeToString(hash[:])
 }
 
 // sortMapKeys recursively sorts map keys for canonical representation

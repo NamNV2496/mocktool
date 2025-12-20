@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net/url"
+	"strings"
 
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
@@ -30,6 +32,31 @@ func newTrieNode() *TrieNode {
 	return &TrieNode{
 		children: make(map[string]*TrieNode),
 	}
+}
+
+// normalizePathWithQueryParams sorts query parameters alphabetically for consistent matching
+func normalizePathWithQueryParams(path string) string {
+	// Split path and query string
+	parts := strings.SplitN(path, "?", 2)
+	if len(parts) != 2 {
+		return path // No query parameters
+	}
+
+	basePath := parts[0]
+	queryString := parts[1]
+
+	// Parse and re-encode to sort parameters
+	queryValues, err := url.ParseQuery(queryString)
+	if err != nil {
+		return path // Return original if parsing fails
+	}
+
+	// Encode() automatically sorts keys alphabetically
+	if len(queryValues) > 0 {
+		return basePath + "?" + queryValues.Encode()
+	}
+
+	return basePath
 }
 
 type Trie struct {
@@ -69,7 +96,9 @@ func NewTrie(
 		newAPINode.hashInput = api.HashInput
 		newAPINode.method = api.Method
 		newAPINode.output = api.Output
-		key := api.Path + hashInputKey(api.HashInput)
+		// Normalize path to ensure query parameters are sorted
+		normalizedPath := normalizePathWithQueryParams(api.Path)
+		key := normalizedPath + hashInputKey(api.HashInput)
 		node.children[key] = newAPINode
 	}
 	return &Trie{
@@ -99,7 +128,9 @@ func (_self *Trie) Insert(request entity.APIRequest) error {
 	newAPINode.method = request.Method
 	newAPINode.output = request.Output
 
-	key := request.Path + hashInputKey(request.HashInput)
+	// Normalize path to ensure query parameters are sorted
+	normalizedPath := normalizePathWithQueryParams(request.Path)
+	key := normalizedPath + hashInputKey(request.HashInput)
 	node.children[key] = newAPINode
 	return nil
 }
@@ -117,7 +148,9 @@ func (_self *Trie) Remove(request entity.APIRequest) {
 	} else {
 		node = childNode
 	}
-	key := request.Path + hashInputKey(request.HashInput)
+	// Normalize path to ensure query parameters are sorted
+	normalizedPath := normalizePathWithQueryParams(request.Path)
+	key := normalizedPath + hashInputKey(request.HashInput)
 	delete(node.children, key)
 }
 
@@ -261,7 +294,9 @@ func (_self *Trie) Search(request entity.APIRequest) *entity.APIResponse {
 		node = childNode
 	}
 	// try with correct path
-	key := request.Path + hashInputKey(request.HashInput)
+	// Normalize path to ensure query parameters are sorted
+	normalizedPath := normalizePathWithQueryParams(request.Path)
+	key := normalizedPath + hashInputKey(request.HashInput)
 	if childNode, ok := node.children[key]; ok {
 		matchMethod := childNode.method == request.Method
 		matchInput := compareBsonRaw(childNode.hashInput, request.HashInput)

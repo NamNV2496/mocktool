@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -31,6 +33,7 @@ func NewForwardUC(
 		ScenarioRepo: ScenarioRepo,
 	}
 }
+
 func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	// Read request body FIRST before c.Bind() consumes it
 	bodyBytes, err := io.ReadAll(c.Request().Body)
@@ -43,8 +46,25 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	var request entity.APIRequest
 	// Remove /forward prefix from path
 	request.Path = strings.TrimPrefix(c.Request().URL.Path, "/forward")
+
 	// Bind query parameters
 	request.FeatureName = c.QueryParam("feature_name")
+	if request.FeatureName == "" {
+		return fmt.Errorf("missing feature_name")
+	}
+	// Include query parameters in the path (excluding feature_name which is used by mocktool)
+	// Query parameters are automatically sorted alphabetically by Encode() for consistent matching
+	if queryString := c.Request().URL.RawQuery; queryString != "" {
+		queryValues, err := url.ParseQuery(queryString)
+		if err == nil {
+			// Remove feature_name from query parameters as it's internal to mocktool
+			queryValues.Del("feature_name")
+			if len(queryValues) > 0 {
+				// Encode() sorts keys alphabetically
+				request.Path = request.Path + "?" + queryValues.Encode()
+			}
+		}
+	}
 
 	// get active scenario by featureName
 	activeScenario, reqerr := _self.ScenarioRepo.GetActiveScenarioByFeatureName(context.Background(), request.FeatureName)

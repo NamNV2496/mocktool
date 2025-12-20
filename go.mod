@@ -5,11 +5,16 @@ go 1.24.0
 require (
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/google/uuid v1.6.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3
 	github.com/labstack/echo/v4 v4.14.0
 	github.com/spf13/cobra v1.10.2
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.26.0
+	google.golang.org/genproto/googleapis/api v0.0.0-20251213004720-97cd9d5aeac2
+	google.golang.org/grpc v1.77.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
@@ -35,4 +40,5 @@ require (
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251124214823-79d6a2a48846 // indirect
 )

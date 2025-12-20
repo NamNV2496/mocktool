@@ -40,7 +40,7 @@ flowchart TB
 
     XYZ_S2 --> XYZ_S2_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
 ```
-![doc/architect.png](doc/architect.png)
+<!-- ![doc/architect.png](doc/architect.png) -->
 
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)
 
@@ -124,10 +124,10 @@ An API path with different request body will have different response.
 docker compose up -d
 
 # Start server
-go run main.go
+go run main.go service
 
 
-# start your service
+# start your service client
 # example
 
 go run ./example/http/main.go

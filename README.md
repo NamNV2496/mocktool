@@ -2,14 +2,72 @@
 
 Mocktool is a simple tool written in the Go language. It supports controlling API responses based on feature scenarios.
 
-During software development, you may encounter bottlenecks where you have to wait for backend developers (BE) to provide APIs or responses to frontend developers (FE) or testers. This tool allows FE and testers to control the process without needing support from the BE.
+During software development, you may encounter bottlenecks where you have to wait for backend developers (BE) to provide APIs or responses to frontend developers (FE) or testers. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
 
 At the same time we have:
 - Multiple active feature
 - Only 1 active scenario for each feature
 - Multiple API for each scenario (same API path but different requestBody)
 
-![doc/1.png](doc/architect.png)
+
+```mermaid
+flowchart TB
+    Client[Client web/mobile] --> API[api service]
+
+    API --> ISMOCK{is mock}
+    ISMOCK -- yes --> ROOT[root]
+    ISMOCK -- no --> REAL[real data]
+
+    %% Feature abc
+    ROOT --> ABC[feature: abc]
+    ABC --> ABC_S1[scenario1]
+    ABC --> ABC_S2[scenario2]
+
+    ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
+    ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
+
+    ABC_S2 --> ABC_S2_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2"]
+    ABC_S2 --> ABC_S2_P2["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/> field2: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
+    ABC_S2 --> ABC_S2_P3["path: /api/v1/{id}/def<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3<br/>- id: {id}"]
+
+    %% Feature xyz
+    ROOT --> XYZ[feature: xyz]
+    XYZ --> XYZ_S1[scenario1]
+    XYZ --> XYZ_S2[scenario2]
+
+    XYZ_S1 --> XYZ_S1_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
+    XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>+ token => need to parse"]
+
+    XYZ_S2 --> XYZ_S2_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
+```
+![doc/architect.png](doc/architect.png)
+
+![doc/sequence_diagram.png](doc/sequence_diagram.png)
+
+<summary>
+<details>
+title Mocktool
+
+participant FE
+participant BE-service
+participant real-service
+participant mock-service
+
+FE->BE-service: request (/api/v1/insert)
+alt is mock data?
+BE-service->BE-service: add suffix /forward (/forward/api/v1/insert)
+BE-service->mock-service: send request (/forward/api/v1/insert)
+mock-service->mock-service: find usecase
+mock-service--> BE-service: response
+BE-service-->FE: response
+else
+
+BE-service->real-service: call final BE
+real-service-->BE-service: response
+BE-service-->FE: response
+end
+</details>
+</summary>
 
 # Pros and cons
 
@@ -46,6 +104,7 @@ targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?featur
 
 # Multiple API for each scenario 
 
+An API path with different request body will have different response.
 
 ![doc/6.png](doc/6.png)
 ![doc/7.png](doc/7.png)

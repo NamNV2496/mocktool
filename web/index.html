@@ -98,6 +98,7 @@
                             <th>Feature</th>
                             <th>Scenario</th>
                             <th>Name</th>
+                            <th>Method</th>
                             <th>Path</th>
                             <th>Active</th>
                             <th>Created At</th>
@@ -106,7 +107,7 @@
                     </thead>
                     <tbody id="mockapis-table-body">
                         <tr>
-                            <td colspan="7" class="loading">Select a scenario to view mock APIs</td>
+                            <td colspan="8" class="loading">Select a scenario to view mock APIs</td>
                         </tr>
                     </tbody>
                 </table>
@@ -210,6 +211,16 @@
                 <div class="form-group">
                     <label for="mockapi-path">Path</label>
                     <input type="text" id="mockapi-path" placeholder="/api/example" required>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-method">HTTP Method</label>
+                    <select id="mockapi-method" required>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="mockapi-regex-path">Regex Path (Optional)</label>

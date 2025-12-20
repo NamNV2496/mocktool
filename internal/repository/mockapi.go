@@ -11,7 +11,7 @@ import (
 )
 
 type IMockAPIRepository interface {
-	ListActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
+	ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error)
 	ListByScenario(ctx context.Context, scenarioID int64) ([]domain.MockAPI, error)
 	ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
@@ -31,12 +31,10 @@ func NewMockAPIRepository(db *mongo.Database) *MockAPIRepository {
 
 /* ---------- list ---------- */
 
-func (_self *MockAPIRepository) ListActiveAPIs(
-	ctx context.Context,
-) ([]domain.MockAPI, error) {
-
+func (_self *MockAPIRepository) ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error) {
 	var result []domain.MockAPI
 	err := _self.FindMany(ctx, bson.M{
+		"scenario_name": bson.M{"$in": scenarios},
 		"is_active": true,
 	}, &result)
 

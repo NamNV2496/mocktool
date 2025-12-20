@@ -1,12 +1,14 @@
 package entity
 
+import "go.mongodb.org/mongo-driver/bson"
+
 type APIRequest struct {
-	FeatureName string `json:"feature_name"`
-	Scenario    string `json:"scenario"`
-	Path        string `json:"path"`
-	RegexPath   string `json:"regex_path"` // regex_path
-	HashInput   string `json:"hash_input"` // hashcode of input
-	Output      any    `json:"output"`     // json response
+	FeatureName string   `json:"feature_name"`
+	Scenario    string   `json:"scenario"`
+	Path        string   `json:"path"`
+	Method      string   `json:"method"`
+	HashInput   bson.Raw `json:"hash_input"` // hashcode of input
+	Output      any      `json:"output"`     // json response
 }
 
 type APIResponse struct {

@@ -3,14 +3,12 @@ package controller
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/mitchellh/hashstructure/v2"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
@@ -73,6 +71,9 @@ func (_self *MockController) StartHttpServer() error {
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario) // update or inactive scenario
 
 	c.GET("/forward/*", _self.responseMockData)
+	c.POST("/forward/*", _self.responseMockData)
+	c.PUT("/forward/*", _self.responseMockData)
+	c.DELETE("/forward/*", _self.responseMockData)
 
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
@@ -192,12 +193,25 @@ func (_self *MockController) CreateNewScenarioByFeature(c echo.Context) error {
 	req.UpdatedAt = now
 	req.IsActive = true
 
+	// Get all active scenarios for this feature before deactivating
+	activeScenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, req.FeatureName)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get active scenarios: "+err.Error())
+	}
+
 	// Deactivate all existing active scenarios for this feature
 	if err := _self.ScenarioRepo.UpdateByFilter(ctx,
 		bson.M{"feature_name": req.FeatureName, "is_active": true},
 		bson.M{"is_active": false, "updated_at": now},
 	); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenarios: "+err.Error())
+	}
+
+	// Remove deactivated scenarios from trie
+	for _, scenario := range activeScenarios {
+		if scenario.IsActive {
+			_self.trie.RemoveScenario(req.FeatureName, scenario.Name)
+		}
 	}
 
 	if err := _self.ScenarioRepo.Create(ctx, &req); err != nil {
@@ -223,12 +237,18 @@ func (_self *MockController) UpdateScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
+	// First get the scenario to know its feature_name
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, objectID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
+	}
+
 	// If activating this scenario, deactivate all other scenarios for the same feature
 	if req.IsActive {
-		// First get the scenario to know its feature_name
-		scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, objectID)
+		// Get all active scenarios for this feature before deactivating
+		activeScenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, scenario.FeatureName)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get active scenarios: "+err.Error())
 		}
 
 		// Deactivate all other active scenarios for this feature
@@ -239,6 +259,37 @@ func (_self *MockController) UpdateScenarioByFeature(c echo.Context) error {
 		); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenarios: "+err.Error())
 		}
+
+		// Remove deactivated scenarios from trie (except the one being activated)
+		for _, s := range activeScenarios {
+			if s.IsActive && s.ID != objectID {
+				_self.trie.RemoveScenario(scenario.FeatureName, s.Name)
+			}
+		}
+
+		// Load the activated scenario's APIs into the trie
+		apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenario.Name)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get scenario APIs: "+err.Error())
+		}
+
+		for _, api := range apis {
+			if api.IsActive {
+				if err := _self.trie.Insert(entity.APIRequest{
+					FeatureName: api.FeatureName,
+					Scenario:    api.ScenarioName,
+					Path:        api.Path,
+					Method:      api.Method,
+					HashInput:   api.HashInput,
+					Output:      api.Output,
+				}); err != nil {
+					slog.Error("failed to insert API into trie", "error", err, "path", api.Path)
+				}
+			}
+		}
+	} else {
+		// If deactivating this scenario, remove it from trie
+		_self.trie.RemoveScenario(scenario.FeatureName, scenario.Name)
 	}
 
 	update := req.ToMap()
@@ -293,7 +344,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"description":   api.Description,
 			"is_active":     api.IsActive,
 			"path":          api.Path,
-			"regex_path":    api.RegexPath,
+			"method":        api.Method,
 			"hash_input":    hashInputJSON,
 			"output":        outputJSON,
 			"created_at":    api.CreatedAt.Format(time.RFC3339),
@@ -316,7 +367,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		Name         string          `json:"name"`
 		Description  string          `json:"description"`
 		Path         string          `json:"path"`
-		RegexPath    string          `json:"regex_path"`
+		Method       string          `json:"method"`
 		HashInput    json.RawMessage `json:"hash_input"`
 		Output       json.RawMessage `json:"output"`
 	}
@@ -332,7 +383,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 	req.Name = reqBody.Name
 	req.Description = reqBody.Description
 	req.Path = reqBody.Path
-	req.RegexPath = reqBody.RegexPath
+	req.Method = reqBody.Method
 
 	now := time.Now().UTC()
 	req.CreatedAt = now
@@ -341,28 +392,25 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 
 	// Process hash input - store original JSON and compute hash
 	// Only process if not empty and not null
-	if len(reqBody.HashInput) > 0 && string(reqBody.HashInput) != "null" && string(reqBody.HashInput) != "" {
-		// Convert json.RawMessage to bson.Raw
-		var inputData any
-		if err := json.Unmarshal(reqBody.HashInput, &inputData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
-		}
-
-		// If the output is a string, try to parse it as JSON
-		if outputStr, ok := inputData.(string); ok {
-			var parsedData any
-			if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
-			}
-			inputData = parsedData
-		}
-
-		bsonData, err := bson.Marshal(inputData)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
-		}
-		req.HashInput = bsonData
+	var inputData any
+	if err := json.Unmarshal(reqBody.HashInput, &inputData); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
 	}
+
+	// If the output is a string, try to parse it as JSON
+	if intputStr, ok := inputData.(string); ok {
+		var parsedData any
+		if err := json.Unmarshal([]byte(intputStr), &parsedData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+		}
+		inputData = parsedData
+	}
+
+	inputBsonData, err := bson.Marshal(inputData)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+	}
+	req.HashInput = inputBsonData
 
 	// Process output - required field
 	if len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "" {
@@ -398,7 +446,8 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		FeatureName: req.FeatureName,
 		Scenario:    req.ScenarioName,
 		Path:        req.Path,
-		HashInput:   req.HashValue,
+		Method:      req.Method,
+		HashInput:   req.HashInput,
 		Output:      req.Output,
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert into trie: "+err.Error())
@@ -429,7 +478,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"description":   req.Description,
 		"is_active":     req.IsActive,
 		"path":          req.Path,
-		"regex_path":    req.RegexPath,
+		"method":        req.Method,
 		"hash_input":    hashInputJSON,
 		"output":        outputJSON,
 		"created_at":    req.CreatedAt.Format(time.RFC3339),
@@ -457,7 +506,7 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		Name         string          `json:"name"`
 		Description  string          `json:"description"`
 		Path         string          `json:"path"`
-		RegexPath    string          `json:"regex_path"`
+		Method       string          `json:"method"`
 		HashInput    json.RawMessage `json:"hash_input"`
 		Output       json.RawMessage `json:"output"`
 		IsActive     bool            `json:"is_active"`
@@ -478,8 +527,8 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	if reqBody.Path != "" {
 		update["path"] = reqBody.Path
 	}
-	if reqBody.RegexPath != "" {
-		update["regex_path"] = reqBody.RegexPath
+	if reqBody.Method != "" {
+		update["method"] = reqBody.Method
 	}
 	if reqBody.FeatureName != "" {
 		update["feature_name"] = reqBody.FeatureName
@@ -490,64 +539,67 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 
 	// Process hash input if provided
 	// Only process if not empty and not null
-	if len(reqBody.HashInput) > 0 && string(reqBody.HashInput) != "null" && string(reqBody.HashInput) != "" {
-		var hashInputData any
-		if err := json.Unmarshal(reqBody.HashInput, &hashInputData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid hash_input JSON: "+err.Error())
+	var inputData any
+	if err := json.Unmarshal(reqBody.HashInput, &inputData); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+	}
+
+	// If the output is a string, try to parse it as JSON
+	if intputStr, ok := inputData.(string); ok {
+		var parsedData any
+		if err := json.Unmarshal([]byte(intputStr), &parsedData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
 		}
+		inputData = parsedData
+	}
 
-		// Skip if unmarshaled to nil
-		if hashInputData != nil {
-			// Store original JSON as BSON for hash_input field
-			hashInputBson, err := bson.Marshal(hashInputData)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert hash_input to BSON: "+err.Error())
-			}
-			update["hash_input"] = hashInputBson
-
-			// Marshal back to consistent JSON string with sorted keys for hashing
-			// Go's json.Marshal automatically sorts map keys alphabetically
-			hashBytes, err := json.Marshal(hashInputData)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal hash_input: "+err.Error())
-			}
-			hashString := string(hashBytes)
-
-			// Compute hash value for matching
-			hash, err := hashstructure.Hash(hashString, hashstructure.FormatV2, nil)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to hash data: "+err.Error())
-			}
-			update["hash_value"] = fmt.Sprint(hash)
+	inputBsonData, err := bson.Marshal(inputData)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+	}
+	var hashInputJSON any
+	if len(inputBsonData) > 0 {
+		var result bson.M
+		if err := bson.Unmarshal(inputBsonData, &result); err == nil {
+			hashInputJSON = result
 		}
 	}
+
+	update["hash_input"] = hashInputJSON
 
 	// Process output if provided
 	// Only process if not empty and not null
-	if len(reqBody.Output) > 0 && string(reqBody.Output) != "null" && string(reqBody.Output) != "" {
-		var outputData any
-		if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+	if len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "output is required")
+	}
+
+	// Convert json.RawMessage to bson.Raw
+	var outputData any
+	if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+	}
+
+	// If the output is a string, try to parse it as JSON
+	if outputStr, ok := outputData.(string); ok {
+		var parsedData any
+		if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
 		}
+		outputData = parsedData
+	}
 
-		// Skip if unmarshaled to nil
-		if outputData != nil {
-			// If the output is a string, try to parse it as JSON
-			if outputStr, ok := outputData.(string); ok {
-				var parsedData any
-				if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
-					return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
-				}
-				outputData = parsedData
-			}
-
-			bsonData, err := bson.Marshal(outputData)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
-			}
-			update["output"] = bsonData
+	bsonData, err := bson.Marshal(outputData)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+	}
+	var outputJSON any
+	if len(bsonData) > 0 {
+		var result bson.M
+		if err := bson.Unmarshal(bsonData, &result); err == nil {
+			outputJSON = result
 		}
 	}
+	update["output"] = outputJSON
 
 	update["is_active"] = reqBody.IsActive
 	update["updated_at"] = time.Now().UTC()

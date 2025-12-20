@@ -139,7 +139,7 @@ function renderMockAPIsTable() {
     const tbody = document.getElementById('mockapis-table-body');
 
     if (!mockAPIs || mockAPIs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">No mock APIs found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No mock APIs found</td></tr>';
         return;
     }
 
@@ -148,6 +148,7 @@ function renderMockAPIsTable() {
             <td>${api.feature_name || 'N/A'}</td>
             <td>${api.scenario_name || 'N/A'}</td>
             <td><strong>${api.name || 'N/A'}</strong></td>
+            <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
             <td><code>${api.path || 'N/A'}</code></td>
             <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
                 ${api.is_active ? 'Active' : 'Inactive'}
@@ -361,6 +362,7 @@ function showCreateMockAPIModal() {
     document.getElementById('mockapi-id').value = '';
     document.getElementById('mockapi-name').value = '';
     document.getElementById('mockapi-path').value = '';
+    document.getElementById('mockapi-method').value = 'GET';
     document.getElementById('mockapi-regex-path').value = '';
     document.getElementById('mockapi-hash-input').value = '';
     document.getElementById('mockapi-output').value = '';
@@ -405,6 +407,7 @@ function editMockAPI(api) {
     document.getElementById('mockapi-id').value = api.id;
     document.getElementById('mockapi-name').value = api.name;
     document.getElementById('mockapi-path').value = api.path;
+    document.getElementById('mockapi-method').value = api.method || 'GET';
     document.getElementById('mockapi-regex-path').value = api.regex_path || '';
 
     // Populate hash_input if it exists
@@ -473,13 +476,14 @@ async function saveMockAPI() {
     const scenarioName = document.getElementById('mockapi-scenario').value;
     const name = document.getElementById('mockapi-name').value.trim();
     const path = document.getElementById('mockapi-path').value.trim();
+    const method = document.getElementById('mockapi-method').value;
     const regexPath = document.getElementById('mockapi-regex-path').value.trim();
     const hashInputStr = document.getElementById('mockapi-hash-input').value.trim();
     const outputStr = document.getElementById('mockapi-output').value.trim();
     const isActive = document.getElementById('mockapi-active').checked;
 
-    if (!featureName || !scenarioName || !name || !path || !outputStr) {
-        showError('Feature, scenario, name, path, and output are required');
+    if (!featureName || !scenarioName || !name || !path || !method || !outputStr) {
+        showError('Feature, scenario, name, path, method, and output are required');
         return;
     }
 
@@ -508,6 +512,7 @@ async function saveMockAPI() {
         scenario_name: scenarioName,
         name: name,
         path: path,
+        method: method,
         regex_path: regexPath,
         hash_input: hashInput,
         output: output,

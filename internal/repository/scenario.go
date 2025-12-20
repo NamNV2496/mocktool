@@ -17,6 +17,7 @@ type IScenarioRepository interface {
 	GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error)
 	ListByFeatureName(ctx context.Context, featureName string) ([]domain.Scenario, error)
 	GetActiveScenarioByFeatureName(ctx context.Context, featureName string) (*domain.Scenario, error)
+	GetActiveScenarios(ctx context.Context) ([]string, error)
 }
 type ScenarioRepository struct {
 	*BaseRepository
@@ -102,4 +103,22 @@ func (r *ScenarioRepository) GetActiveScenarioByFeatureName(ctx context.Context,
 	}, &result)
 
 	return &result, err
+}
+
+func (r *ScenarioRepository) GetActiveScenarios(ctx context.Context) ([]string, error) {
+	var results []domain.Scenario
+	err := r.FindMany(ctx, bson.M{
+		"is_active": true,
+	}, &results)
+
+	if err != nil {
+		return nil, err
+	}
+
+	scenarios := make([]string, len(results))
+	for i, scenario := range results {
+		scenarios[i] = scenario.Name
+	}
+
+	return scenarios, nil
 }

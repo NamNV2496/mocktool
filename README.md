@@ -21,7 +21,6 @@ At the same time we have:
 - Need define correct API contract at the first time
 - Need define all usecase
 
-
 # Multiple active feature at the same time
 
 The feature_name is control by `api-service`. Which support multiple services work at the same time.
@@ -61,6 +60,10 @@ targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?featur
 # How to start
 
 ```bash
+# start docker
+
+docker compose up -d
+
 # Start server
 go run main.go
 
@@ -72,3 +75,11 @@ go run ./example/http/main.go
 ```
 
 Ref: [example](./example/http/README.md)
+
+# Technologies
+
+```bash
+- Trie algorythm
+- mongoDB: "go.mongodb.org/mongo-driver/mongo"
+- echo: "github.com/labstack/echo/v4"
+```

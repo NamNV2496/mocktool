@@ -17,6 +17,7 @@ type MockAPI struct {
 	Path         string             `bson:"path" json:"path"`             // path
 	Method       string             `bson:"method" json:"method"`         // path
 	HashInput    bson.Raw           `bson:"hash_input" json:"hash_input"` // original JSON input for hashing
+	Headers      bson.Raw           `bson:"headers" json:"headers"`       // original map
 	Output       bson.Raw           `bson:"output" json:"output"`         // json response
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time          `bson:"updated_at" json:"updated_at"`

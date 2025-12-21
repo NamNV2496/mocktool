@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -63,6 +64,7 @@ func (_self *MockController) StartHttpServer() error {
 	v1.PUT("/features/:feature_id", _self.UpdateFeature) // update or inactive
 
 	v1.GET("/scenarios", _self.ListScenarioByFeature)                // list all scenarios by feature
+	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)   // list all scenarios by feature
 	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)          // create new scenario
 	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature) // update or inactive scenario
 
@@ -171,6 +173,24 @@ func (_self *MockController) ListScenarioByFeature(c echo.Context) error {
 	}
 
 	scenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, featureName)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, scenarios)
+}
+
+/* ---------- GET /scenarios?feature_name= ---------- */
+
+func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	featureName := c.QueryParam("feature_name")
+	if featureName == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
+	}
+
+	scenarios, err := _self.ScenarioRepo.GetActiveScenarioByFeatureName(ctx, featureName)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -336,6 +356,15 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			}
 		}
 
+		// Convert bson.Raw to JSON object
+		var headers any = nil
+		if len(api.Headers) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(api.Headers, &result); err == nil {
+				headers = result
+			}
+		}
+
 		response = append(response, map[string]any{
 			"id":            api.ID.Hex(),
 			"feature_name":  api.FeatureName,
@@ -347,6 +376,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"method":        api.Method,
 			"hash_input":    hashInputJSON,
 			"output":        outputJSON,
+			"headers":       headers,
 			"created_at":    api.CreatedAt.Format(time.RFC3339),
 			"updated_at":    api.UpdatedAt.Format(time.RFC3339),
 		})
@@ -369,6 +399,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		Path         string          `json:"path"`
 		Method       string          `json:"method"`
 		HashInput    json.RawMessage `json:"hash_input"`
+		Headers      json.RawMessage `json:"headers"`
 		Output       json.RawMessage `json:"output"`
 	}
 
@@ -437,7 +468,46 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
 	}
 	req.Output = bsonData
+	// headers
+	if len(reqBody.Headers) != 0 {
+		// Step 1: json.RawMessage -> string
+		var headersStr string
+		if err := json.Unmarshal(reqBody.Headers, &headersStr); err != nil {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"headers must be a JSON string: "+err.Error(),
+			)
+		}
 
+		// Step 2: normalize string to valid JSON object
+		headersStr = strings.TrimSpace(headersStr)
+
+		if !strings.HasPrefix(headersStr, "{") {
+			headersStr = "{" + headersStr + "}"
+		}
+
+		// Step 3: string -> map
+		var headersMap map[string]string
+		if err := json.Unmarshal([]byte(headersStr), &headersMap); err != nil {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"invalid headers JSON object: "+err.Error(),
+			)
+		}
+
+		// Step 4: map -> bson.Raw
+		headerData, err := bson.Marshal(headersMap)
+		if err != nil {
+			return echo.NewHTTPError(
+				http.StatusInternalServerError,
+				"failed to convert headers to BSON: "+err.Error(),
+			)
+		}
+
+		req.Headers = bson.Raw(headerData)
+	}
+
+	// create
 	if err := _self.MockAPIRepo.Create(ctx, &req); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
@@ -481,6 +551,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"method":        req.Method,
 		"hash_input":    hashInputJSON,
 		"output":        outputJSON,
+		"headers":       req.Headers,
 		"created_at":    req.CreatedAt.Format(time.RFC3339),
 		"updated_at":    req.UpdatedAt.Format(time.RFC3339),
 	}
@@ -508,6 +579,7 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		Path         string          `json:"path"`
 		Method       string          `json:"method"`
 		HashInput    json.RawMessage `json:"hash_input"`
+		Headers      json.RawMessage `json:"headers"`
 		Output       json.RawMessage `json:"output"`
 		IsActive     bool            `json:"is_active"`
 	}
@@ -600,7 +672,44 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		}
 	}
 	update["output"] = outputJSON
+	// headers
+	if len(reqBody.Headers) != 0 {
+		// Step 1: json.RawMessage -> string
+		var headersStr string
+		if err := json.Unmarshal(reqBody.Headers, &headersStr); err != nil {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"headers must be a JSON string: "+err.Error(),
+			)
+		}
 
+		// Step 2: normalize string to valid JSON object
+		headersStr = strings.TrimSpace(headersStr)
+
+		if !strings.HasPrefix(headersStr, "{") {
+			headersStr = "{" + headersStr + "}"
+		}
+
+		// Step 3: string -> map
+		var headersMap map[string]string
+		if err := json.Unmarshal([]byte(headersStr), &headersMap); err != nil {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"invalid headers JSON object: "+err.Error(),
+			)
+		}
+
+		// Step 4: map -> bson.Raw
+		headerData, err := bson.Marshal(headersMap)
+		if err != nil {
+			return echo.NewHTTPError(
+				http.StatusInternalServerError,
+				"failed to convert headers to BSON: "+err.Error(),
+			)
+		}
+
+		update["headers"] = bson.Raw(headerData)
+	}
 	update["is_active"] = reqBody.IsActive
 	update["updated_at"] = time.Now().UTC()
 

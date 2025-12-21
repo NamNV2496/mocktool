@@ -17,7 +17,7 @@ A beautiful web interface to manage your mock API features, scenarios, and endpo
 Make sure your Go backend is running on `http://localhost:8080`
 
 ```bash
-go run main.go
+go run main.go service
 ```
 
 ### 2. Open the Web Interface

@@ -118,6 +118,9 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	}
 
 	c.Response().Header().Set("Content-Type", "application/json")
+	for key, value := range response.Headers {
+		c.Response().Header().Set(key, value)
+	}
 	_, err = io.Copy(c.Response().Writer, strings.NewReader(string(outputBytes)))
 	if err != nil {
 		return err

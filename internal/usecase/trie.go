@@ -26,6 +26,7 @@ type TrieNode struct {
 	hashInput bson.Raw
 	method    string
 	output    any
+	Headers   map[string]string
 }
 
 func newTrieNode() *TrieNode {
@@ -96,6 +97,11 @@ func NewTrie(
 		newAPINode.hashInput = api.HashInput
 		newAPINode.method = api.Method
 		newAPINode.output = api.Output
+		var headerData map[string]string
+		err := bson.Unmarshal(api.Headers, &headerData)
+		if err == nil {
+			newAPINode.Headers = headerData
+		}
 		// Normalize path to ensure query parameters are sorted
 		normalizedPath := normalizePathWithQueryParams(api.Path)
 		key := normalizedPath + hashInputKey(api.HashInput)
@@ -127,7 +133,7 @@ func (_self *Trie) Insert(request entity.APIRequest) error {
 	newAPINode.hashInput = request.HashInput
 	newAPINode.method = request.Method
 	newAPINode.output = request.Output
-
+	newAPINode.Headers = request.Headers
 	// Normalize path to ensure query parameters are sorted
 	normalizedPath := normalizePathWithQueryParams(request.Path)
 	key := normalizedPath + hashInputKey(request.HashInput)
@@ -302,7 +308,8 @@ func (_self *Trie) Search(request entity.APIRequest) *entity.APIResponse {
 		matchInput := compareBsonRaw(childNode.hashInput, request.HashInput)
 		if matchMethod && matchInput {
 			return &entity.APIResponse{
-				Output: childNode.output,
+				Output:  childNode.output,
+				Headers: childNode.Headers,
 			}
 		}
 	}

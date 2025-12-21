@@ -115,6 +115,11 @@ An API path with different request body will have different response.
 ![doc/9.png](doc/9.png)
 ![doc/10.png](doc/10.png)
 
+response with headers
+
+![doc/11.png](doc/11.png)
+![doc/12.png](doc/12.png)
+
 
 # How to start
 
@@ -126,6 +131,8 @@ docker compose up -d
 # Start server
 go run main.go service
 
+# start UI
+open web/index.html
 
 # start your service client
 # example

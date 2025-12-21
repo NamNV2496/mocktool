@@ -195,18 +195,17 @@ function populateMockAPIFilters() {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
-            const scenarios = await response.json();
+            const response = await fetch(`${API_BASE_URL}/scenarios/active?feature_name=${featureName}`);
+            const scenario = await response.json();
 
             const scenarioFilter = document.getElementById('mockapi-scenario-filter');
             scenarioFilter.innerHTML = '<option value="">Select a scenario...</option>';
 
-            scenarios.forEach(scenario => {
-                const option = document.createElement('option');
-                option.value = scenario.name;
-                option.textContent = scenario.name;
-                scenarioFilter.appendChild(option);
-            });
+            const option = document.createElement('option');
+            option.value = scenario.name;
+            option.textContent = scenario.name;
+            scenarioFilter.appendChild(option);
+        
         } catch (error) {
             console.error('Error loading scenarios:', error);
         }
@@ -430,6 +429,20 @@ function editMockAPI(api) {
         document.getElementById('mockapi-output').value = '';
     }
 
+    // Populate headers if they exist
+    try {
+        if (api.headers && api.headers !== null) {
+            let headerStr = typeof api.headers === 'string' ? api.headers : JSON.stringify(api.headers, null, 2);
+            // Remove outer braces and trim
+            headerStr = headerStr.replace(/^\{\n?/, '').replace(/\n?\}$/, '').trim();
+            document.getElementById('mockapi-output-header').value = headerStr;
+        } else {
+            document.getElementById('mockapi-output-header').value = '';
+        }
+    } catch (e) {
+        document.getElementById('mockapi-output-header').value = '';
+    }
+
     document.getElementById('mockapi-active').checked = api.is_active;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -480,6 +493,7 @@ async function saveMockAPI() {
     const regexPath = document.getElementById('mockapi-regex-path').value.trim();
     const hashInputStr = document.getElementById('mockapi-hash-input').value.trim();
     const outputStr = document.getElementById('mockapi-output').value.trim();
+    const outputHeaders = document.getElementById('mockapi-output-header').value.trim();
     const isActive = document.getElementById('mockapi-active').checked;
 
     if (!featureName || !scenarioName || !name || !path || !method || !outputStr) {
@@ -516,6 +530,7 @@ async function saveMockAPI() {
         regex_path: regexPath,
         hash_input: hashInput,
         output: output,
+        headers: outputHeaders,
         is_active: isActive
     };
 

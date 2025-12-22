@@ -18,13 +18,13 @@ import (
 // }
 
 type ErrorResponse struct {
-	Success      bool
-	Status       int
-	Code         codes.Code
-	ErrorCode    string
-	ErrorMessage string
-	Details      map[string]string
-	TraceId      string
+	Success      bool              `json:"success"`
+	HttpStatus   int               `json:"http_status,omitempty"`
+	GrpcCode     codes.Code        `json:"grpc_code"`
+	ErrorCode    string            `json:"error_code,omitempty"`
+	ErrorMessage string            `json:"error_message,omitempty"`
+	Details      map[string]string `json:"details,omitempty"`
+	TraceId      string            `json:"trace_id,omitempty"`
 }
 
 func NewError(
@@ -41,12 +41,6 @@ func NewError(
 	})
 
 	return stWithDetails.Err()
-	// return &ErrorResponse{
-	// 	Code:         code,
-	// 	ErrorCode:    errorCode,
-	// 	ErrorMessage: fmt.Sprintf(errorMessage, args...),
-	// 	Details:      details,
-	// }
 }
 
 func (_self ErrorResponse) Error() string {
@@ -63,7 +57,7 @@ func ConvertToGrpc(err error) error {
 		return status.Errorf(codes.Internal, "Internal server error")
 	}
 
-	st := status.New(errResp.Code, errResp.ErrorMessage)
+	st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
 
 	// Convert metadata to string map
 	metadataMap := make(map[string]string)
@@ -89,13 +83,14 @@ func ConvertToHttpResponse(err error) ErrorResponse {
 
 	st, ok := status.FromError(err)
 	if !ok {
-		resp.Status = http.StatusInternalServerError
+		resp.HttpStatus = http.StatusInternalServerError
 		resp.ErrorMessage = "internal server error"
 		return resp
 	}
 
-	resp.Status = runtime.HTTPStatusFromCode(st.Code())
+	resp.HttpStatus = runtime.HTTPStatusFromCode(st.Code())
 	resp.ErrorMessage = st.Message()
+	resp.GrpcCode = st.Code()
 
 	for _, detail := range st.Details() {
 		if d, ok := detail.(*pb.ErrorDetail); ok {
@@ -113,35 +108,6 @@ func ConvertToHttpResponse(err error) ErrorResponse {
 
 	return resp
 }
-
-// func ConvertToHttpResponse(err error) ErrorResponse {
-// 	resp := ErrorResponse{
-// 		Success: false,
-// 	}
-
-// 	st, ok := status.FromError(err)
-// 	if !ok {
-// 		resp.Status = http.StatusInternalServerError
-// 		resp.ErrorMessage = "internal server error"
-// 		return resp
-// 	}
-
-// 	resp.Status = runtime.HTTPStatusFromCode(st.Code())
-// 	resp.ErrorMessage = st.Message()
-
-// 	for _, detail := range st.Details() {
-// 		if d, ok := detail.(*pb.ErrorDetail); ok {
-// 			resp.ErrorCode = d.ErrorCode
-// 			resp.Details = d.Metadata
-// 			break
-// 		}
-// 	}
-
-// 	if value, exist := resp.Details["x-trace-id"]; exist {
-// 		resp.TraceId = value
-// 	}
-// 	return resp
-// }
 
 func isCustomeError(err error) (*ErrorResponse, bool) {
 	var errResp ErrorResponse

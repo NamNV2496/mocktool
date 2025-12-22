@@ -84,10 +84,16 @@ end
 The feature_name is control by `api-service`. Which support multiple services work at the same time.
 ```go
 // Service 1
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?feature_name=test_feature"
+targetURL := "http://localhost:8081/forward" + c.Request().RequestURI
 
 // Service 2
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?feature_name=featur2"
+targetURL := "http://localhost:8081/forward" + c.Request().RequestURI 
+
+// parse accountId from token
+accountId := 1
+forwardReq.Header.Set("Content-Type", "application/json")
+forwardReq.Header.Set("X-Feature-Name", "feature2")
+forwardReq.Header.Set("X-Account-Id", accountId)
 ```
 
 ![doc/1.png](doc/1.png)
@@ -161,28 +167,28 @@ Ref: [example grpc](./example/grpc/README.md)
 - echo: "github.com/labstack/echo/v4"
 ```
 
-
 ## Build errorResponse
 
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 protoc --go_out=pkg/generated --go-grpc_out=pkg/generated pkg/errorcustome/error_detail.proto
 ```
 
 ```go
-return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error %s", metadata, string(b))
+return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s", metadata, string(b))
 
 // Example
 {
-    "Success": false,
-    "Status": 500,
-    "Code": 0,
-    "ErrorCode": "ERR.001",
-    "ErrorMessage": "Forward error {\"message\":\"Internal Server Error\"}\n",
-    "Details": {
+    "success": false,
+    "http_status": 500,
+    "grpc_code": 13,
+    "error_code": "ERR.001",
+    "error_message": "Forward error: Internal Server Error",
+    "details": {
         "x-trace-id": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
     },
-    "TraceId": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+    "trace_id": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
 }
 ```

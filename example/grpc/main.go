@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -115,17 +116,30 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
-		b, _ := io.ReadAll(resp.Body)
-		metadata := make(map[string]string, 0)
-		metadata["x-trace-id"] = "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
-		return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error %s", metadata, string(b))
-	}
-
 	// 4️⃣ Read response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "read response failed: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		metadata := make(map[string]string, 0)
+		metadata["x-trace-id"] = "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+
+		// Extract error message from response
+		var errResp map[string]interface{}
+		var errorMessage string
+		if err := json.Unmarshal(respBody, &errResp); err == nil {
+			if msg, ok := errResp["message"]; ok {
+				errorMessage = fmt.Sprintf("%v", msg)
+			} else {
+				errorMessage = string(respBody)
+			}
+		} else {
+			errorMessage = string(respBody)
+		}
+
+		return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s", metadata, errorMessage)
 	}
 
 	// 5️⃣ Unmarshal → proto response
@@ -140,6 +154,6 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 func customHttpResponse(ctx context.Context, _ *runtime.ServeMux, marshaller runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
 	customErrResp := errorcustome.ConvertToHttpResponse(err)
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(customErrResp.Status)
+	w.WriteHeader(customErrResp.HttpStatus)
 	marshaller.NewEncoder(w).Encode(customErrResp)
 }

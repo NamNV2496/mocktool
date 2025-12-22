@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package testgrpc;
+
+option go_package = "github.com/namnv/mockTool/example/gprc/proto;testgrpc";
+
+import "google/api/annotations.proto";
+
+message TestRequest {
+  int64 id = 1;
+  string name = 2;
+}
+
+message TestResponse {
+  int64 id = 1;
+  string name = 2;
+}
+
+service TestService {
+  rpc TestAPI(TestRequest) returns (TestResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/test"
+    };
+  }
+}

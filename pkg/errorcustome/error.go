@@ -1,10 +1,8 @@
 package errorcustome
 
 import (
-	"errors"
 	"fmt"
 	"maps"
-	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	pb "github.com/namnv2496/mocktool/pkg/generated/github.com/namnv/mockTool/pkg/errorcustome"
@@ -47,47 +45,39 @@ func (_self ErrorResponse) Error() string {
 	return _self.ErrorMessage
 }
 
-func ConvertToGrpc(err error) error {
-	if err == nil {
-		return nil
-	}
+// func ConvertToGrpc(err error) error {
+// 	if err == nil {
+// 		return nil
+// 	}
 
-	errResp, ok := isCustomeError(err)
-	if !ok {
-		return status.Errorf(codes.Internal, "Internal server error")
-	}
+// 	errResp, ok := isCustomeError(err)
+// 	if !ok {
+// 		return status.Errorf(codes.Internal, "Internal server error")
+// 	}
+// 	st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
+// 	// Convert metadata to string map
+// 	metadataMap := make(map[string]string)
+// 	maps.Copy(metadataMap, errResp.Details)
 
-	st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
+// 	st, withDetailErr := st.WithDetails(
+// 		&pb.ErrorDetail{
+// 			ErrorCode: errResp.ErrorCode,
+// 			Metadata:  metadataMap,
+// 		},
+// 	)
+// 	if withDetailErr != nil {
+// 		return status.Errorf(codes.Internal, "failed to attach error detail")
+// 	}
 
-	// Convert metadata to string map
-	metadataMap := make(map[string]string)
-	maps.Copy(metadataMap, errResp.Details)
-
-	st, withDetailErr := st.WithDetails(
-		&pb.ErrorDetail{
-			ErrorCode: errResp.ErrorCode,
-			Metadata:  metadataMap,
-		},
-	)
-	if withDetailErr != nil {
-		return status.Errorf(codes.Internal, "failed to attach error detail")
-	}
-
-	return st.Err()
-}
+// 	return st.Err()
+// }
 
 func ConvertToHttpResponse(err error) ErrorResponse {
 	resp := ErrorResponse{
 		Success: false,
 	}
 
-	st, ok := status.FromError(err)
-	if !ok {
-		resp.HttpStatus = http.StatusInternalServerError
-		resp.ErrorMessage = "internal server error"
-		return resp
-	}
-
+	st, _ := status.FromError(err)
 	resp.HttpStatus = runtime.HTTPStatusFromCode(st.Code())
 	resp.ErrorMessage = st.Message()
 	resp.GrpcCode = st.Code()
@@ -109,10 +99,36 @@ func ConvertToHttpResponse(err error) ErrorResponse {
 	return resp
 }
 
-func isCustomeError(err error) (*ErrorResponse, bool) {
-	var errResp ErrorResponse
-	if errors.As(err, &errResp) {
-		return &errResp, true
+// func isCustomeError(err error) (*ErrorResponse, bool) {
+// 	var errResp ErrorResponse
+// 	if errors.As(err, &errResp) {
+// 		return &errResp, true
+// 	}
+// 	return nil, false
+// }
+
+func WrapErrorResponse(err error) ErrorResponse {
+	resp := ErrorResponse{
+		Success: false,
 	}
-	return nil, false
+	st, _ := status.FromError(err)
+
+	resp.HttpStatus = runtime.HTTPStatusFromCode(st.Code())
+	resp.ErrorMessage = st.Message()
+	resp.GrpcCode = st.Code()
+
+	for _, detail := range st.Details() {
+		if d, ok := detail.(*pb.ErrorDetail); ok {
+			resp.ErrorCode = d.ErrorCode
+			resp.Details = map[string]string{}
+
+			maps.Copy(resp.Details, d.Metadata)
+			break
+		}
+	}
+
+	if v, ok := resp.Details["x-trace-id"]; ok {
+		resp.TraceId = v
+	}
+	return resp
 }

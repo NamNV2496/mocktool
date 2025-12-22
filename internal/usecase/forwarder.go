@@ -10,10 +10,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/grpc/codes"
 )
 
 type IForwardUC interface {
@@ -111,6 +114,11 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 
 	response := _self.trie.Search(request)
 	if response == nil {
+		// =================================================WAY 1===================================================
+		metadata := make(map[string]string, 0)
+		metadata["x-trace-id"] = uuid.NewString()
+		return errorcustome.NewError(codes.Internal, "ERR.001", "Trie search error: %s", metadata, "not found")
+		// =================================================WAY 2===================================================
 		_, err = io.Copy(c.Response().Writer, strings.NewReader("not found"))
 		return err
 	}

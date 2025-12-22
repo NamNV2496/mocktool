@@ -1,18 +1,13 @@
-version: v2
-
-deps:
-  - buf.build/googleapis/googleapis
-
-managed:
-  enabled: true
-  go_package_prefix:
-    default: github.com/your-org/scheduler-service
-    except:
-      - buf.build/googleapis/googleapis
-      - buf.build/bufbuild/protovalidate
+version: v1
 plugins:
-  - plugin: buf.build/protocolbuffers/go
-  - plugin: buf.build/grpc/go
-  - plugin: buf.build/grpc-ecosystem/gateway
-  - plugin: buf.build/bufbuild/validate-go
-  - plugin: buf.build/grpc-ecosystem/openapiv2
+  - plugin: go
+    out: generated
+    opt: paths=source_relative
+
+  - plugin: go-grpc
+    out: generated
+    opt: paths=source_relative
+
+  - plugin: grpc-gateway
+    out: generated
+    opt: paths=source_relative

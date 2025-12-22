@@ -12,8 +12,9 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/validator"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	schedulerv1 "github.com/namnv2496/mocktool/example/grpc/proto/generated/pkg/proto"
+	testgrpc "github.com/namnv2496/mocktool/example/grpc/proto/generated"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
+	pb "github.com/namnv2496/mocktool/pkg/generated/github.com/namnv/mockTool/pkg/errorcustome"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -21,22 +22,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type SchedulerEventController struct {
-	schedulerv1.UnimplementedSchedulerEventServiceServer
+type TestController struct {
+	testgrpc.UnimplementedTestServiceServer
 }
 
-type Request struct {
-	Id   int64  `json:"id"`
-	Name string `json:"name"`
-}
-
-func NewSchedulerEventController() schedulerv1.SchedulerEventServiceServer {
-	return &SchedulerEventController{}
+func NewTestController() testgrpc.TestServiceServer {
+	return &TestController{}
 }
 
 func main() {
 	// Initialize gRPC controller
-	controller := NewSchedulerEventController()
+	controller := NewTestController()
 	listener, err := net.Listen("tcp", ":9091")
 	if err != nil {
 		return
@@ -52,7 +48,7 @@ func main() {
 	}
 	server := grpc.NewServer(opts...)
 	reflection.Register(server)
-	schedulerv1.RegisterSchedulerEventServiceServer(server, controller)
+	testgrpc.RegisterTestServiceServer(server, controller)
 	conn, err := grpc.NewClient(":9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return
@@ -63,7 +59,7 @@ func main() {
 	muxOptions = append(muxOptions, runtime.WithErrorHandler(customHttpResponse))
 
 	mux := runtime.NewServeMux(muxOptions...)
-	schedulerv1.RegisterSchedulerEventServiceHandler(context.Background(), mux, conn)
+	testgrpc.RegisterTestServiceHandler(context.Background(), mux, conn)
 	go func() {
 		server.Serve(listener)
 	}()
@@ -73,17 +69,8 @@ func main() {
 	}
 }
 
-func (_self *SchedulerEventController) GetSchedulerEvents(
-	ctx context.Context,
-	req *schedulerv1.GetSchedulerEventsRequest,
-) (*schedulerv1.GetSchedulerEventsResponse, error) {
-
-	// 1️⃣ Marshal proto request → JSON
-	requestBody := Request{
-		Id:   123,
-		Name: "fdff",
-	}
-	body, err := json.Marshal(requestBody)
+func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestResponse, error) {
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "marshal request failed: %v", err)
 	}
@@ -100,9 +87,9 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 		return nil, status.Errorf(codes.Internal, "create http request failed: %v", err)
 	}
 	// parse accountId from token
-	accountId := "2"
+	accountId := "1"
 	forwardReq.Header.Set("Content-Type", "application/json")
-	forwardReq.Header.Set("X-Feature-Name", "feature2")
+	forwardReq.Header.Set("X-Feature-Name", "test_feature")
 	forwardReq.Header.Set("X-Account-Id", accountId)
 
 	// 3️⃣ Send request
@@ -122,6 +109,24 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 		return nil, status.Errorf(codes.Internal, "read response failed: %v", err)
 	}
 
+	// =================================================WAY 1===================================================
+	// forward error message from server
+	if resp.StatusCode >= 400 {
+		var errResp errorcustome.ErrorResponse
+		json.Unmarshal(respBody, &errResp)
+
+		// Reconstruct gRPC status error with details
+		st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
+		stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
+			ErrorCode: errResp.ErrorCode,
+			Metadata:  errResp.Details,
+		})
+		return nil, stWithDetails.Err()
+		// return nil, errorcustome.WrapErrorResponse(errResp)
+	}
+
+	// =================================================WAY 2===================================================
+	// on ly get message from server and create new error with that error message
 	if resp.StatusCode >= 400 {
 		metadata := make(map[string]string, 0)
 		metadata["x-trace-id"] = "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
@@ -138,12 +143,12 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 		} else {
 			errorMessage = string(respBody)
 		}
-
 		return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s", metadata, errorMessage)
 	}
+	// ====================================================================================================
 
 	// 5️⃣ Unmarshal → proto response
-	var out schedulerv1.GetSchedulerEventsResponse
+	var out testgrpc.TestResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
 		return nil, status.Errorf(codes.Internal, "unmarshal response failed: %v", err)
 	}

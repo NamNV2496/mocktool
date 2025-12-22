@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/internal/usecase"
+	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -66,11 +68,11 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/features", _self.CreateNewFeature)         // create new feature
 	v1.PUT("/features/:feature_id", _self.UpdateFeature) // update or inactive
 
-	v1.GET("/scenarios", _self.ListScenarioByFeature)                          // list all scenarios by feature
-	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)             // get active scenario for feature+account
-	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                    // create new scenario
-	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)           // update scenario
-	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)        // activate scenario for account
+	v1.GET("/scenarios", _self.ListScenarioByFeature)                         // list all scenarios by feature
+	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)            // get active scenario for feature+account
+	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                   // create new scenario
+	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)          // update scenario
+	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)       // activate scenario for account
 	v1.DELETE("/scenarios/:scenario_id/deactivate", _self.DeactivateScenario) // deactivate scenario for account
 
 	v1.GET("/mockapis", _self.ListMockAPIsByScenario)          // list all APIs by scenario
@@ -91,6 +93,19 @@ func (_self *MockController) StartHttpServer() error {
 
 // handler
 func (_self *MockController) responseMockData(c echo.Context) error {
+	// =================================================WAY 1===================================================
+	err := _self.forwardUc.ResponseMockData(c)
+	if err != nil {
+		errResp := errorcustome.WrapErrorResponse(err)
+		c.Response().Header().Set("Content-Type", "application/json")
+		c.Response().WriteHeader(errResp.HttpStatus)
+		errRespBytes, _ := json.Marshal(errResp)
+		_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
+		return err
+	}
+	c.Response().WriteHeader(http.StatusOK)
+	return nil
+	// =================================================WAY 2===================================================
 	return _self.forwardUc.ResponseMockData(c)
 }
 

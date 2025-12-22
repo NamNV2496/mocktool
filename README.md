@@ -160,3 +160,29 @@ Ref: [example grpc](./example/grpc/README.md)
 - mongoDB: "go.mongodb.org/mongo-driver/mongo"
 - echo: "github.com/labstack/echo/v4"
 ```
+
+
+## Build errorResponse
+
+```bash
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+protoc --go_out=pkg/generated --go-grpc_out=pkg/generated pkg/errorcustome/error_detail.proto
+```
+
+```go
+return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error %s", metadata, string(b))
+
+// Example
+{
+    "Success": false,
+    "Status": 500,
+    "Code": 0,
+    "ErrorCode": "ERR.001",
+    "ErrorMessage": "Forward error {\"message\":\"Internal Server Error\"}\n",
+    "Details": {
+        "x-trace-id": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+    },
+    "TraceId": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+}
+```

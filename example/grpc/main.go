@@ -80,7 +80,7 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 	// 1️⃣ Marshal proto request → JSON
 	requestBody := Request{
 		Id:   123,
-		Name: "test",
+		Name: "fdff",
 	}
 	body, err := json.Marshal(requestBody)
 	if err != nil {
@@ -111,17 +111,15 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 
 	resp, err := client.Do(forwardReq)
 	if err != nil {
-		return nil, status.Errorf(codes.Unavailable, "forward request failed: %v", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, status.Errorf(
-			codes.Internal,
-			"forward service error: %s",
-			string(b),
-		)
+		metadata := make(map[string]string, 0)
+		metadata["x-trace-id"] = "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+		return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error %s", metadata, string(b))
 	}
 
 	// 4️⃣ Read response

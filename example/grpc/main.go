@@ -12,6 +12,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/validator"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	schedulerv1 "github.com/namnv2496/mocktool/example/grpc/proto/generated/pkg/proto"
+	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -21,6 +22,11 @@ import (
 
 type SchedulerEventController struct {
 	schedulerv1.UnimplementedSchedulerEventServiceServer
+}
+
+type Request struct {
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 func NewSchedulerEventController() schedulerv1.SchedulerEventServiceServer {
@@ -51,19 +57,19 @@ func main() {
 		return
 	}
 	defer conn.Close()
-	mux := runtime.NewServeMux()
+	// add custom http response
+	muxOptions := make([]runtime.ServeMuxOption, 0)
+	muxOptions = append(muxOptions, runtime.WithErrorHandler(customHttpResponse))
+
+	mux := runtime.NewServeMux(muxOptions...)
 	schedulerv1.RegisterSchedulerEventServiceHandler(context.Background(), mux, conn)
 	go func() {
 		server.Serve(listener)
 	}()
+
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		panic("failed to start HTTP server")
 	}
-}
-
-type Request struct {
-	Id   int64  `json:"id"`
-	Name string `json:"name"`
 }
 
 func (_self *SchedulerEventController) GetSchedulerEvents(
@@ -82,7 +88,7 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 	}
 
 	// 2️⃣ Build target URL
-	targetURL := "http://localhost:8081/forward/api/v1/test?feature_name=test_feature"
+	targetURL := "http://localhost:8081/forward/api/v1/test"
 	forwardReq, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -92,7 +98,11 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "create http request failed: %v", err)
 	}
+	// parse accountId from token
+	accountId := "2"
 	forwardReq.Header.Set("Content-Type", "application/json")
+	forwardReq.Header.Set("X-Feature-Name", "feature2")
+	forwardReq.Header.Set("X-Account-Id", accountId)
 
 	// 3️⃣ Send request
 	client := &http.Client{
@@ -127,4 +137,11 @@ func (_self *SchedulerEventController) GetSchedulerEvents(
 	}
 
 	return &out, nil
+}
+
+func customHttpResponse(ctx context.Context, _ *runtime.ServeMux, marshaller runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
+	customErrResp := errorcustome.ConvertToHttpResponse(err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(customErrResp.Status)
+	marshaller.NewEncoder(w).Encode(customErrResp)
 }

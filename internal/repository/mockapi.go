@@ -11,12 +11,9 @@ import (
 )
 
 type IMockAPIRepository interface {
-	ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error)
-	ListByScenario(ctx context.Context, scenarioID int64) ([]domain.MockAPI, error)
+	ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
 	ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
-	FindByPathAndHash(ctx context.Context, path string, hash string) (*domain.MockAPI, error)
-	Update(ctx context.Context, id int64, update bson.M) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 }
 type MockAPIRepository struct {
@@ -35,6 +32,15 @@ func (_self *MockAPIRepository) ListActiveAPIsByScenario(ctx context.Context, sc
 	var result []domain.MockAPI
 	err := _self.FindMany(ctx, bson.M{
 		"scenario_name": bson.M{"$in": scenarios},
+		"is_active":     true,
+	}, &result)
+
+	return result, err
+}
+
+func (_self *MockAPIRepository) ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error) {
+	var result []domain.MockAPI
+	err := _self.FindMany(ctx, bson.M{
 		"is_active": true,
 	}, &result)
 

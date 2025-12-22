@@ -72,8 +72,9 @@ func NewTrie(
 ) *Trie {
 	ctx := context.Background()
 	root := newTrieNode()
-	scenarios, _ := ScenarioRepo.GetActiveScenarios(ctx)
-	activeApis, _ := MockAPIRepo.ListActiveAPIsByScenario(ctx, scenarios)
+	// Load all active APIs into the trie
+	// The scenario filtering happens at request time via AccountScenario mapping
+	activeApis, _ := MockAPIRepo.ListAllActiveAPIs(ctx)
 	for _, api := range activeApis {
 		node := root
 		// Navigate to or create feature node

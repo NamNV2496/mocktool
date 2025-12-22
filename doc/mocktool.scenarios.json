@@ -5,12 +5,11 @@
   "feature_name": "test_feature",
   "name": "happy_case",
   "description": "",
-  "is_active": false,
   "created_at": {
     "$date": "2025-12-19T16:41:37.528Z"
   },
   "updated_at": {
-    "$date": "2025-12-20T04:10:42.208Z"
+    "$date": "2025-12-20T05:01:09.885Z"
   }
 },
 {
@@ -20,11 +19,24 @@
   "feature_name": "test_feature",
   "name": "unhappy_case",
   "description": "",
-  "is_active": true,
   "created_at": {
     "$date": "2025-12-19T16:41:57.298Z"
   },
   "updated_at": {
-    "$date": "2025-12-20T04:10:42.211Z"
+    "$date": "2025-12-20T05:01:09.894Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "694766175df058ecd3f8e07c"
+  },
+  "feature_name": "feature2",
+  "name": "test_header",
+  "description": "",
+  "created_at": {
+    "$date": "2025-12-21T03:14:31.238Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-21T03:14:31.238Z"
   }
 }]

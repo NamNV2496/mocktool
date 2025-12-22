@@ -15,14 +15,14 @@
   },
   "hash_value": "17031540538161738135",
   "output": {
-    "name": "happy case",
-    "id": 123
+    "id": 123,
+    "name": "happy case"
   },
   "created_at": {
     "$date": "2025-12-19T16:42:42.828Z"
   },
   "updated_at": {
-    "$date": "2025-12-20T04:08:49.448Z"
+    "$date": "2025-12-20T04:34:26.713Z"
   },
   "method": "GET"
 },
@@ -53,4 +53,54 @@
     "$date": "2025-12-20T04:09:03.149Z"
   },
   "method": "GET"
+},
+{
+  "_id": {
+    "$oid": "69462404787870b9630a0f54"
+  },
+  "feature_name": "test_feature",
+  "scenario_name": "happy_case",
+  "name": "testAPI2",
+  "description": "",
+  "is_active": true,
+  "path": "/api/v1/test",
+  "method": "GET",
+  "hash_input": {
+    "id": 123,
+    "name": "testAPI2"
+  },
+  "output": {
+    "id": 123,
+    "name": "testAPI2"
+  },
+  "created_at": {
+    "$date": "2025-12-20T04:20:20.917Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:20:20.917Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "694768eb05c505f3ea7d34b9"
+  },
+  "feature_name": "feature2",
+  "scenario_name": "test_header",
+  "name": "test header",
+  "description": "",
+  "is_active": true,
+  "path": "/api/v1/test",
+  "method": "PUT",
+  "hash_input": {},
+  "headers": {
+    "x-corr-id": "jfd4-dsf3-3dde",
+    "x-corr": "jfd4-fsdsd-ds"
+  },
+  "output": {},
+  "created_at": {
+    "$date": "2025-12-21T03:26:17.027Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-21T03:26:17.027Z"
+  }
 }]

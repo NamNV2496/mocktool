@@ -6,7 +6,7 @@ During software development, you may encounter bottlenecks where you have to wai
 
 At the same time we have:
 - Multiple active feature
-- Only 1 active scenario for each feature
+- Only 1 active scenario for each feature for each accountId
 - Multiple API for each scenario (same API path but different requestBody)
 
 
@@ -92,19 +92,25 @@ targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?featur
 
 ![doc/1.png](doc/1.png)
 
-# Only 1 active scenario for each feature
+# Only 1 active scenario for each feature for each accountId
 
 - If I add new scenario of a feature, that new scenario will active and deactive others.
 - If I active a existed scenario of a feature. others scenarios will deactive
+- Reusable because all scenario is shared
+- Setup globally scenario => All accountIds will have the same result
 
-=> Make sure 1 API can response expecting answer
+![doc/14.png](doc/14.png)
+![doc/15.png](doc/15.png)
+
+=> Make sure 1 API can response expecting answer for a accountId
+=> Multiple platform can develop parrallelly. 1 account for IOS with scenario1, 1 account for ANDROID with scenario2, 1 account for QC to write automation testing.
 
 ![doc/2.png](doc/2.png)
 ![doc/2.png](doc/3.png)
 
 # Multiple API for each scenario 
 
-An API path with different request body will have different response.
+An API path with different request body will have different response by hashing requestBody
 
 ![doc/6.png](doc/6.png)
 ![doc/7.png](doc/7.png)
@@ -119,6 +125,7 @@ response with headers
 
 ![doc/11.png](doc/11.png)
 ![doc/12.png](doc/12.png)
+![doc/13.png](doc/13.png)
 
 
 # How to start
@@ -135,12 +142,18 @@ go run main.go service
 open web/index.html
 
 # start your service client
-# example
+# example http server
 
 go run ./example/http/main.go
+
+# start your service client
+# example grpc gatway server
+
+go run ./example/grpc/main.go 
 ```
 
-Ref: [example](./example/http/README.md)
+Ref: [example http](./example/http/README.md)
+Ref: [example grpc](./example/grpc/README.md)
 
 # Technologies
 

@@ -20,17 +20,20 @@ type IForwardUC interface {
 	ResponseMockData(c echo.Context) error
 }
 type ForwardUC struct {
-	trie         ITrie
-	ScenarioRepo repository.IScenarioRepository
+	trie                ITrie
+	ScenarioRepo        repository.IScenarioRepository
+	AccountScenarioRepo repository.IAccountScenarioRepository
 }
 
 func NewForwardUC(
 	trie ITrie,
 	ScenarioRepo repository.IScenarioRepository,
+	AccountScenarioRepo repository.IAccountScenarioRepository,
 ) IForwardUC {
 	return &ForwardUC{
-		trie:         trie,
-		ScenarioRepo: ScenarioRepo,
+		trie:                trie,
+		ScenarioRepo:        ScenarioRepo,
+		AccountScenarioRepo: AccountScenarioRepo,
 	}
 }
 
@@ -47,18 +50,30 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	// Remove /forward prefix from path
 	request.Path = strings.TrimPrefix(c.Request().URL.Path, "/forward")
 
-	// Bind query parameters
-	request.FeatureName = c.QueryParam("feature_name")
-	if request.FeatureName == "" {
-		return fmt.Errorf("missing feature_name")
+	// Extract accountId from header
+	var accountId *string
+	accountIdHeader := c.Request().Header.Get("X-Account-Id")
+	if accountIdHeader != "" {
+		accountId = &accountIdHeader
+	} else {
+		return fmt.Errorf("Header X-Account-Id is required")
 	}
+	// Extract accountId from header
+	var featureName string
+	featureNameHeader := c.Request().Header.Get("X-Feature-Name")
+	if featureNameHeader != "" {
+		featureName = featureNameHeader
+	} else {
+		return fmt.Errorf("Header X-Feature-Name is required")
+	}
+	request.FeatureName = featureName
 	// Include query parameters in the path (excluding feature_name which is used by mocktool)
 	// Query parameters are automatically sorted alphabetically by Encode() for consistent matching
 	if queryString := c.Request().URL.RawQuery; queryString != "" {
 		queryValues, err := url.ParseQuery(queryString)
 		if err == nil {
 			// Remove feature_name from query parameters as it's internal to mocktool
-			queryValues.Del("feature_name")
+			// queryValues.Del("feature_name")
 			if len(queryValues) > 0 {
 				// Encode() sorts keys alphabetically
 				request.Path = request.Path + "?" + queryValues.Encode()
@@ -66,10 +81,16 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 		}
 	}
 
-	// get active scenario by featureName
-	activeScenario, reqerr := _self.ScenarioRepo.GetActiveScenarioByFeatureName(context.Background(), request.FeatureName)
-	if reqerr != nil || activeScenario == nil {
+	// get active scenario by featureName and accountId
+	activeAccountScenario, reqerr := _self.AccountScenarioRepo.GetActiveScenario(context.Background(), request.FeatureName, accountId)
+	if reqerr != nil || activeAccountScenario == nil {
 		return reqerr
+	}
+
+	// Get the actual scenario details
+	activeScenario, err := _self.ScenarioRepo.GetByObjectID(context.Background(), activeAccountScenario.ScenarioID)
+	if err != nil || activeScenario == nil {
+		return err
 	}
 
 	request.Scenario = activeScenario.Name

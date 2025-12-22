@@ -1,0 +1,31 @@
+[{
+  "_id": {
+    "$oid": "694941b6f776e55a93ad958a"
+  },
+  "feature_name": "test_feature",
+  "scenario_id": {
+    "$oid": "694580552e6d69582e30a66c"
+  },
+  "account_id": "2",
+  "created_at": {
+    "$date": "2025-12-22T13:03:50.569Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-22T13:03:50.569Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "694941ddf776e55a93ad958b"
+  },
+  "feature_name": "test_feature",
+  "scenario_id": {
+    "$oid": "694580412e6d69582e30a66b"
+  },
+  "created_at": {
+    "$date": "2025-12-22T13:04:29.159Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-22T13:04:29.159Z"
+  }
+}]

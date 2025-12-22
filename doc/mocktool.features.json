@@ -11,4 +11,18 @@
   "updated_at": {
     "$date": "2025-12-18T18:45:55.943Z"
   }
+},
+{
+  "_id": {
+    "$oid": "694622e6787870b9630a0f53"
+  },
+  "name": "feature2",
+  "description": "test feature 2",
+  "is_active": true,
+  "created_at": {
+    "$date": "2025-12-20T04:15:34.974Z"
+  },
+  "updated_at": {
+    "$date": "2025-12-20T04:15:34.974Z"
+  }
 }]

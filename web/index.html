@@ -50,6 +50,7 @@
             <div class="section-header">
                 <h2>Scenarios</h2>
                 <div class="filter-group">
+                    <input type="text" id="scenario-account-id-filter" class="filter-select" placeholder="Account ID to check active status" style="width: 250px;">
                     <select id="scenario-feature-filter" class="filter-select">
                         <option value="">Select a feature...</option>
                     </select>
@@ -63,14 +64,13 @@
                             <th>Feature</th>
                             <th>Name</th>
                             <th>Description</th>
-                            <th>Active</th>
                             <th>Created At</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="scenarios-table-body">
                         <tr>
-                            <td colspan="6" class="loading">Select a feature to view scenarios</td>
+                            <td colspan="5" class="loading">Select a feature to view scenarios</td>
                         </tr>
                     </tbody>
                 </table>
@@ -168,12 +168,6 @@
                 <div class="form-group">
                     <label for="scenario-description">Description</label>
                     <textarea id="scenario-description" placeholder="Enter description" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="scenario-active" checked>
-                        Active
-                    </label>
                 </div>
             </div>
             <div class="modal-footer">

@@ -29,6 +29,7 @@ func InvokeServer(invokers ...any) *fx.App {
 		fx.Provide(
 			fx.Annotate(repository.NewFeatureRepository, fx.As(new(repository.IFeatureRepository))),
 			fx.Annotate(repository.NewScenarioRepository, fx.As(new(repository.IScenarioRepository))),
+			fx.Annotate(repository.NewAccountScenarioRepository, fx.As(new(repository.IAccountScenarioRepository))),
 			fx.Annotate(repository.NewMockAPIRepository, fx.As(new(repository.IMockAPIRepository))),
 
 			fx.Annotate(controller.NewMockController, fx.As(new(controller.IMockController))),
@@ -49,10 +50,6 @@ func InvokeServer(invokers ...any) *fx.App {
 func startServer(
 	lc fx.Lifecycle,
 	mockController controller.IMockController,
-	// forwardController controller.IFowardController,
 ) error {
-	// go func() {
-	// 	forwardController.StartHttpServer()
-	// }()
 	return mockController.StartHttpServer()
 }

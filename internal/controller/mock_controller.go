@@ -24,30 +24,33 @@ type IMockController interface {
 }
 
 type MockController struct {
-	config       *configs.Config
-	FeatureRepo  repository.IFeatureRepository
-	ScenarioRepo repository.IScenarioRepository
-	MockAPIRepo  repository.IMockAPIRepository
-	forwardUc    usecase.IForwardUC
-	trie         usecase.ITrie
+	config              *configs.Config
+	FeatureRepo         repository.IFeatureRepository
+	ScenarioRepo        repository.IScenarioRepository
+	AccountScenarioRepo repository.IAccountScenarioRepository
+	MockAPIRepo         repository.IMockAPIRepository
+	forwardUc           usecase.IForwardUC
+	trie                usecase.ITrie
 }
 
 func NewMockController(
 	config *configs.Config,
 	featureRepo repository.IFeatureRepository,
 	scenarioRepo repository.IScenarioRepository,
+	accountScenarioRepo repository.IAccountScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
 	forwardUc usecase.IForwardUC,
 	trie usecase.ITrie,
 ) IMockController {
 
 	return &MockController{
-		config:       config,
-		FeatureRepo:  featureRepo,
-		ScenarioRepo: scenarioRepo,
-		MockAPIRepo:  mockAPIRepo,
-		forwardUc:    forwardUc,
-		trie:         trie,
+		config:              config,
+		FeatureRepo:         featureRepo,
+		ScenarioRepo:        scenarioRepo,
+		AccountScenarioRepo: accountScenarioRepo,
+		MockAPIRepo:         mockAPIRepo,
+		forwardUc:           forwardUc,
+		trie:                trie,
 	}
 }
 
@@ -63,10 +66,12 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/features", _self.CreateNewFeature)         // create new feature
 	v1.PUT("/features/:feature_id", _self.UpdateFeature) // update or inactive
 
-	v1.GET("/scenarios", _self.ListScenarioByFeature)                // list all scenarios by feature
-	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)   // list all scenarios by feature
-	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)          // create new scenario
-	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature) // update or inactive scenario
+	v1.GET("/scenarios", _self.ListScenarioByFeature)                          // list all scenarios by feature
+	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)             // get active scenario for feature+account
+	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                    // create new scenario
+	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)           // update scenario
+	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)        // activate scenario for account
+	v1.DELETE("/scenarios/:scenario_id/deactivate", _self.DeactivateScenario) // deactivate scenario for account
 
 	v1.GET("/mockapis", _self.ListMockAPIsByScenario)          // list all APIs by scenario
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)        // create new scenario
@@ -190,12 +195,25 @@ func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
 	}
 
-	scenarios, err := _self.ScenarioRepo.GetActiveScenarioByFeatureName(ctx, featureName)
+	// Extract accountId from header - REQUIRED
+	accountIdHeader := c.Request().Header.Get("X-Account-Id")
+	if accountIdHeader == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "X-Account-Id header is required")
+	}
+
+	// Get active scenario mapping for this feature and account
+	accountScenario, err := _self.AccountScenarioRepo.GetActiveScenario(ctx, featureName, &accountIdHeader)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, scenarios)
+	// Get the actual scenario details
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, accountScenario.ScenarioID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, scenario)
 }
 
 /* ---------- POST /scenarios ---------- */
@@ -211,29 +229,8 @@ func (_self *MockController) CreateNewScenarioByFeature(c echo.Context) error {
 	now := time.Now().UTC()
 	req.CreatedAt = now
 	req.UpdatedAt = now
-	req.IsActive = true
 
-	// Get all active scenarios for this feature before deactivating
-	activeScenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, req.FeatureName)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get active scenarios: "+err.Error())
-	}
-
-	// Deactivate all existing active scenarios for this feature
-	if err := _self.ScenarioRepo.UpdateByFilter(ctx,
-		bson.M{"feature_name": req.FeatureName, "is_active": true},
-		bson.M{"is_active": false, "updated_at": now},
-	); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenarios: "+err.Error())
-	}
-
-	// Remove deactivated scenarios from trie
-	for _, scenario := range activeScenarios {
-		if scenario.IsActive {
-			_self.trie.RemoveScenario(req.FeatureName, scenario.Name)
-		}
-	}
-
+	// Just create the scenario - activation is handled separately via AccountScenario
 	if err := _self.ScenarioRepo.Create(ctx, &req); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
@@ -257,67 +254,115 @@ func (_self *MockController) UpdateScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	// First get the scenario to know its feature_name
-	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, objectID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
-	}
-
-	// If activating this scenario, deactivate all other scenarios for the same feature
-	if req.IsActive {
-		// Get all active scenarios for this feature before deactivating
-		activeScenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, scenario.FeatureName)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get active scenarios: "+err.Error())
-		}
-
-		// Deactivate all other active scenarios for this feature
-		now := time.Now().UTC()
-		if err := _self.ScenarioRepo.UpdateByFilter(ctx,
-			bson.M{"feature_name": scenario.FeatureName, "is_active": true, "_id": bson.M{"$ne": objectID}},
-			bson.M{"is_active": false, "updated_at": now},
-		); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenarios: "+err.Error())
-		}
-
-		// Remove deactivated scenarios from trie (except the one being activated)
-		for _, s := range activeScenarios {
-			if s.IsActive && s.ID != objectID {
-				_self.trie.RemoveScenario(scenario.FeatureName, s.Name)
-			}
-		}
-
-		// Load the activated scenario's APIs into the trie
-		apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenario.Name)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get scenario APIs: "+err.Error())
-		}
-
-		for _, api := range apis {
-			if api.IsActive {
-				if err := _self.trie.Insert(entity.APIRequest{
-					FeatureName: api.FeatureName,
-					Scenario:    api.ScenarioName,
-					Path:        api.Path,
-					Method:      api.Method,
-					HashInput:   api.HashInput,
-					Output:      api.Output,
-				}); err != nil {
-					slog.Error("failed to insert API into trie", "error", err, "path", api.Path)
-				}
-			}
-		}
-	} else {
-		// If deactivating this scenario, remove it from trie
-		_self.trie.RemoveScenario(scenario.FeatureName, scenario.Name)
-	}
-
+	// Just update the scenario details - activation is handled separately via AccountScenario
 	update := req.ToMap()
 	if err := _self.ScenarioRepo.UpdateByObjectID(ctx, objectID, update); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+/* ---------- POST /scenarios/:scenario_id/activate ---------- */
+
+func (_self *MockController) ActivateScenario(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("scenario_id")
+	scenarioID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid scenario_id")
+	}
+
+	// Get the scenario to know its feature
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, scenarioID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
+	}
+
+	// Extract accountId from query or default to global
+	var accountId *string
+	accountIdParam := c.QueryParam("account_id")
+	if accountIdParam != "" {
+		accountId = &accountIdParam
+	}
+
+	// Deactivate existing active scenario for this feature+account
+	if err := _self.AccountScenarioRepo.DeactivateByFeatureAndAccount(ctx, scenario.FeatureName, accountId); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenario: "+err.Error())
+	}
+
+	// Create new AccountScenario mapping
+	now := time.Now().UTC()
+	accountScenario := &domain.AccountScenario{
+		FeatureName: scenario.FeatureName,
+		ScenarioID:  scenarioID,
+		AccountId:   accountId,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := _self.AccountScenarioRepo.Create(ctx, accountScenario); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to activate scenario: "+err.Error())
+	}
+
+	// Load the activated scenario's APIs into the trie
+	apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenario.Name)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get scenario APIs: "+err.Error())
+	}
+
+	for _, api := range apis {
+		if api.IsActive {
+			if err := _self.trie.Insert(entity.APIRequest{
+				FeatureName: api.FeatureName,
+				Scenario:    api.ScenarioName,
+				Path:        api.Path,
+				Method:      api.Method,
+				HashInput:   api.HashInput,
+				Output:      api.Output,
+			}); err != nil {
+				slog.Error("failed to insert API into trie", "error", err, "path", api.Path)
+			}
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "scenario activated successfully"})
+}
+
+/* ---------- DELETE /scenarios/:scenario_id/deactivate ---------- */
+
+func (_self *MockController) DeactivateScenario(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("scenario_id")
+	scenarioID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid scenario_id")
+	}
+
+	// Get the scenario to know its feature
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, scenarioID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
+	}
+
+	// Extract accountId from query or default to global
+	var accountId *string
+	accountIdParam := c.QueryParam("account_id")
+	if accountIdParam != "" {
+		accountId = &accountIdParam
+	}
+
+	// Deactivate the scenario for this account
+	if err := _self.AccountScenarioRepo.DeactivateByFeatureAndAccount(ctx, scenario.FeatureName, accountId); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
+	}
+
+	// Remove the scenario's APIs from trie
+	_self.trie.RemoveScenario(scenario.FeatureName, scenario.Name)
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "scenario deactivated successfully"})
 }
 
 /* ---------- GET /mockapis?scenario_name= ---------- */

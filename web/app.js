@@ -3,6 +3,7 @@ const API_BASE_URL = 'http://localhost:8081/api/v1/mocktool';
 let features = [];
 let scenarios = [];
 let mockAPIs = [];
+let activeScenarioId = null; // Track the active scenario ID for the current accountId
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
@@ -76,6 +77,7 @@ async function loadScenarios(featureName) {
     if (!featureName) {
         document.getElementById('scenarios-table-body').innerHTML =
             '<tr><td colspan="6" class="loading">Select a feature to view scenarios</td></tr>';
+        activeScenarioId = null;
         return;
     }
 
@@ -84,10 +86,40 @@ async function loadScenarios(featureName) {
         if (!response.ok) throw new Error('Failed to load scenarios');
 
         scenarios = await response.json();
+
+        // Fetch active scenario if accountId is provided
+        const accountId = document.getElementById('scenario-account-id-filter')?.value.trim();
+        if (accountId) {
+            await fetchActiveScenario(featureName, accountId);
+        } else {
+            activeScenarioId = null;
+        }
+
         renderScenariosTable();
     } catch (error) {
         console.error('Error loading scenarios:', error);
         showError('Failed to load scenarios');
+    }
+}
+
+async function fetchActiveScenario(featureName, accountId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/scenarios/active?feature_name=${featureName}`, {
+            headers: {
+                'X-Account-Id': accountId
+            }
+        });
+
+        if (response.ok) {
+            const activeScenario = await response.json();
+            activeScenarioId = activeScenario.id;
+        } else {
+            // No active scenario for this account
+            activeScenarioId = null;
+        }
+    } catch (error) {
+        console.error('Error fetching active scenario:', error);
+        activeScenarioId = null;
     }
 }
 
@@ -99,21 +131,31 @@ function renderScenariosTable() {
         return;
     }
 
-    tbody.innerHTML = scenarios.map(scenario => `
-        <tr>
-            <td>${scenario.feature_name || 'N/A'}</td>
-            <td><strong>${scenario.name || 'N/A'}</strong></td>
-            <td>${scenario.description || '-'}</td>
-            <td><span class="status-badge ${scenario.is_active ? 'status-active' : 'status-inactive'}">
-                ${scenario.is_active ? 'Active' : 'Inactive'}
-            </span></td>
-            <td>${formatDate(scenario.created_at)}</td>
-            <td class="actions">
-                <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario)})'>Edit</button>
-                <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">Delete</button>
-            </td>
-        </tr>
-    `).join('');
+    // Get the accountId filter value
+    const filterAccountId = document.getElementById('scenario-account-id-filter')?.value.trim();
+
+    tbody.innerHTML = scenarios.map(scenario => {
+        // Check if this scenario is the active one
+        const isActive = activeScenarioId && scenario.id === activeScenarioId;
+        const rowStyle = isActive ? 'background-color: #e6ffed;' : '';
+
+        return `
+            <tr style="${rowStyle}">
+                <td>${scenario.feature_name || 'N/A'}</td>
+                <td>
+                    <strong>${scenario.name || 'N/A'}</strong>
+                    ${isActive ? '<span class="status-badge status-active" style="margin-left: 8px;">ACTIVE</span>' : ''}
+                </td>
+                <td>${scenario.description || '-'}</td>
+                <td>${formatDate(scenario.created_at)}</td>
+                <td class="actions">
+                    <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'>Edit</button>
+                    <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">Delete</button>
+                    ${filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}')">Activate for ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}')">Activate Globally</button>`}
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 async function loadMockAPIs(scenarioName) {
@@ -174,6 +216,22 @@ function populateFeatureFilters() {
     });
 
     scenarioFilter.onchange = (e) => loadScenarios(e.target.value);
+
+    // Add event listener to accountId filter to re-render table when it changes
+    const accountIdFilter = document.getElementById('scenario-account-id-filter');
+    accountIdFilter.addEventListener('input', async () => {
+        // Fetch and re-render the table to show which scenarios are active for the entered accountId
+        const accountId = accountIdFilter.value.trim();
+        const featureName = scenarioFilter.value;
+
+        if (featureName && accountId) {
+            await fetchActiveScenario(featureName, accountId);
+        } else {
+            activeScenarioId = null;
+        }
+
+        renderScenariosTable();
+    });
 }
 
 function populateMockAPIFilters() {
@@ -195,19 +253,27 @@ function populateMockAPIFilters() {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scenarios/active?feature_name=${featureName}`);
-            const scenario = await response.json();
+            const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to load scenarios');
+            }
+
+            const scenarios = await response.json();
 
             const scenarioFilter = document.getElementById('mockapi-scenario-filter');
             scenarioFilter.innerHTML = '<option value="">Select a scenario...</option>';
 
-            const option = document.createElement('option');
-            option.value = scenario.name;
-            option.textContent = scenario.name;
-            scenarioFilter.appendChild(option);
-        
+            scenarios.forEach(scenario => {
+                const option = document.createElement('option');
+                option.value = scenario.name;
+                option.textContent = scenario.name;
+                scenarioFilter.appendChild(option);
+            });
+
         } catch (error) {
             console.error('Error loading scenarios:', error);
+            showError('Failed to load scenarios');
         }
     };
 
@@ -276,7 +342,6 @@ function showCreateScenarioModal() {
     document.getElementById('scenario-id').value = '';
     document.getElementById('scenario-name').value = '';
     document.getElementById('scenario-description').value = '';
-    document.getElementById('scenario-active').checked = true;
 
     const featureSelect = document.getElementById('scenario-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
@@ -295,7 +360,6 @@ function editScenario(scenario) {
     document.getElementById('scenario-id').value = scenario.id;
     document.getElementById('scenario-name').value = scenario.name;
     document.getElementById('scenario-description').value = scenario.description || '';
-    document.getElementById('scenario-active').checked = scenario.is_active;
 
     const featureSelect = document.getElementById('scenario-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
@@ -317,7 +381,6 @@ async function saveScenario() {
     const featureName = document.getElementById('scenario-feature').value;
     const name = document.getElementById('scenario-name').value.trim();
     const description = document.getElementById('scenario-description').value.trim();
-    const isActive = document.getElementById('scenario-active').checked;
 
     if (!featureName || !name) {
         showError('Feature and scenario name are required');
@@ -327,8 +390,7 @@ async function saveScenario() {
     const data = {
         feature_name: featureName,
         name: name,
-        description: description,
-        is_active: isActive
+        description: description
     };
 
     try {
@@ -353,6 +415,54 @@ async function saveScenario() {
     } catch (error) {
         console.error('Error saving scenario:', error);
         showError('Failed to save scenario');
+    }
+}
+
+async function activateScenario(scenarioId, accountId) {
+    try {
+        const url = `${API_BASE_URL}/scenarios/${scenarioId}/activate?account_id=${encodeURIComponent(accountId)}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) throw new Error('Failed to activate scenario');
+
+        showSuccess(`Scenario activated for account ${accountId}`);
+
+        // Update active scenario ID and reload
+        activeScenarioId = scenarioId;
+        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        if (currentFeature) {
+            loadScenarios(currentFeature);
+        }
+    } catch (error) {
+        console.error('Error activating scenario:', error);
+        showError('Failed to activate scenario');
+    }
+}
+
+async function activateScenarioGlobal(scenarioId) {
+    try {
+        const url = `${API_BASE_URL}/scenarios/${scenarioId}/activate`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) throw new Error('Failed to activate scenario');
+
+        showSuccess('Scenario activated globally');
+
+        // Clear active scenario ID since this is a global activation
+        activeScenarioId = null;
+        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        if (currentFeature) {
+            loadScenarios(currentFeature);
+        }
+    } catch (error) {
+        console.error('Error activating scenario:', error);
+        showError('Failed to activate scenario');
     }
 }
 

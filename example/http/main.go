@@ -61,7 +61,7 @@ func forwardRequest(c echo.Context) error {
 	slog.Info("Forwarding requestBody", "body", string(bodyBytes))
 
 	// Create the forward request with the updated body + append feature_name
-	targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?feature_name=test_feature"
+	targetURL := "http://localhost:8081/forward" + c.Request().RequestURI
 	req, err := http.NewRequest(c.Request().Method, targetURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -71,6 +71,11 @@ func forwardRequest(c echo.Context) error {
 	for k, v := range c.Request().Header {
 		req.Header[k] = v
 	}
+	// parse accountId from token
+	accountId := "1"
+	// add accountId to header
+	req.Header["X-Account-Id"] = []string{accountId}
+	req.Header["X-Feature-Name"] = []string{"test_feature"}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

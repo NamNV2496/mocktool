@@ -103,12 +103,10 @@ targetURL := "http://localhost:8081/forward" + c.Request().RequestURI + "?featur
 ![doc/15.png](doc/15.png)
 
 => Make sure 1 API can response expecting answer for a accountId
+
 => Multiple platform can develop parrallelly. 1 account for IOS with scenario1, 1 account for ANDROID with scenario2, 1 account for QC to write automation testing.
 
-![doc/2.png](doc/2.png)
-![doc/2.png](doc/3.png)
-
-# Multiple API for each scenario 
+# Multiple APIs for each scenario 
 
 An API path with different request body will have different response by hashing requestBody
 

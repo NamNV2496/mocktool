@@ -10,11 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// type IErrorResponse interface {
-// 	ConvertToGrpc(err error) error
-// 	ConvertToHttpResponse(err error) ErrorResponse
-// }
-
 type ErrorResponse struct {
 	Success      bool              `json:"success"`
 	HttpStatus   int               `json:"http_status,omitempty"`
@@ -30,7 +25,7 @@ func NewError(
 	errorCode string,
 	errorMessage string,
 	details map[string]string,
-	args ...interface{},
+	args ...any,
 ) error {
 	st := status.New(code, fmt.Sprintf(errorMessage, args...))
 	stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
@@ -72,32 +67,32 @@ func (_self ErrorResponse) Error() string {
 // 	return st.Err()
 // }
 
-func ConvertToHttpResponse(err error) ErrorResponse {
-	resp := ErrorResponse{
-		Success: false,
-	}
+// func ConvertToHttpResponse(err error) ErrorResponse {
+// 	resp := ErrorResponse{
+// 		Success: false,
+// 	}
+// 	st, _ := status.FromError(err)
 
-	st, _ := status.FromError(err)
-	resp.HttpStatus = runtime.HTTPStatusFromCode(st.Code())
-	resp.ErrorMessage = st.Message()
-	resp.GrpcCode = st.Code()
+// 	resp.HttpStatus = runtime.HTTPStatusFromCode(st.Code())
+// 	resp.ErrorMessage = st.Message()
+// 	resp.GrpcCode = st.Code()
 
-	for _, detail := range st.Details() {
-		if d, ok := detail.(*pb.ErrorDetail); ok {
-			resp.ErrorCode = d.ErrorCode
-			resp.Details = map[string]string{}
+// 	for _, detail := range st.Details() {
+// 		if d, ok := detail.(*pb.ErrorDetail); ok {
+// 			resp.ErrorCode = d.ErrorCode
+// 			resp.Details = map[string]string{}
 
-			maps.Copy(resp.Details, d.Metadata)
-			break
-		}
-	}
+// 			maps.Copy(resp.Details, d.Metadata)
+// 			break
+// 		}
+// 	}
 
-	if v, ok := resp.Details["x-trace-id"]; ok {
-		resp.TraceId = v
-	}
+// 	if v, ok := resp.Details["x-trace-id"]; ok {
+// 		resp.TraceId = v
+// 	}
 
-	return resp
-}
+// 	return resp
+// }
 
 // func isCustomeError(err error) (*ErrorResponse, bool) {
 // 	var errResp ErrorResponse

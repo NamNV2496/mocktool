@@ -9,6 +9,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -26,7 +28,7 @@ func StartHttpServer() error {
 	e.PUT("/*", PutHandler)
 	e.DELETE("/*", DeleteHandler)
 
-	if err := e.Start(":9090"); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := e.Start(":8080"); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err
 	}
@@ -88,6 +90,27 @@ func forwardRequest(c echo.Context) error {
 	for k, v := range resp.Header {
 		c.Response().Header()[k] = v
 	}
+	// respBody, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	return status.Errorf(codes.Internal, "read response failed: %v", err)
+	// }
 
-	return c.Stream(resp.StatusCode, resp.Header.Get("Content-Type"), resp.Body)
+	// var errResp errorcustome.ErrorResponse
+	// json.Unmarshal(respBody, &errResp)
+
+	// // Reconstruct gRPC status error with details
+	// st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
+	// stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
+	// 	ErrorCode: errResp.ErrorCode,
+	// 	Metadata:  errResp.Details,
+	// })
+
+	// return c.Stream(resp.StatusCode, resp.Header.Get("Content-Type"), stWithDetails.Err())
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return status.Errorf(codes.Internal, "read response failed: %v", err)
+	}
+
+	return c.Stream(resp.StatusCode, resp.Header.Get("Content-Type"), bytes.NewBuffer(respBody))
 }

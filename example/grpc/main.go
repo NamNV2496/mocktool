@@ -14,7 +14,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	testgrpc "github.com/namnv2496/mocktool/example/grpc/proto/generated"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
-	pb "github.com/namnv2496/mocktool/pkg/generated/github.com/namnv/mockTool/pkg/errorcustome"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -116,13 +115,21 @@ func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequ
 		json.Unmarshal(respBody, &errResp)
 
 		// Reconstruct gRPC status error with details
-		st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
-		stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
-			ErrorCode: errResp.ErrorCode,
-			Metadata:  errResp.Details,
-		})
-		return nil, stWithDetails.Err()
-		// return nil, errorcustome.WrapErrorResponse(errResp)
+		// st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
+		// stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
+		// 	ErrorCode: errResp.ErrorCode,
+		// 	Metadata:  errResp.Details,
+		// })
+
+		erResp := errorcustome.NewError(
+			errResp.GrpcCode,
+			errResp.ErrorCode,
+			errResp.ErrorMessage,
+			errResp.Details,
+			nil,
+		)
+
+		return nil, erResp
 	}
 
 	// =================================================WAY 2===================================================
@@ -157,7 +164,7 @@ func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequ
 }
 
 func customHttpResponse(ctx context.Context, _ *runtime.ServeMux, marshaller runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
-	customErrResp := errorcustome.ConvertToHttpResponse(err)
+	customErrResp := errorcustome.WrapErrorResponse(err)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(customErrResp.HttpStatus)
 	marshaller.NewEncoder(w).Encode(customErrResp)

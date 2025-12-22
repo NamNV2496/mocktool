@@ -9,7 +9,7 @@ git clone https://github.com/googleapis/googleapis.git ~/googleapis
 
 protoc -I example/grpc/proto -I ~/googleapis --go_out=example/grpc/proto/generated --go-grpc_out=example/grpc/proto/generated example/grpc/proto/test.proto
 
-# Way 2
+# Way 2: use buf
 
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest

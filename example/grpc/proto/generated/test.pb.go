@@ -126,6 +126,78 @@ func (x *TestResponse) GetName() string {
 	return ""
 }
 
+type AnotherServiceFuncRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnotherServiceFuncRequest) Reset() {
+	*x = AnotherServiceFuncRequest{}
+	mi := &file_test_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnotherServiceFuncRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnotherServiceFuncRequest) ProtoMessage() {}
+
+func (x *AnotherServiceFuncRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_test_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnotherServiceFuncRequest.ProtoReflect.Descriptor instead.
+func (*AnotherServiceFuncRequest) Descriptor() ([]byte, []int) {
+	return file_test_proto_rawDescGZIP(), []int{2}
+}
+
+type AnotherServiceFuncResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnotherServiceFuncResponse) Reset() {
+	*x = AnotherServiceFuncResponse{}
+	mi := &file_test_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnotherServiceFuncResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnotherServiceFuncResponse) ProtoMessage() {}
+
+func (x *AnotherServiceFuncResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_test_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnotherServiceFuncResponse.ProtoReflect.Descriptor instead.
+func (*AnotherServiceFuncResponse) Descriptor() ([]byte, []int) {
+	return file_test_proto_rawDescGZIP(), []int{3}
+}
+
 var File_test_proto protoreflect.FileDescriptor
 
 const file_test_proto_rawDesc = "" +
@@ -137,9 +209,12 @@ const file_test_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"2\n" +
 	"\fTestResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name2]\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x1b\n" +
+	"\x19AnotherServiceFuncRequest\"\x1c\n" +
+	"\x1aAnotherServiceFuncResponse2\xd7\x01\n" +
 	"\vTestService\x12N\n" +
-	"\aTestAPI\x12\x15.testgrpc.TestRequest\x1a\x16.testgrpc.TestResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/api/v1/testB7Z5github.com/namnv/mockTool/example/gprc/proto;testgrpcb\x06proto3"
+	"\aTestAPI\x12\x15.testgrpc.TestRequest\x1a\x16.testgrpc.TestResponse\"\x14\x82\xd3\xe4\x93\x02\x0e\x12\f/api/v1/test\x12x\n" +
+	"\x12AnotherServiceFunc\x12#.testgrpc.AnotherServiceFuncRequest\x1a$.testgrpc.AnotherServiceFuncResponse\"\x17\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/anotherB7Z5github.com/namnv/mockTool/example/gprc/proto;testgrpcb\x06proto3"
 
 var (
 	file_test_proto_rawDescOnce sync.Once
@@ -153,16 +228,20 @@ func file_test_proto_rawDescGZIP() []byte {
 	return file_test_proto_rawDescData
 }
 
-var file_test_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_test_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_test_proto_goTypes = []any{
-	(*TestRequest)(nil),  // 0: testgrpc.TestRequest
-	(*TestResponse)(nil), // 1: testgrpc.TestResponse
+	(*TestRequest)(nil),                // 0: testgrpc.TestRequest
+	(*TestResponse)(nil),               // 1: testgrpc.TestResponse
+	(*AnotherServiceFuncRequest)(nil),  // 2: testgrpc.AnotherServiceFuncRequest
+	(*AnotherServiceFuncResponse)(nil), // 3: testgrpc.AnotherServiceFuncResponse
 }
 var file_test_proto_depIdxs = []int32{
 	0, // 0: testgrpc.TestService.TestAPI:input_type -> testgrpc.TestRequest
-	1, // 1: testgrpc.TestService.TestAPI:output_type -> testgrpc.TestResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: testgrpc.TestService.AnotherServiceFunc:input_type -> testgrpc.AnotherServiceFuncRequest
+	1, // 2: testgrpc.TestService.TestAPI:output_type -> testgrpc.TestResponse
+	3, // 3: testgrpc.TestService.AnotherServiceFunc:output_type -> testgrpc.AnotherServiceFuncResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -179,7 +258,7 @@ func file_test_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_test_proto_rawDesc), len(file_test_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

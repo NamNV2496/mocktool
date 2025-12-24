@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -96,7 +97,7 @@ func (_self *MockController) responseMockData(c echo.Context) error {
 	// =================================================WAY 1===================================================
 	err := _self.forwardUc.ResponseMockData(c)
 	if err != nil {
-		errResp := errorcustome.WrapErrorResponse(err)
+		errResp := errorcustome.WrapErrorResponse(context.Background(), err)
 		c.Response().Header().Set("Content-Type", "application/json")
 		c.Response().WriteHeader(errResp.HttpStatus)
 		errRespBytes, _ := json.Marshal(errResp)

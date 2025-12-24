@@ -1,6 +1,7 @@
 package errorcustome
 
 import (
+	"context"
 	"fmt"
 	"maps"
 
@@ -102,7 +103,7 @@ func (_self ErrorResponse) Error() string {
 // 	return nil, false
 // }
 
-func WrapErrorResponse(err error) ErrorResponse {
+func WrapErrorResponse(ctx context.Context, err error) ErrorResponse {
 	resp := ErrorResponse{
 		Success: false,
 	}
@@ -122,7 +123,14 @@ func WrapErrorResponse(err error) ErrorResponse {
 		}
 	}
 
-	if v, ok := resp.Details["x-trace-id"]; ok {
+	md, ok := runtime.ServerMetadataFromContext(ctx)
+	if ok {
+		if val := md.TrailerMD.Get("x-trace-id"); len(val) > 0 {
+			resp.TraceId = val[0]
+		}
+	}
+
+	if v, ok := resp.Details["x-trace-id"]; ok && resp.TraceId == "" {
 		resp.TraceId = v
 	}
 	return resp

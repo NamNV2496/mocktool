@@ -2,6 +2,8 @@ module github.com/namnv2496/mocktool
 
 go 1.24.0
 
+toolchain go1.24.2
+
 require (
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/google/uuid v1.6.0

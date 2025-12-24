@@ -16,10 +16,20 @@ message TestResponse {
   string name = 2;
 }
 
+message AnotherServiceFuncRequest {}
+
+message AnotherServiceFuncResponse {}
+
 service TestService {
   rpc TestAPI(TestRequest) returns (TestResponse) {
     option (google.api.http) = {
       get: "/api/v1/test"
+    };
+  }
+
+  rpc AnotherServiceFunc(AnotherServiceFuncRequest) returns (AnotherServiceFuncResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/another"
     };
   }
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/validator"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	testgrpc "github.com/namnv2496/mocktool/example/grpc/proto/generated"
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
@@ -69,6 +71,13 @@ func main() {
 }
 
 func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestResponse, error) {
+	// =================================================WAY 1===================================================
+	return callHttp(ctx, req)
+	// =================================================WAY 2===================================================
+	return callGrpc(ctx, req)
+}
+
+func callHttp(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "marshal request failed: %v", err)
@@ -109,37 +118,28 @@ func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequ
 	}
 
 	// =================================================WAY 1===================================================
-	// forward error message from server
+	// throw new error with forwarding error from server
 	if resp.StatusCode >= 400 {
 		var errResp errorcustome.ErrorResponse
 		json.Unmarshal(respBody, &errResp)
 
-		// Reconstruct gRPC status error with details
-		// st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
-		// stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
-		// 	ErrorCode: errResp.ErrorCode,
-		// 	Metadata:  errResp.Details,
-		// })
-
-		erResp := errorcustome.NewError(
+		return nil, errorcustome.NewError(
 			errResp.GrpcCode,
 			errResp.ErrorCode,
 			errResp.ErrorMessage,
 			errResp.Details,
 			nil,
 		)
-
-		return nil, erResp
 	}
 
 	// =================================================WAY 2===================================================
-	// on ly get message from server and create new error with that error message
+	// throw new error with new trace-id
 	if resp.StatusCode >= 400 {
 		metadata := make(map[string]string, 0)
-		metadata["x-trace-id"] = "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
+		metadata["x-trace-id"] = uuid.NewString()
 
 		// Extract error message from response
-		var errResp map[string]interface{}
+		var errResp map[string]any
 		var errorMessage string
 		if err := json.Unmarshal(respBody, &errResp); err == nil {
 			if msg, ok := errResp["message"]; ok {
@@ -152,19 +152,56 @@ func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequ
 		}
 		return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s", metadata, errorMessage)
 	}
-	// ====================================================================================================
 
+	// =================================================WAY 3===================================================
+	if resp.StatusCode >= 400 {
+		// set trace-id because it is http. If call grpc it can get from ctx
+		var errResp errorcustome.ErrorResponse
+		json.Unmarshal(respBody, &errResp)
+
+		// Set context
+		md := metadata.New(map[string]string{
+			"x-trace-id":  errResp.TraceId,
+			"error_code":  errResp.ErrorCode,
+			"http_status": fmt.Sprint(errResp.HttpStatus),
+		})
+		grpc.SetTrailer(ctx, md)
+		return nil, fmt.Errorf("error: %s", errResp.ErrorMessage)
+	}
+	// ====================================================================================================
 	// 5️⃣ Unmarshal → proto response
 	var out testgrpc.TestResponse
 	if err := json.Unmarshal(respBody, &out); err != nil {
 		return nil, status.Errorf(codes.Internal, "unmarshal response failed: %v", err)
 	}
-
 	return &out, nil
 }
 
+func callGrpc(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestResponse, error) {
+	// for test only
+	conn, err := grpc.NewClient("anotherService:9092", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+	anotherServiceClient := testgrpc.NewTestServiceClient(conn)
+	var md metadata.MD
+	_, err = anotherServiceClient.AnotherServiceFunc(ctx, nil, grpc.Trailer(&md))
+	if err != nil {
+		// forward grpc trailer
+		grpc.SetTrailer(ctx, md)
+		if st, ok := status.FromError(err); ok {
+			if val := md.Get("x-trace-id"); len(val) > 0 {
+				grpc.SetTrailer(ctx, md)
+			}
+			return nil, fmt.Errorf("%s", st.Message())
+		}
+		return nil, err
+	}
+	return nil, nil
+}
+
 func customHttpResponse(ctx context.Context, _ *runtime.ServeMux, marshaller runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
-	customErrResp := errorcustome.WrapErrorResponse(err)
+	customErrResp := errorcustome.WrapErrorResponse(ctx, err)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(customErrResp.HttpStatus)
 	marshaller.NewEncoder(w).Encode(customErrResp)

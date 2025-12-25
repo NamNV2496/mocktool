@@ -185,9 +185,15 @@ func callGrpc(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestRes
 	}
 	anotherServiceClient := testgrpc.NewTestServiceClient(conn)
 	var md metadata.MD
+	// read metadata from grpc trailer
 	_, err = anotherServiceClient.AnotherServiceFunc(ctx, nil, grpc.Trailer(&md))
+	// fake server response
+	// ======================================for test ONLY======================================
+	md, err = fakeGrpcServerRespErr(ctx)
+	// ======================================end for test ONLY======================================
+
 	if err != nil {
-		// forward grpc trailer
+		// forward grpc trailer to current context
 		grpc.SetTrailer(ctx, md)
 		if st, ok := status.FromError(err); ok {
 			if val := md.Get("x-trace-id"); len(val) > 0 {
@@ -198,6 +204,17 @@ func callGrpc(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestRes
 		return nil, err
 	}
 	return nil, nil
+}
+
+func fakeGrpcServerRespErr(ctx context.Context) (metadata.MD, error) {
+	md := metadata.New(map[string]string{
+		"x-trace-id":    uuid.NewString(),
+		"error_code":    "ERR.001",
+		"error_message": "internal server error",
+	})
+	// set trailer for response context
+	grpc.SetTrailer(ctx, md)
+	return md, fmt.Errorf("fakeGrpcServerRespErr")
 }
 
 func customHttpResponse(ctx context.Context, _ *runtime.ServeMux, marshaller runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {

@@ -34,10 +34,12 @@ type MockController struct {
 	MockAPIRepo         repository.IMockAPIRepository
 	forwardUc           usecase.IForwardUC
 	trie                usecase.ITrie
+	TestWay             int
 }
 
 func NewMockController(
 	config *configs.Config,
+	flags entity.ServiceFlags,
 	featureRepo repository.IFeatureRepository,
 	scenarioRepo repository.IScenarioRepository,
 	accountScenarioRepo repository.IAccountScenarioRepository,
@@ -54,6 +56,7 @@ func NewMockController(
 		MockAPIRepo:         mockAPIRepo,
 		forwardUc:           forwardUc,
 		trie:                trie,
+		TestWay:             flags.TestWay,
 	}
 }
 
@@ -94,20 +97,28 @@ func (_self *MockController) StartHttpServer() error {
 
 // handler
 func (_self *MockController) responseMockData(c echo.Context) error {
-	// =================================================WAY 1===================================================
-	err := _self.forwardUc.ResponseMockData(c)
-	if err != nil {
-		errResp := errorcustome.WrapErrorResponse(context.Background(), err)
-		c.Response().Header().Set("Content-Type", "application/json")
-		c.Response().WriteHeader(errResp.HttpStatus)
-		errRespBytes, _ := json.Marshal(errResp)
-		_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
-		return err
+	switch _self.TestWay {
+	case 1:
+		// =================================================WAY 1===================================================
+		// wrapper http response
+		err := _self.forwardUc.ResponseMockData(c)
+		if err != nil {
+			errResp := errorcustome.WrapErrorResponse(context.Background(), err)
+			c.Response().Header().Set("Content-Type", "application/json")
+			c.Response().WriteHeader(errResp.HttpStatus)
+			errRespBytes, _ := json.Marshal(errResp)
+			_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
+			return err
+		}
+		c.Response().WriteHeader(http.StatusOK)
+		return nil
+	case 2:
+		// =================================================WAY 2===================================================
+		// forward response
+		return _self.forwardUc.ResponseMockData(c)
+	default:
+		return nil
 	}
-	c.Response().WriteHeader(http.StatusOK)
-	return nil
-	// =================================================WAY 2===================================================
-	return _self.forwardUc.ResponseMockData(c)
 }
 
 /* ---------- GET /features ---------- */

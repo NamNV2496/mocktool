@@ -5,20 +5,39 @@ import (
 
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/controller"
+	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
 
+var serviceFlags = &entity.ServiceFlags{}
+
 var serviceCmd = &cobra.Command{
 	Use:   "service",
 	Short: "Start the mock tool",
-	Run: func(cmd *cobra.Command, args []string) {
-		InvokeServer(
-			startServer,
-		)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		app := InvokeServer(startServer)
+		return app.Start(cmd.Context())
 	},
+}
+
+func init() {
+	serviceCmd.Flags().IntVarP(
+		&serviceFlags.TestWay,
+		"test",
+		"t", // short flag
+		1,
+		"HTTP server port",
+	)
+
+	serviceCmd.Flags().BoolVar(
+		&serviceFlags.EnableHTTP,
+		"http",
+		true,
+		"Enable HTTP server",
+	)
 }
 
 func InvokeServer(invokers ...any) *fx.App {
@@ -41,6 +60,7 @@ func InvokeServer(invokers ...any) *fx.App {
 		),
 		fx.Supply(
 			config,
+			*serviceFlags,
 		),
 		fx.Invoke(invokers...),
 	)

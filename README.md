@@ -21,7 +21,7 @@ flowchart TB
     %% Feature abc
     ROOT --> ABC[feature: abc]
     ABC --> ABC_S1[scenario1]
-    ABC --> ABC_S2[scenario2]
+    ABC --> ABC_S2[scenario2(active)]
 
     ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
     ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
@@ -32,7 +32,7 @@ flowchart TB
 
     %% Feature xyz
     ROOT --> XYZ[feature: xyz]
-    XYZ --> XYZ_S1[scenario1]
+    XYZ --> XYZ_S1[scenario1(active)]
     XYZ --> XYZ_S2[scenario2]
 
     XYZ_S1 --> XYZ_S1_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
@@ -57,7 +57,7 @@ FE->BE-service: request (/api/v1/insert)
 alt is mock data?
 BE-service->BE-service: add suffix /forward (/forward/api/v1/insert)
 BE-service->mock-service: send request (/forward/api/v1/insert)
-mock-service->mock-service: find usecase
+mock-service->mock-service: find by featureName and active scenario by accountId
 mock-service--> BE-service: response
 BE-service-->FE: response
 else

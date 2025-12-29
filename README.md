@@ -20,8 +20,8 @@ flowchart TB
 
     %% Feature abc
     ROOT --> ABC[feature: abc]
-    ABC --> ABC_S1[scenario1 - active with accountId = 2]
-    ABC --> ABC_S2[scenario2 - active with accountId = 1,2,3,4,5]
+    ABC --> ABC_S1[scenario1]
+    ABC --> ABC_S2[scenario2 - active with global (all accountId)]
 
     ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
     ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]

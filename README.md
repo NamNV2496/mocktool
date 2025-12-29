@@ -21,25 +21,26 @@ flowchart TB
     %% Feature abc
     ROOT --> ABC[feature: abc]
     ABC --> ABC_S1[scenario1]
-    ABC --> ABC_S2[scenario2(active)]
+    ABC --> ABC_S2[scenario2 - active]
 
     ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
     ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
 
     ABC_S2 --> ABC_S2_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2"]
-    ABC_S2 --> ABC_S2_P2["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/> field2: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
-    ABC_S2 --> ABC_S2_P3["path: /api/v1/{id}/def<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3<br/>- id: {id}"]
+    ABC_S2 --> ABC_S2_P2["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
+    ABC_S2 --> ABC_S2_P3["path: /api/v1/:id/def<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3<br/>- id: id"]
 
     %% Feature xyz
     ROOT --> XYZ[feature: xyz]
-    XYZ --> XYZ_S1[scenario1(active)]
+    XYZ --> XYZ_S1[scenario1 - active]
     XYZ --> XYZ_S2[scenario2]
 
     XYZ_S1 --> XYZ_S1_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
-    XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>+ token => need to parse"]
+    XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>"]
 
     XYZ_S2 --> XYZ_S2_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
 ```
+
 <!-- ![doc/architect.png](doc/architect.png) -->
 
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)

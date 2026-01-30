@@ -132,6 +132,9 @@ response with headers
 ![doc/12.png](doc/12.png)
 ![doc/13.png](doc/13.png)
 
+Or you can set global scenario for all account
+
+![doc/16.png](doc/16.png)
 
 # How to start
 
@@ -193,3 +196,17 @@ return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s"
     "trace_id": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
 }
 ```
+
+# Load test feature
+
+![doc/17.png](doc/17.png)
+
+You can run test scenario
+
+![doc/18.png](doc/18.png)
+
+example at `/doc/mocktool.loadtest_scenarios.json`
+
+result
+
+![doc/19.png](doc/19.png)

@@ -17,6 +17,7 @@
             <button class="tab-btn active" data-tab="features">Features</button>
             <button class="tab-btn" data-tab="scenarios">Scenarios</button>
             <button class="tab-btn" data-tab="mockapis">Mock APIs</button>
+            <button class="tab-btn" data-tab="loadtest">Load Test Tool</button>
         </div>
 
         <!-- Features Tab -->
@@ -108,6 +109,35 @@
                     <tbody id="mockapis-table-body">
                         <tr>
                             <td colspan="8" class="loading">Select a scenario to view mock APIs</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Load Test Tool Tab -->
+        <div id="loadtest" class="tab-content">
+            <div class="section-header">
+                <h2>Load Test Scenarios</h2>
+                <button class="btn btn-primary" onclick="showCreateLoadTestModal()">+ New Scenario</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Concurrency</th>
+                            <th>Steps</th>
+                            <th>Accounts</th>
+                            <th>Active</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loadtest-table-body">
+                        <tr>
+                            <td colspan="8" class="loading">Loading load test scenarios...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -248,6 +278,138 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal for Creating/Editing Load Test Scenario -->
+    <div id="loadtest-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="loadtest-modal-title">Create Load Test Scenario</h3>
+                <span class="close" onclick="closeModal('loadtest-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="loadtest-id">
+                <div class="form-group">
+                    <label for="loadtest-name">Scenario Name</label>
+                    <input type="text" id="loadtest-name" placeholder="Enter scenario name" required>
+                </div>
+                <div class="form-group">
+                    <label for="loadtest-description">Description</label>
+                    <textarea id="loadtest-description" placeholder="Enter description" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="loadtest-accounts-input">Test Accounts (Format: username-password, comma separated)</label>
+                    <textarea id="loadtest-accounts-input" placeholder="098888888-Test123456,09575757-Test123456,0966666666-Password789" rows="4" style="font-family: monospace; width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 4px;"></textarea>
+                    <small style="color: #718096; font-size: 0.85rem; display: block; margin-top: 5px;">
+                        Enter username-password pairs separated by commas. These accounts will be used as {{username}} and {{password}} variables in test steps.
+                    </small>
+                    <div style="margin-top: 8px;">
+                        <strong style="font-size: 13px;">Accounts count: <span id="loadtest-accounts-count">0</span></strong>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="loadtest-concurrency">Default Concurrency</label>
+                    <input type="number" id="loadtest-concurrency" placeholder="10" value="10" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Steps</label>
+                    <div id="loadtest-steps-container">
+                        <!-- Other steps will be added here dynamically -->
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addLoadTestStep()" style="margin-top: 10px;">+ Add Step</button>
+                </div>
+                <!-- <div class="form-group" style="display: none;">
+                    <label>Accounts (<span id="loadtest-accounts-count-old">0</span>)</label>
+                    <button type="button" class="btn btn-secondary" onclick="showAccountsModalFromLoadTest()" style="margin-top: 5px;">Manage Accounts</button>
+                    <small style="color: #718096; font-size: 0.85rem; display: block; margin-top: 5px;">Add test accounts (username-password pairs) to use in load testing</small>
+                </div> -->
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="loadtest-active" checked>
+                        Active
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('loadtest-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveLoadTestScenario()">Save</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Variable Extraction Row Template (hidden) -->
+    <template id="variable-row-template">
+        <div class="variable-row" style="display: grid; grid-template-columns: 1fr 2fr 30px; gap: 5px; margin-bottom: 5px; align-items: center;">
+            <input type="text" class="var-name" placeholder="Variable name (e.g., token)" style="padding: 5px; font-size: 12px;">
+            <input type="text" class="var-jsonpath" placeholder="data.token or header.X-Header-Name" style="padding: 5px; font-size: 12px;">
+            <button type="button" class="btn btn-delete" onclick="this.closest('.variable-row').remove()" style="padding: 3px 6px; font-size: 10px;">X</button>
+        </div>
+    </template>
+
+    <!-- Step Template (hidden) -->
+    <template id="loadtest-step-template">
+        <div class="loadtest-step" style="border: 1px solid #e2e8f0; padding: 15px; margin-bottom: 10px; border-radius: 8px; background: #f8fafc;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong>Step <span class="step-number"></span></strong>
+                <button type="button" class="btn btn-delete" onclick="removeLoadTestStep(this)" style="padding: 5px 10px;">Remove</button>
+            </div>
+            <div class="form-group">
+                <label>Step Name</label>
+                <input type="text" class="step-name" placeholder="e.g., login, get_profile" required>
+            </div>
+            <div class="form-group">
+                <label>Path or cURL Command</label>
+                <textarea class="step-path" placeholder="https://api.example.com/login
+
+OR paste cURL from Postman:
+curl --location 'https://api.example.com/login' \
+--header 'Content-Type: application/json' \
+--data '{\"username\": \"{{username}}\"}'" rows="4" style="font-family: monospace; font-size: 12px;" required></textarea>
+                <small style="color: #3b82f6; font-size: 0.8rem;">
+                    <strong>Tip:</strong> Paste cURL from Postman to auto-extract URL, method, headers, and body. Use {{username}}, {{password}}, or any saved variable.
+                </small>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group">
+                    <label>Method (override cURL)</label>
+                    <select class="step-method">
+                        <option value="" selected>Auto (from cURL or GET)</option>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expected Status Code</label>
+                    <input type="number" class="step-expectstatus" placeholder="200" value="200">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Headers (override cURL headers)</label>
+                <textarea class="step-headers" placeholder='{"Authorization": "Bearer {{access_token}}"}' rows="2"></textarea>
+                <small style="color: #718096; font-size: 0.8rem;">Optional. Add or override headers from cURL.</small>
+            </div>
+            <div class="form-group">
+                <label>Request Body (override cURL body)</label>
+                <textarea class="step-body" placeholder='{"username": "{{username}}", "password": "{{password}}"}' rows="3"></textarea>
+                <small style="color: #718096; font-size: 0.8rem;">Optional. Override body from cURL if needed.</small>
+            </div>
+            <div class="form-group">
+                <label>Extract Variables from Response and SAVE FOR FUTURE</label>
+                <div class="step-variables-container">
+                    <!-- Variables will be added dynamically -->
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="addStepVariable(this)" style="margin-top: 5px; padding: 3px 8px; font-size: 12px;">+ Add Variable</button>
+                <small style="color: #718096; font-size: 0.8rem; display: block; margin-top: 5px;">
+                    Extract values from response to use in next steps with {{variable_name}}<br>
+                    <strong>From body:</strong> data.token, ads.0.account_id (dot notation for arrays)<br>
+                    <strong>From header:</strong> header.X-Correlation-Id, header.Authorization
+                </small>
+            </div>
+        </div>
+    </template>
 
     <script src="app.js"></script>
 </body>

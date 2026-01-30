@@ -1,0 +1,37 @@
+[{
+  "_id": {
+    "$oid": "697ce9c3d6808372a0b88348"
+  },
+  "name": "test load test",
+  "description": "test",
+  "concurrency": 10,
+  "accounts": "098888888-Test123456,09575757-Test123456,0966666666-Password789",
+  "steps": [
+    {
+      "name": "get first id",
+      "method": "",
+      "path": "curl 'https://api.sforum.vn/graphql/query' \\\n  -H 'accept: application/json' \\\n  -H 'accept-language: en,en-US;q=0.9,vi;q=0.8' \\\n  -H 'content-type: application/json' \\\n  -H 'origin: https://cellphones.com.vn' \\\n  -H 'priority: u=1, i' \\\n  -H 'sec-ch-ua: \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"' \\\n  -H 'sec-ch-ua-mobile: ?0' \\\n  -H 'sec-ch-ua-platform: \"macOS\"' \\\n  -H 'sec-fetch-dest: empty' \\\n  -H 'sec-fetch-mode: cors' \\\n  -H 'sec-fetch-site: cross-site' \\\n  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36' \\\n  --data-raw '{\"query\":\"\\n                query posts {\\n                  posts(\\n                    filter: {include: {\\n                      tag_slugs:[\\\"apple-iphone-13\\\"]\\n                    }}\\n                    paginator: {size: 5, page: 1}\\n                    sort: [ { field: \\\"published_at\\\", direction: \\\"desc\\\" } ]\\n                  ) {\\n                    posts {\\n                      id\\n                      title\\n                      slug\\n                      thumbnail\\n                      short_description\\n                      scheduled_at\\n                      created_at\\n                      updated_at\\n                      author {\\n                        id\\n                        first_name\\n                        last_name\\n                        slug\\n                        profile {\\n                          avatar\\n                          description\\n                        }\\n                        total_posts\\n                      }\\n                    }\\n                  }\\n                }\"}'",
+      "save_variables": {
+        "first_id": "data.posts.posts.0.id"
+      },
+      "expect_status": 200
+    },
+    {
+      "name": "get first available shop",
+      "method": "",
+      "path": "curl 'https://api.cellphones.com.vn/graphql-dashboard/graphql/query' \\\n  -H 'accept: application/json' \\\n  -H 'accept-language: en,en-US;q=0.9,vi;q=0.8' \\\n  -H 'content-type: application/json' \\\n  -H 'origin: https://cellphones.com.vn' \\\n  -H 'priority: u=1, i' \\\n  -H 'sec-ch-ua: \"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"' \\\n  -H 'sec-ch-ua-mobile: ?0' \\\n  -H 'sec-ch-ua-platform: \"macOS\"' \\\n  -H 'sec-fetch-dest: empty' \\\n  -H 'sec-fetch-mode: cors' \\\n  -H 'sec-fetch-site: same-site' \\\n  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36' \\\n  --data-raw '{\"query\":\"query SHOP_STOCK {\\n                          shops_stock(productId: 36527, provinceId: 30) {\\n                            district_id\\n                            district_name\\n                            province_id\\n                            province_name\\n                            shops {\\n                              id\\n                              external_id\\n                              district_id\\n                              province_id\\n                              address\\n                              phone\\n                              near\\n                              google_link\\n                            }\\n                          }\\n                        }\",\"variables\":{}}'",
+      "body": "{\"id\": {{first_id}} }",
+      "save_variables": {
+        "first_avai_shop": "data.shops_stock.0.district_name"
+      },
+      "expect_status": 200
+    }
+  ],
+  "is_active": true,
+  "created_at": {
+    "$date": "2026-01-30T17:26:27.204Z"
+  },
+  "updated_at": {
+    "$date": "2026-01-30T17:26:27.204Z"
+  }
+}]

@@ -27,14 +27,15 @@ type IMockController interface {
 }
 
 type MockController struct {
-	config              *configs.Config
-	FeatureRepo         repository.IFeatureRepository
-	ScenarioRepo        repository.IScenarioRepository
-	AccountScenarioRepo repository.IAccountScenarioRepository
-	MockAPIRepo         repository.IMockAPIRepository
-	forwardUc           usecase.IForwardUC
-	trie                usecase.ITrie
-	TestWay             int
+	config               *configs.Config
+	FeatureRepo          repository.IFeatureRepository
+	ScenarioRepo         repository.IScenarioRepository
+	AccountScenarioRepo  repository.IAccountScenarioRepository
+	MockAPIRepo          repository.IMockAPIRepository
+	loadTestController   ILoadTestController
+	forwardUc            usecase.IForwardUC
+	trie                 usecase.ITrie
+	TestWay              int
 }
 
 func NewMockController(
@@ -44,6 +45,7 @@ func NewMockController(
 	scenarioRepo repository.IScenarioRepository,
 	accountScenarioRepo repository.IAccountScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
+	loadTestController ILoadTestController,
 	forwardUc usecase.IForwardUC,
 	trie usecase.ITrie,
 ) IMockController {
@@ -54,6 +56,7 @@ func NewMockController(
 		ScenarioRepo:        scenarioRepo,
 		AccountScenarioRepo: accountScenarioRepo,
 		MockAPIRepo:         mockAPIRepo,
+		loadTestController:  loadTestController,
 		forwardUc:           forwardUc,
 		trie:                trie,
 		TestWay:             flags.TestWay,
@@ -83,10 +86,19 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)        // create new scenario
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario) // update or inactive scenario
 
+	// Load test scenarios - delegate to LoadTestController
+	_self.loadTestController.RegisterRoutes(v1)
+
 	c.GET("/forward/*", _self.responseMockData)
 	c.POST("/forward/*", _self.responseMockData)
 	c.PUT("/forward/*", _self.responseMockData)
 	c.DELETE("/forward/*", _self.responseMockData)
+
+	// Public API endpoints - no X-Account-Id required, uses global scenario
+	c.GET("/public/forward/*", _self.responsePublicMockData)
+	c.POST("/public/forward/*", _self.responsePublicMockData)
+	c.PUT("/public/forward/*", _self.responsePublicMockData)
+	c.DELETE("/public/forward/*", _self.responsePublicMockData)
 
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
@@ -116,6 +128,28 @@ func (_self *MockController) responseMockData(c echo.Context) error {
 		// =================================================WAY 2===================================================
 		// forward response
 		return _self.forwardUc.ResponseMockData(c)
+	default:
+		return nil
+	}
+}
+
+// handler for public API - no X-Account-Id required
+func (_self *MockController) responsePublicMockData(c echo.Context) error {
+	switch _self.TestWay {
+	case 1:
+		err := _self.forwardUc.ResponsePublicMockData(c)
+		if err != nil {
+			errResp := errorcustome.WrapErrorResponse(context.Background(), err)
+			c.Response().Header().Set("Content-Type", "application/json")
+			c.Response().WriteHeader(errResp.HttpStatus)
+			errRespBytes, _ := json.Marshal(errResp)
+			_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
+			return err
+		}
+		c.Response().WriteHeader(http.StatusOK)
+		return nil
+	case 2:
+		return _self.forwardUc.ResponsePublicMockData(c)
 	default:
 		return nil
 	}

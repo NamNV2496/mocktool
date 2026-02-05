@@ -84,7 +84,7 @@ func callHttp(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestRes
 	}
 
 	// 2️⃣ Build target URL
-	targetURL := "http://localhost:8081/forward/api/v1/test"
+	targetURL := "http://localhost:8082/forward/api/v1/test"
 	forwardReq, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,

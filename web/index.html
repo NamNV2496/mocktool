@@ -44,6 +44,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="features-pagination" class="pagination-container"></div>
         </div>
 
         <!-- Scenarios Tab -->
@@ -76,6 +77,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="scenarios-pagination" class="pagination-container"></div>
         </div>
 
         <!-- Mock APIs Tab -->
@@ -89,6 +91,7 @@
                     <select id="mockapi-scenario-filter" class="filter-select">
                         <option value="">Select a scenario...</option>
                     </select>
+                    <button class="btn btn-outline" onclick="showProtoParserModal()">Parse .proto</button>
                     <button class="btn btn-primary" onclick="showCreateMockAPIModal()">+ New Mock API</button>
                 </div>
             </div>
@@ -113,6 +116,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="mockapis-pagination" class="pagination-container"></div>
         </div>
 
         <!-- Load Test Tool Tab -->
@@ -142,6 +146,7 @@
                     </tbody>
                 </table>
             </div>
+            <div id="loadtest-pagination" class="pagination-container"></div>
         </div>
     </div>
 
@@ -248,16 +253,30 @@
                 </div>
                 <div class="form-group">
                     <label for="mockapi-regex-path">Regex Path (Optional)</label>
-                    <input type="text" id="mockapi-regex-path" placeholder="/api/users/[0-9]+">
+                    <input type="text" id="mockapi-regex-path" placeholder="/api/users/[0-9]+ example: /api/users/123456">
                 </div>
                 <div class="form-group">
-                    <label for="mockapi-hash-input">Hash Input - JSON (Optional)</label>
+                    <div class="json-field-header">
+                        <label for="mockapi-hash-input">Request Input - JSON (Optional)</label>
+                        <div class="json-mode-toggle">
+                            <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-hash-input', 'raw')">Raw</button>
+                            <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-hash-input', 'tree')">Tree</button>
+                        </div>
+                    </div>
                     <textarea id="mockapi-hash-input" placeholder='{"userId": 123, "action": "login"}' rows="4"></textarea>
+                    <div id="mockapi-hash-input-tree" class="json-tree" style="display: none;"></div>
                     <small style="color: #718096; font-size: 0.85rem;">JSON object to generate unique hash for request matching. Keys are automatically sorted for consistent hashing.</small>
                 </div>
                 <div class="form-group">
-                    <label for="mockapi-output">Response Output - JSON (Required)</label>
+                    <div class="json-field-header">
+                        <label for="mockapi-output">Response Output - JSON (Required)</label>
+                        <div class="json-mode-toggle">
+                            <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-output', 'raw')">Raw</button>
+                            <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-output', 'tree')">Tree</button>
+                        </div>
+                    </div>
                     <textarea id="mockapi-output" placeholder='{"message": "success", "data": {...}}' rows="8" required></textarea>
+                    <div id="mockapi-output-tree" class="json-tree" style="display: none;"></div>
                     <small style="color: #718096; font-size: 0.85rem;">JSON response to return when this mock API is matched</small>
                 </div>
                 <div class="form-group">
@@ -275,6 +294,28 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('mockapi-modal')">Cancel</button>
                 <button class="btn btn-primary" onclick="saveMockAPI()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Parsing .proto Files -->
+    <div id="proto-parser-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Parse .proto File</h3>
+                <span class="close" onclick="closeModal('proto-parser-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Upload .proto file</label>
+                    <input type="file" id="proto-file-input" accept=".proto">
+                </div>
+                <div class="form-group">
+                    <label for="proto-text-input">Or paste .proto content</label>
+                    <textarea id="proto-text-input" placeholder="Paste your .proto file content here..." rows="8"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="parseProtoInput()">Parse</button>
+                <div id="proto-results" style="display: none; margin-top: 20px;"></div>
             </div>
         </div>
     </div>

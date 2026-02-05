@@ -74,6 +74,31 @@ func (_self *BaseRepository) FindMany(
 	return cursor.All(ctx, out)
 }
 
+func (_self *BaseRepository) FindManyWithPagination(
+	ctx context.Context,
+	filter bson.M,
+	skip int64,
+	limit int64,
+	out interface{},
+) error {
+	opts := options.Find().
+		SetSkip(skip).
+		SetLimit(limit).
+		SetSort(bson.D{{Key: "created_at", Value: -1}}) // newest first
+
+	cursor, err := _self.col.Find(ctx, filter, opts)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	return cursor.All(ctx, out)
+}
+
+func (_self *BaseRepository) Count(ctx context.Context, filter bson.M) (int64, error) {
+	return _self.col.CountDocuments(ctx, filter)
+}
+
 func (_self *BaseRepository) UpdateByID(
 	ctx context.Context,
 	id int64,

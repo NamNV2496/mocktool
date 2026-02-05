@@ -52,7 +52,7 @@ func InvokeServer(invokers ...any) *fx.App {
 			fx.Annotate(repository.NewMockAPIRepository, fx.As(new(repository.IMockAPIRepository))),
 
 			fx.Annotate(controller.NewMockController, fx.As(new(controller.IMockController))),
-			// fx.Annotate(controller.NewFowardController, fx.As(new(controller.IFowardController))),
+			fx.Annotate(controller.NewFowardController, fx.As(new(controller.IForwardController))),
 			fx.Annotate(usecase.NewTrie, fx.As(new(usecase.ITrie))),
 			fx.Annotate(usecase.NewForwardUC, fx.As(new(usecase.IForwardUC))),
 			// load test
@@ -72,7 +72,9 @@ func InvokeServer(invokers ...any) *fx.App {
 
 func startServer(
 	lc fx.Lifecycle,
+	forwardController controller.IForwardController,
 	mockController controller.IMockController,
 ) error {
+	go forwardController.StartMockServer()
 	return mockController.StartHttpServer()
 }

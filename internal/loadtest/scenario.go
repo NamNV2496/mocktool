@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"gopkg.in/yaml.v3"
 )
@@ -117,15 +116,6 @@ func (l *ScenarioLoader) SaveScenarioToDB(ctx context.Context, scenario *Scenari
 
 	domainScenario := ToDomain(scenario, description)
 	return l.repo.Create(ctx, domainScenario)
-}
-
-// ListScenariosFromDB lists all scenarios from the database
-func (l *ScenarioLoader) ListScenariosFromDB(ctx context.Context) ([]domain.LoadTestScenario, error) {
-	if l.repo == nil {
-		return nil, fmt.Errorf("database repository not configured")
-	}
-
-	return l.repo.List(ctx)
 }
 
 // GetAccountsPath returns the expected Excel file path for a scenario

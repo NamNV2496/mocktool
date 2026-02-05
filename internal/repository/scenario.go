@@ -14,7 +14,7 @@ type IScenarioRepository interface {
 	Create(ctx context.Context, s *domain.Scenario) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error)
-	ListByFeatureName(ctx context.Context, featureName string) ([]domain.Scenario, error)
+	ListByFeatureNamePaginated(ctx context.Context, featureName string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
 }
 type ScenarioRepository struct {
 	*BaseRepository
@@ -26,15 +26,25 @@ func NewScenarioRepository(db *mongo.Database) *ScenarioRepository {
 	}
 }
 
-func (r *ScenarioRepository) ListByFeatureName(
+func (r *ScenarioRepository) ListByFeatureNamePaginated(
 	ctx context.Context,
 	featureName string,
-) ([]domain.Scenario, error) {
+	params domain.PaginationParams,
+) ([]domain.Scenario, int64, error) {
+	filter := bson.M{"feature_name": featureName}
+
+	total, err := r.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var result []domain.Scenario
-	err := r.FindMany(ctx, bson.M{
-		"feature_name": featureName,
-	}, &result)
-	return result, err
+	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
 }
 
 func (r *ScenarioRepository) Create(ctx context.Context, s *domain.Scenario) error {

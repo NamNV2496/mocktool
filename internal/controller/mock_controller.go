@@ -1,12 +1,11 @@
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/internal/usecase"
-	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -27,26 +25,22 @@ type IMockController interface {
 }
 
 type MockController struct {
-	config               *configs.Config
-	FeatureRepo          repository.IFeatureRepository
-	ScenarioRepo         repository.IScenarioRepository
-	AccountScenarioRepo  repository.IAccountScenarioRepository
-	MockAPIRepo          repository.IMockAPIRepository
-	loadTestController   ILoadTestController
-	forwardUc            usecase.IForwardUC
-	trie                 usecase.ITrie
-	TestWay              int
+	config              *configs.Config
+	FeatureRepo         repository.IFeatureRepository
+	ScenarioRepo        repository.IScenarioRepository
+	AccountScenarioRepo repository.IAccountScenarioRepository
+	MockAPIRepo         repository.IMockAPIRepository
+	loadTestController  ILoadTestController
+	trie                usecase.ITrie
 }
 
 func NewMockController(
 	config *configs.Config,
-	flags entity.ServiceFlags,
 	featureRepo repository.IFeatureRepository,
 	scenarioRepo repository.IScenarioRepository,
 	accountScenarioRepo repository.IAccountScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
 	loadTestController ILoadTestController,
-	forwardUc usecase.IForwardUC,
 	trie usecase.ITrie,
 ) IMockController {
 
@@ -57,9 +51,7 @@ func NewMockController(
 		AccountScenarioRepo: accountScenarioRepo,
 		MockAPIRepo:         mockAPIRepo,
 		loadTestController:  loadTestController,
-		forwardUc:           forwardUc,
 		trie:                trie,
-		TestWay:             flags.TestWay,
 	}
 }
 
@@ -88,18 +80,6 @@ func (_self *MockController) StartHttpServer() error {
 
 	// Load test scenarios - delegate to LoadTestController
 	_self.loadTestController.RegisterRoutes(v1)
-
-	c.GET("/forward/*", _self.responseMockData)
-	c.POST("/forward/*", _self.responseMockData)
-	c.PUT("/forward/*", _self.responseMockData)
-	c.DELETE("/forward/*", _self.responseMockData)
-
-	// Public API endpoints - no X-Account-Id required, uses global scenario
-	c.GET("/public/forward/*", _self.responsePublicMockData)
-	c.POST("/public/forward/*", _self.responsePublicMockData)
-	c.PUT("/public/forward/*", _self.responsePublicMockData)
-	c.DELETE("/public/forward/*", _self.responsePublicMockData)
-
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err
@@ -107,65 +87,43 @@ func (_self *MockController) StartHttpServer() error {
 	return nil
 }
 
-// handler
-func (_self *MockController) responseMockData(c echo.Context) error {
-	switch _self.TestWay {
-	case 1:
-		// =================================================WAY 1===================================================
-		// wrapper http response
-		err := _self.forwardUc.ResponseMockData(c)
-		if err != nil {
-			errResp := errorcustome.WrapErrorResponse(context.Background(), err)
-			c.Response().Header().Set("Content-Type", "application/json")
-			c.Response().WriteHeader(errResp.HttpStatus)
-			errRespBytes, _ := json.Marshal(errResp)
-			_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
-			return err
-		}
-		c.Response().WriteHeader(http.StatusOK)
-		return nil
-	case 2:
-		// =================================================WAY 2===================================================
-		// forward response
-		return _self.forwardUc.ResponseMockData(c)
-	default:
-		return nil
-	}
-}
-
-// handler for public API - no X-Account-Id required
-func (_self *MockController) responsePublicMockData(c echo.Context) error {
-	switch _self.TestWay {
-	case 1:
-		err := _self.forwardUc.ResponsePublicMockData(c)
-		if err != nil {
-			errResp := errorcustome.WrapErrorResponse(context.Background(), err)
-			c.Response().Header().Set("Content-Type", "application/json")
-			c.Response().WriteHeader(errResp.HttpStatus)
-			errRespBytes, _ := json.Marshal(errResp)
-			_, err = io.Copy(c.Response().Writer, strings.NewReader(string(errRespBytes)))
-			return err
-		}
-		c.Response().WriteHeader(http.StatusOK)
-		return nil
-	case 2:
-		return _self.forwardUc.ResponsePublicMockData(c)
-	default:
-		return nil
-	}
-}
-
 /* ---------- GET /features ---------- */
 
 func (_self *MockController) GetFeatures(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	features, err := _self.FeatureRepo.ListAll(ctx)
+	params := parsePaginationParams(c)
+
+	features, total, err := _self.FeatureRepo.ListAllPaginated(ctx, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, features)
+	response := domain.NewPaginatedResponse(features, total, params)
+	return c.JSON(http.StatusOK, response)
+}
+
+// parsePaginationParams extracts and validates pagination parameters from query string
+func parsePaginationParams(c echo.Context) domain.PaginationParams {
+	params := domain.PaginationParams{
+		Page:     domain.DefaultPage,
+		PageSize: domain.DefaultPageSize,
+	}
+
+	if pageStr := c.QueryParam("page"); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil {
+			params.Page = page
+		}
+	}
+
+	if pageSizeStr := c.QueryParam("page_size"); pageSizeStr != "" {
+		if pageSize, err := strconv.Atoi(pageSizeStr); err == nil {
+			params.PageSize = pageSize
+		}
+	}
+
+	params.Normalize()
+	return params
 }
 
 /* ---------- POST /features ---------- */
@@ -238,12 +196,15 @@ func (_self *MockController) ListScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
 	}
 
-	scenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, featureName)
+	params := parsePaginationParams(c)
+
+	scenarios, total, err := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, scenarios)
+	response := domain.NewPaginatedResponse(scenarios, total, params)
+	return c.JSON(http.StatusOK, response)
 }
 
 /* ---------- GET /scenarios?feature_name= ---------- */
@@ -436,13 +397,15 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "scenario_name is required")
 	}
 
-	apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenarioName)
+	params := parsePaginationParams(c)
+
+	apis, total, err := _self.MockAPIRepo.ListByScenarioNamePaginated(ctx, scenarioName, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	// Convert to response format with JSON objects for frontend
-	var response []map[string]any
+	var data []map[string]any
 	for _, api := range apis {
 		// Convert bson.Raw to JSON object
 		var hashInputJSON any = nil
@@ -471,7 +434,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			}
 		}
 
-		response = append(response, map[string]any{
+		data = append(data, map[string]any{
 			"id":            api.ID.Hex(),
 			"feature_name":  api.FeatureName,
 			"scenario_name": api.ScenarioName,
@@ -486,6 +449,20 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"created_at":    api.CreatedAt.Format(time.RFC3339),
 			"updated_at":    api.UpdatedAt.Format(time.RFC3339),
 		})
+	}
+
+	// Calculate total pages
+	totalPages := int(total) / params.PageSize
+	if int(total)%params.PageSize > 0 {
+		totalPages++
+	}
+
+	response := map[string]any{
+		"data":        data,
+		"total":       total,
+		"page":        params.Page,
+		"page_size":   params.PageSize,
+		"total_pages": totalPages,
 	}
 
 	return c.JSON(http.StatusOK, response)

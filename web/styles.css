@@ -269,6 +269,10 @@ tr:hover {
     animation: slideUp 0.3s ease;
 }
 
+#mockapi-modal .modal-content {
+    max-width: 900px;
+}
+
 @keyframes slideUp {
     from {
         transform: translateY(50px);
@@ -392,6 +396,365 @@ tr:hover {
     border-radius: 6px;
     margin-bottom: 15px;
     border-left: 4px solid #38a169;
+}
+
+.btn-outline {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.form-group input[type="file"] {
+    padding: 8px;
+    border: 2px dashed #e2e8f0;
+    border-radius: 6px;
+    width: 100%;
+    font-size: 0.95rem;
+}
+
+.form-group input[type="file"]:hover {
+    border-color: #667eea;
+}
+
+.proto-results-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.proto-result-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    flex: 1 1 280px;
+    background: #f7fafc;
+    transition: box-shadow 0.2s ease;
+}
+
+.proto-result-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.proto-result-name {
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 10px;
+}
+
+.proto-result-json {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.85rem;
+    color: #4a5568;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 200px;
+    margin-bottom: 12px;
+    white-space: pre;
+    font-family: 'Courier New', monospace;
+}
+
+.proto-result-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-proto-input,
+.btn-proto-output {
+    background: #cbd5e0;
+    color: #4a5568;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-proto-input:hover,
+.btn-proto-output:hover {
+    background: #a0aec0;
+}
+
+.btn-proto-input.selected {
+    background: #3182ce;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.4);
+}
+
+.btn-proto-output.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+}
+
+.proto-apply-row {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.pagination-container {
+    padding: 15px 0;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.page-btn {
+    padding: 8px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: white;
+    color: #4a5568;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 38px;
+    text-align: center;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.page-btn:hover:not(:disabled) {
+    border-color: #667eea;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.page-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-ellipsis {
+    padding: 8px 4px;
+    color: #a0aec0;
+    font-size: 0.9rem;
+}
+
+/* === JSON Tree Editor === */
+.json-field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.json-field-header label {
+    margin-bottom: 0;
+}
+
+.json-mode-toggle {
+    display: flex;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mode-btn {
+    padding: 4px 10px;
+    background: white;
+    border: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #718096;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+    transition: all 0.2s ease;
+}
+
+.mode-btn:hover {
+    background: #f0f4ff;
+    color: #667eea;
+}
+
+.mode-btn.active {
+    background: #667eea;
+    color: white;
+}
+
+.json-tree {
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 12px 8px;
+    background: #fafbfc;
+    min-height: 50px;
+}
+
+.tree-node {
+    margin: 2px 0;
+}
+
+.tree-node-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 0;
+}
+
+.tree-expand-btn {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: none;
+    background: rgba(102, 126, 234, 0.08);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.tree-expand-btn:hover {
+    background: rgba(102, 126, 234, 0.22);
+}
+
+.tree-expand-spacer {
+    width: 20px;
+    min-width: 20px;
+}
+
+.tree-key-input {
+    width: 90px;
+    padding: 2px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-family: 'Courier New', monospace;
+    color: #d6336c;
+    background: white;
+    transition: border-color 0.15s;
+}
+
+.tree-key-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+.tree-index-badge {
+    font-size: 0.8rem;
+    color: #a0aec0;
+    font-family: 'Courier New', monospace;
+    min-width: 24px;
+}
+
+.tree-colon {
+    color: #4a5568;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.tree-type-select {
+    padding: 2px 4px;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: #718096;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.tree-type-select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.tree-value-input {
+    padding: 2px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-family: 'Courier New', monospace;
+    min-width: 70px;
+    max-width: 220px;
+    flex: 1;
+    background: white;
+    transition: border-color 0.15s;
+}
+
+.tree-value-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+select.tree-value-input {
+    flex: none;
+    width: auto;
+}
+
+.tree-null-label {
+    color: #a0aec0;
+    font-style: italic;
+    font-size: 0.82rem;
+    font-family: 'Courier New', monospace;
+}
+
+.tree-add-btn,
+.tree-remove-btn {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border: 1px solid #e2e8f0;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    background: white;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: 0;
+}
+
+.tree-add-btn {
+    color: #38a169;
+}
+
+.tree-add-btn:hover {
+    background: #c6f6d5;
+    border-color: #38a169;
+}
+
+.tree-remove-btn {
+    color: #e53e3e;
+}
+
+.tree-remove-btn:hover {
+    background: #fed7d7;
+    border-color: #e53e3e;
+}
+
+.tree-children {
+    margin-left: 10px;
+    padding-left: 16px;
+    border-left: 2px solid #e2e8f0;
+    margin-top: 3px;
+    margin-bottom: 2px;
 }
 
 @media (max-width: 768px) {

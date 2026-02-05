@@ -46,7 +46,9 @@ func (c *LoadTestController) RegisterRoutes(g *echo.Group) {
 /* ---------- GET /loadtest/scenarios ---------- */
 
 func (c *LoadTestController) ListScenarios(ctx echo.Context) error {
-	scenarios, err := c.scenarioRepo.List(ctx.Request().Context())
+	params := parsePaginationParams(ctx)
+
+	scenarios, total, err := c.scenarioRepo.ListPaginated(ctx.Request().Context(), params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -55,7 +57,8 @@ func (c *LoadTestController) ListScenarios(ctx echo.Context) error {
 		scenarios = []domain.LoadTestScenario{}
 	}
 
-	return ctx.JSON(http.StatusOK, scenarios)
+	response := domain.NewPaginatedResponse(scenarios, total, params)
+	return ctx.JSON(http.StatusOK, response)
 }
 
 /* ---------- GET /loadtest/scenarios/:scenario_id ---------- */

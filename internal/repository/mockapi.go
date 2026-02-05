@@ -13,6 +13,7 @@ import (
 type IMockAPIRepository interface {
 	ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
 	ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
+	ListByScenarioNamePaginated(ctx context.Context, scenarioName string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 }
@@ -72,6 +73,30 @@ func (_self *MockAPIRepository) ListByScenarioName(
 	}, &result)
 
 	return result, err
+}
+
+func (_self *MockAPIRepository) ListByScenarioNamePaginated(
+	ctx context.Context,
+	scenarioName string,
+	params domain.PaginationParams,
+) ([]domain.MockAPI, int64, error) {
+	filter := bson.M{
+		"scenario_name": scenarioName,
+		"is_active":     true,
+	}
+
+	total, err := _self.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result []domain.MockAPI
+	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
 }
 
 /* ---------- create ---------- */

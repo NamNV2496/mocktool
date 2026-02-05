@@ -6,9 +6,23 @@ let mockAPIs = [];
 let loadTestScenarios = [];
 let activeScenarioId = null; // Track the active scenario ID for the current accountId
 
+let parsedEnums = {};
+let parsedMessages = {};
+let protoTemplates = [];
+let selectedProtoInput = null;
+let selectedProtoOutput = null;
+
+const pagination = {
+    features: { page: 1, totalPages: 1 },
+    scenarios: { page: 1, totalPages: 1 },
+    mockapis: { page: 1, totalPages: 1 },
+    loadtest: { page: 1, totalPages: 1 }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
     loadFeatures();
+    initProtoFileInput();
     
     // Add event listener for accounts input to update count
     const accountsInput = document.getElementById('loadtest-accounts-input');
@@ -45,13 +59,16 @@ function switchTab(tabName) {
     }
 }
 
-async function loadFeatures() {
+async function loadFeatures(page = 1) {
     try {
-        const response = await fetch(`${API_BASE_URL}/features`);
+        const response = await fetch(`${API_BASE_URL}/features?page=${page}&page_size=10`);
         if (!response.ok) throw new Error('Failed to load features');
 
-        features = await response.json();
+        const result = await response.json();
+        features = result.data;
+        pagination.features = { page: result.page, totalPages: result.total_pages };
         renderFeaturesTable();
+        renderPagination('features', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading features:', error);
         showError('Failed to load features');
@@ -82,19 +99,22 @@ function renderFeaturesTable() {
     `).join('');
 }
 
-async function loadScenarios(featureName) {
+async function loadScenarios(featureName, page = 1) {
     if (!featureName) {
         document.getElementById('scenarios-table-body').innerHTML =
             '<tr><td colspan="6" class="loading">Select a feature to view scenarios</td></tr>';
+        document.getElementById('scenarios-pagination').innerHTML = '';
         activeScenarioId = null;
         return;
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
+        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}&page=${page}&page_size=10`);
         if (!response.ok) throw new Error('Failed to load scenarios');
 
-        scenarios = await response.json();
+        const result = await response.json();
+        scenarios = result.data;
+        pagination.scenarios = { page: result.page, totalPages: result.total_pages };
 
         // Fetch active scenario if accountId is provided
         const accountId = document.getElementById('scenario-account-id-filter')?.value.trim();
@@ -105,6 +125,7 @@ async function loadScenarios(featureName) {
         }
 
         renderScenariosTable();
+        renderPagination('scenarios', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading scenarios:', error);
         showError('Failed to load scenarios');
@@ -167,19 +188,23 @@ function renderScenariosTable() {
     }).join('');
 }
 
-async function loadMockAPIs(scenarioName) {
+async function loadMockAPIs(scenarioName, page = 1) {
     if (!scenarioName) {
         document.getElementById('mockapis-table-body').innerHTML =
             '<tr><td colspan="7" class="loading">Select a scenario to view mock APIs</td></tr>';
+        document.getElementById('mockapis-pagination').innerHTML = '';
         return;
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/mockapis?scenario_name=${scenarioName}`);
+        const response = await fetch(`${API_BASE_URL}/mockapis?scenario_name=${scenarioName}&page=${page}&page_size=10`);
         if (!response.ok) throw new Error('Failed to load mock APIs');
 
-        mockAPIs = await response.json();
+        const result = await response.json();
+        mockAPIs = result.data;
+        pagination.mockapis = { page: result.page, totalPages: result.total_pages };
         renderMockAPIsTable();
+        renderPagination('mockapis', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading mock APIs:', error);
         showError('Failed to load mock APIs');
@@ -213,11 +238,90 @@ function renderMockAPIsTable() {
     `).join('');
 }
 
-function populateFeatureFilters() {
+async function fetchAllFeatures() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/features?page_size=1000`);
+        if (!response.ok) throw new Error('Failed to load features');
+        const result = await response.json();
+        return result.data;
+    } catch (error) {
+        console.error('Error fetching all features:', error);
+        return [];
+    }
+}
+
+async function fetchAllScenarios(featureName) {
+    if (!featureName) return [];
+    try {
+        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}&page_size=1000`);
+        if (!response.ok) throw new Error('Failed to load scenarios');
+        const result = await response.json();
+        return result.data;
+    } catch (error) {
+        console.error('Error fetching all scenarios:', error);
+        return [];
+    }
+}
+
+function renderPagination(entity, currentPage, totalPages) {
+    const container = document.getElementById(`${entity}-pagination`);
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '<div class="pagination">';
+
+    // Previous button
+    html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage - 1})">Prev</button>`;
+
+    // Page number range
+    const range = 2;
+    const start = Math.max(1, currentPage - range);
+    const end = Math.min(totalPages, currentPage + range);
+
+    if (start > 1) {
+        html += `<button class="page-btn" onclick="loadPage('${entity}', 1)">1</button>`;
+        if (start > 2) html += '<span class="page-ellipsis">...</span>';
+    }
+
+    for (let i = start; i <= end; i++) {
+        html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="loadPage('${entity}', ${i})">${i}</button>`;
+    }
+
+    if (end < totalPages) {
+        if (end < totalPages - 1) html += '<span class="page-ellipsis">...</span>';
+        html += `<button class="page-btn" onclick="loadPage('${entity}', ${totalPages})">${totalPages}</button>`;
+    }
+
+    // Next button
+    html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage + 1})">Next</button>`;
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function loadPage(entity, page) {
+    if (entity === 'features') {
+        loadFeatures(page);
+    } else if (entity === 'scenarios') {
+        const featureName = document.getElementById('scenario-feature-filter').value;
+        loadScenarios(featureName, page);
+    } else if (entity === 'mockapis') {
+        const scenarioName = document.getElementById('mockapi-scenario-filter').value;
+        loadMockAPIs(scenarioName, page);
+    } else if (entity === 'loadtest') {
+        loadLoadTestScenarios(page);
+    }
+}
+
+async function populateFeatureFilters() {
+    const allFeatures = await fetchAllFeatures();
+
     const scenarioFilter = document.getElementById('scenario-feature-filter');
     scenarioFilter.innerHTML = '<option value="">Select a feature...</option>';
 
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -229,7 +333,6 @@ function populateFeatureFilters() {
     // Add event listener to accountId filter to re-render table when it changes
     const accountIdFilter = document.getElementById('scenario-account-id-filter');
     accountIdFilter.addEventListener('input', async () => {
-        // Fetch and re-render the table to show which scenarios are active for the entered accountId
         const accountId = accountIdFilter.value.trim();
         const featureName = scenarioFilter.value;
 
@@ -243,11 +346,13 @@ function populateFeatureFilters() {
     });
 }
 
-function populateMockAPIFilters() {
+async function populateMockAPIFilters() {
+    const allFeatures = await fetchAllFeatures();
+
     const featureFilter = document.getElementById('mockapi-feature-filter');
     featureFilter.innerHTML = '<option value="">Select a feature...</option>';
 
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -262,13 +367,7 @@ function populateMockAPIFilters() {
         }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to load scenarios');
-            }
-
-            const scenarios = await response.json();
+            const scenarios = await fetchAllScenarios(featureName);
 
             const scenarioFilter = document.getElementById('mockapi-scenario-filter');
             scenarioFilter.innerHTML = '<option value="">Select a scenario...</option>';
@@ -279,7 +378,6 @@ function populateMockAPIFilters() {
                 option.textContent = scenario.name;
                 scenarioFilter.appendChild(option);
             });
-
         } catch (error) {
             console.error('Error loading scenarios:', error);
             showError('Failed to load scenarios');
@@ -346,15 +444,16 @@ async function saveFeature() {
     }
 }
 
-function showCreateScenarioModal() {
+async function showCreateScenarioModal() {
     document.getElementById('scenario-modal-title').textContent = 'Create Scenario';
     document.getElementById('scenario-id').value = '';
     document.getElementById('scenario-name').value = '';
     document.getElementById('scenario-description').value = '';
 
+    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('scenario-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -364,15 +463,16 @@ function showCreateScenarioModal() {
     showModal('scenario-modal');
 }
 
-function editScenario(scenario) {
+async function editScenario(scenario) {
     document.getElementById('scenario-modal-title').textContent = 'Edit Scenario';
     document.getElementById('scenario-id').value = scenario.id;
     document.getElementById('scenario-name').value = scenario.name;
     document.getElementById('scenario-description').value = scenario.description || '';
 
+    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('scenario-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -475,7 +575,7 @@ async function activateScenarioGlobal(scenarioId) {
     }
 }
 
-function showCreateMockAPIModal() {
+async function showCreateMockAPIModal() {
     document.getElementById('mockapi-modal-title').textContent = 'Create Mock API';
     document.getElementById('mockapi-id').value = '';
     document.getElementById('mockapi-name').value = '';
@@ -486,9 +586,10 @@ function showCreateMockAPIModal() {
     document.getElementById('mockapi-output').value = '';
     document.getElementById('mockapi-active').checked = true;
 
+    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('mockapi-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -503,8 +604,7 @@ function showCreateMockAPIModal() {
         if (!featureName) return;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
-            const scenarios = await response.json();
+            const scenarios = await fetchAllScenarios(featureName);
 
             scenarios.forEach(scenario => {
                 const option = document.createElement('option');
@@ -517,10 +617,12 @@ function showCreateMockAPIModal() {
         }
     };
 
+    resetJsonTreeMode('mockapi-hash-input');
+    resetJsonTreeMode('mockapi-output');
     showModal('mockapi-modal');
 }
 
-function editMockAPI(api) {
+async function editMockAPI(api) {
     document.getElementById('mockapi-modal-title').textContent = 'Edit Mock API';
     document.getElementById('mockapi-id').value = api.id;
     document.getElementById('mockapi-name').value = api.name;
@@ -564,9 +666,10 @@ function editMockAPI(api) {
 
     document.getElementById('mockapi-active').checked = api.is_active;
 
+    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('mockapi-feature');
     featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    features.forEach(feature => {
+    allFeatures.forEach(feature => {
         const option = document.createElement('option');
         option.value = feature.name;
         option.textContent = feature.name;
@@ -577,29 +680,26 @@ function editMockAPI(api) {
     });
 
     loadScenariosForEdit(api.feature_name, api.scenario_name);
+    resetJsonTreeMode('mockapi-hash-input');
+    resetJsonTreeMode('mockapi-output');
     showModal('mockapi-modal');
 }
 
 async function loadScenariosForEdit(featureName, selectedScenario) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}`);
-        const scenarios = await response.json();
+    const scenarios = await fetchAllScenarios(featureName);
 
-        const scenarioSelect = document.getElementById('mockapi-scenario');
-        scenarioSelect.innerHTML = '<option value="">Select a scenario...</option>';
+    const scenarioSelect = document.getElementById('mockapi-scenario');
+    scenarioSelect.innerHTML = '<option value="">Select a scenario...</option>';
 
-        scenarios.forEach(scenario => {
-            const option = document.createElement('option');
-            option.value = scenario.name;
-            option.textContent = scenario.name;
-            if (scenario.name === selectedScenario) {
-                option.selected = true;
-            }
-            scenarioSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error loading scenarios:', error);
-    }
+    scenarios.forEach(scenario => {
+        const option = document.createElement('option');
+        option.value = scenario.name;
+        option.textContent = scenario.name;
+        if (scenario.name === selectedScenario) {
+            option.selected = true;
+        }
+        scenarioSelect.appendChild(option);
+    });
 }
 
 async function saveMockAPI() {
@@ -610,8 +710,8 @@ async function saveMockAPI() {
     const path = document.getElementById('mockapi-path').value.trim();
     const method = document.getElementById('mockapi-method').value;
     const regexPath = document.getElementById('mockapi-regex-path').value.trim();
-    const hashInputStr = document.getElementById('mockapi-hash-input').value.trim();
-    const outputStr = document.getElementById('mockapi-output').value.trim();
+    const hashInputStr = getJsonFieldValue('mockapi-hash-input');
+    const outputStr = getJsonFieldValue('mockapi-output');
     const outputHeaders = document.getElementById('mockapi-output-header').value.trim();
     const isActive = document.getElementById('mockapi-active').checked;
 
@@ -760,15 +860,563 @@ async function deleteMockAPI(id) {
     }
 }
 
+// === Proto Parser ===
+
+function initProtoFileInput() {
+    document.getElementById('proto-file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            document.getElementById('proto-text-input').value = event.target.result;
+        };
+        reader.readAsText(file);
+    });
+}
+
+function showProtoParserModal() {
+    document.getElementById('proto-file-input').value = '';
+    document.getElementById('proto-text-input').value = '';
+    document.getElementById('proto-results').style.display = 'none';
+    document.getElementById('proto-results').innerHTML = '';
+    selectedProtoInput = null;
+    selectedProtoOutput = null;
+    showModal('proto-parser-modal');
+}
+
+function parseProtoInput() {
+    const text = document.getElementById('proto-text-input').value.trim();
+    if (!text) {
+        showError('Please enter or upload a .proto file');
+        return;
+    }
+
+    parsedEnums = {};
+    parsedMessages = {};
+
+    const cleaned = text
+        .replace(/\/\/.*$/gm, '')
+        .replace(/\/\*[\s\S]*?\*\//g, '');
+
+    extractEnums(cleaned);
+    extractMessages(cleaned);
+    renderProtoResults();
+}
+
+function findMatchingBrace(text, start) {
+    let depth = 1;
+    let i = start;
+    while (i < text.length && depth > 0) {
+        if (text[i] === '{') depth++;
+        if (text[i] === '}') depth--;
+        i++;
+    }
+    return i;
+}
+
+function extractEnums(text) {
+    const regex = /\benum\s+(\w+)\s*\{/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        const bodyStart = match.index + match[0].length;
+        const bodyEnd = findMatchingBrace(text, bodyStart);
+        const body = text.substring(bodyStart, bodyEnd - 1);
+
+        const values = [];
+        const valRegex = /(\w+)\s*=\s*(\d+)/g;
+        let valMatch;
+        while ((valMatch = valRegex.exec(body)) !== null) {
+            values.push({ name: valMatch[1], number: parseInt(valMatch[2]) });
+        }
+        values.sort((a, b) => a.number - b.number);
+        if (values.length > 0) {
+            parsedEnums[match[1]] = values;
+        }
+    }
+}
+
+function extractMessages(text) {
+    const regex = /\bmessage\s+(\w+)\s*\{/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        const bodyStart = match.index + match[0].length;
+        const bodyEnd = findMatchingBrace(text, bodyStart);
+        const body = text.substring(bodyStart, bodyEnd - 1);
+
+        parsedMessages[match[1]] = parseFields(getTopLevelContent(body));
+    }
+}
+
+// Strips nested message/enum blocks; inlines oneof field declarations
+function getTopLevelContent(body) {
+    let result = '';
+    let i = 0;
+    while (i < body.length) {
+        const ahead = body.substring(i);
+
+        const skipMatch = ahead.match(/^(message|enum)\s+\w+\s*\{/);
+        if (skipMatch) {
+            i += skipMatch[0].length;
+            i = findMatchingBrace(body, i);
+            continue;
+        }
+
+        const oneofMatch = ahead.match(/^oneof\s+\w+\s*\{/);
+        if (oneofMatch) {
+            i += oneofMatch[0].length;
+            let depth = 1;
+            while (i < body.length && depth > 0) {
+                if (body[i] === '{') depth++;
+                else if (body[i] === '}') depth--;
+                if (depth > 0) result += body[i];
+                i++;
+            }
+            continue;
+        }
+
+        result += body[i];
+        i++;
+    }
+    return result;
+}
+
+function parseFields(text) {
+    const fields = [];
+    const regex = /(?:(repeated|optional)\s+)?(?:map\s*<\s*(\w+)\s*,\s*(\w+)\s*>|(\w+(?:\.\w+)*))\s+(\w+)\s*=\s*(\d+)/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        fields.push({
+            modifier: match[1] || null,
+            mapKeyType: match[2] || null,
+            mapValueType: match[3] || null,
+            type: match[4] || null,
+            name: match[5],
+            number: parseInt(match[6])
+        });
+    }
+    return fields;
+}
+
+const _protoIntTypes = ['int32', 'int64', 'uint32', 'uint64', 'sint32', 'sint64',
+    'fixed32', 'fixed64', 'sfixed32', 'sfixed64'];
+
+const _protoWellKnown = {
+    'google.protobuf.Timestamp': '2024-01-01T00:00:00Z',
+    'google.protobuf.Duration': '0s',
+    'google.protobuf.Struct': {},
+    'google.protobuf.Value': null,
+    'google.protobuf.ListValue': [],
+    'google.protobuf.Any': { '@type': '' }
+};
+
+function getDefaultValue(type, depth) {
+    if (type === 'string') return '';
+    if (type === 'bool') return false;
+    if (type === 'bytes') return '';
+    if (_protoIntTypes.includes(type)) return 0;
+    if (type === 'float' || type === 'double') return 0;
+    if (Object.prototype.hasOwnProperty.call(_protoWellKnown, type)) {
+        return JSON.parse(JSON.stringify(_protoWellKnown[type]));
+    }
+    if (parsedEnums[type] && parsedEnums[type].length > 0) {
+        return parsedEnums[type][0].name;
+    }
+    if (depth < 3 && parsedMessages[type]) {
+        return generateTemplate(parsedMessages[type], depth + 1);
+    }
+    return {};
+}
+
+function generateTemplate(fields, depth = 0) {
+    const obj = {};
+    for (const field of fields) {
+        if (field.mapKeyType) {
+            obj[field.name] = { 'key': getDefaultValue(field.mapValueType, depth) };
+        } else if (field.modifier === 'repeated') {
+            obj[field.name] = [getDefaultValue(field.type, depth)];
+        } else {
+            obj[field.name] = getDefaultValue(field.type, depth);
+        }
+    }
+    return obj;
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function renderProtoResults() {
+    const container = document.getElementById('proto-results');
+    const names = Object.keys(parsedMessages);
+
+    if (names.length === 0) {
+        container.innerHTML = '<p style="color: #718096; font-style: italic;">No messages found in the .proto file.</p>';
+        container.style.display = 'block';
+        return;
+    }
+
+    protoTemplates = names.map(name => ({
+        name,
+        json: JSON.stringify(generateTemplate(parsedMessages[name]), null, 2)
+    }));
+
+    let html = '<div class="proto-results-grid">';
+    protoTemplates.forEach((item, index) => {
+        html += `
+            <div class="proto-result-card">
+                <div class="proto-result-name">${escapeHtml(item.name)}</div>
+                <pre class="proto-result-json">${escapeHtml(item.json)}</pre>
+                <div class="proto-result-actions">
+                    <button class="btn btn-proto-input btn-proto-select" onclick="selectProtoTemplate(${index}, 'input')">Use as Input</button>
+                    <button class="btn btn-proto-output btn-proto-select" onclick="selectProtoTemplate(${index}, 'output')">Use as Output</button>
+                </div>
+            </div>`;
+    });
+    html += '</div>';
+    html += '<div class="proto-apply-row">';
+    html += '<button class="btn btn-primary" id="proto-apply-btn" style="display: none;" onclick="applyProtoTemplates()">Create Mock API</button>';
+    html += '</div>';
+
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+function selectProtoTemplate(index, target) {
+    document.querySelectorAll(`.btn-proto-${target}`).forEach(btn => btn.classList.remove('selected'));
+    document.querySelectorAll(`.btn-proto-${target}`)[index]?.classList.add('selected');
+
+    if (target === 'input') {
+        selectedProtoInput = protoTemplates[index]?.json || null;
+    } else {
+        selectedProtoOutput = protoTemplates[index]?.json || null;
+    }
+
+    document.getElementById('proto-apply-btn').style.display =
+        (selectedProtoInput || selectedProtoOutput) ? 'inline-block' : 'none';
+}
+
+async function applyProtoTemplates() {
+    closeModal('proto-parser-modal');
+    await showCreateMockAPIModal();
+
+    if (selectedProtoInput) {
+        document.getElementById('mockapi-hash-input').value = selectedProtoInput;
+    }
+    if (selectedProtoOutput) {
+        document.getElementById('mockapi-output').value = selectedProtoOutput;
+    }
+
+    selectedProtoInput = null;
+    selectedProtoOutput = null;
+}
+
+// === JSON Tree Editor ===
+
+function getJsonType(value) {
+    if (value === null || value === undefined) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value;
+}
+
+function createTreeNode(key, value, isRoot, isArrayItem, arrayIndex) {
+    const type = getJsonType(value);
+    const node = document.createElement('div');
+    node.className = 'tree-node';
+    node.dataset.type = type;
+
+    const header = document.createElement('div');
+    header.className = 'tree-node-header';
+
+    // Expand/collapse toggle (containers) or spacer (primitives)
+    if (type === 'object' || type === 'array') {
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'tree-expand-btn';
+        expandBtn.textContent = '▼';
+        expandBtn.onclick = function () {
+            const ch = node.querySelector(':scope > .tree-children');
+            if (ch.style.display === 'none') {
+                ch.style.display = 'block';
+                expandBtn.textContent = '▼';
+            } else {
+                ch.style.display = 'none';
+                expandBtn.textContent = '▶';
+            }
+        };
+        header.appendChild(expandBtn);
+    } else {
+        const spacer = document.createElement('span');
+        spacer.className = 'tree-expand-spacer';
+        header.appendChild(spacer);
+    }
+
+    // Key input (object property) or index badge (array item)
+    if (!isRoot) {
+        if (isArrayItem) {
+            const badge = document.createElement('span');
+            badge.className = 'tree-index-badge';
+            badge.textContent = '[' + arrayIndex + ']';
+            header.appendChild(badge);
+        } else {
+            const keyInput = document.createElement('input');
+            keyInput.className = 'tree-key-input';
+            keyInput.value = (key != null) ? String(key) : '';
+            keyInput.placeholder = 'key';
+            header.appendChild(keyInput);
+        }
+        const colon = document.createElement('span');
+        colon.className = 'tree-colon';
+        colon.textContent = ':';
+        header.appendChild(colon);
+    }
+
+    // Type selector
+    const typeOptions = isRoot ? ['object', 'array'] : ['string', 'number', 'boolean', 'null', 'object', 'array'];
+    const typeSelect = document.createElement('select');
+    typeSelect.className = 'tree-type-select';
+    typeOptions.forEach(function (t) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === type) opt.selected = true;
+        typeSelect.appendChild(opt);
+    });
+    typeSelect.onchange = function (e) {
+        changeNodeType(node, e.target.value, isRoot);
+    };
+    header.appendChild(typeSelect);
+
+    // Value control (primitives only)
+    if (type === 'string' || type === 'number') {
+        const input = document.createElement('input');
+        input.className = 'tree-value-input';
+        input.value = String(value);
+        input.placeholder = type === 'number' ? '0' : 'value';
+        header.appendChild(input);
+    } else if (type === 'boolean') {
+        const sel = document.createElement('select');
+        sel.className = 'tree-value-input';
+        ['true', 'false'].forEach(function (v) {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            if (v === String(value)) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        header.appendChild(sel);
+    } else if (type === 'null') {
+        const lbl = document.createElement('span');
+        lbl.className = 'tree-null-label';
+        lbl.textContent = 'null';
+        header.appendChild(lbl);
+    }
+
+    // Add-child button (containers only)
+    if (type === 'object' || type === 'array') {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'tree-add-btn';
+        addBtn.textContent = '+';
+        addBtn.title = type === 'object' ? 'Add property' : 'Add item';
+        addBtn.onclick = function () { addTreeChild(node); };
+        header.appendChild(addBtn);
+    }
+
+    // Remove button (non-root only)
+    if (!isRoot) {
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'tree-remove-btn';
+        rmBtn.textContent = '×';
+        rmBtn.title = 'Remove';
+        rmBtn.onclick = function () { removeTreeNode(node); };
+        header.appendChild(rmBtn);
+    }
+
+    node.appendChild(header);
+
+    // Children container (containers only)
+    if (type === 'object' || type === 'array') {
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'tree-children';
+        if (type === 'object') {
+            Object.keys(value).forEach(function (k) {
+                childrenDiv.appendChild(createTreeNode(k, value[k], false, false, null));
+            });
+        } else {
+            value.forEach(function (item, idx) {
+                childrenDiv.appendChild(createTreeNode(null, item, false, true, idx));
+            });
+        }
+        node.appendChild(childrenDiv);
+    }
+
+    return node;
+}
+
+function renderJsonTree(containerId, data) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    container.appendChild(createTreeNode(null, data, true, false, null));
+}
+
+function readTreeValue(node) {
+    const type = node.dataset.type;
+
+    if (type === 'object') {
+        const obj = {};
+        const ch = node.querySelector(':scope > .tree-children');
+        if (ch) {
+            ch.querySelectorAll(':scope > .tree-node').forEach(function (child) {
+                const ki = child.querySelector(':scope > .tree-node-header > .tree-key-input');
+                const key = ki ? ki.value.trim() : '';
+                if (key) obj[key] = readTreeValue(child);
+            });
+        }
+        return obj;
+    }
+
+    if (type === 'array') {
+        const arr = [];
+        const ch = node.querySelector(':scope > .tree-children');
+        if (ch) {
+            ch.querySelectorAll(':scope > .tree-node').forEach(function (child) {
+                arr.push(readTreeValue(child));
+            });
+        }
+        return arr;
+    }
+
+    if (type === 'null') return null;
+
+    const valueEl = node.querySelector(':scope > .tree-node-header > .tree-value-input');
+    if (type === 'boolean') return valueEl ? valueEl.value === 'true' : false;
+    if (type === 'number') {
+        const n = Number(valueEl ? valueEl.value : '0');
+        return isNaN(n) ? 0 : n;
+    }
+    return valueEl ? valueEl.value : '';
+}
+
+function addTreeChild(node) {
+    const type = node.dataset.type;
+    let ch = node.querySelector(':scope > .tree-children');
+    if (!ch) {
+        ch = document.createElement('div');
+        ch.className = 'tree-children';
+        node.appendChild(ch);
+    }
+    if (type === 'object') {
+        const newNode = createTreeNode('', '', false, false, null);
+        ch.appendChild(newNode);
+        newNode.querySelector('.tree-key-input').focus();
+    } else if (type === 'array') {
+        const idx = ch.querySelectorAll(':scope > .tree-node').length;
+        ch.appendChild(createTreeNode(null, '', false, true, idx));
+    }
+}
+
+function removeTreeNode(node) {
+    const parent = node.parentNode;
+    const grandparent = parent ? parent.parentNode : null;
+    node.remove();
+    if (grandparent && grandparent.dataset.type === 'array') {
+        reindexArrayChildren(grandparent);
+    }
+}
+
+function reindexArrayChildren(parentNode) {
+    const ch = parentNode.querySelector(':scope > .tree-children');
+    if (!ch) return;
+    ch.querySelectorAll(':scope > .tree-node').forEach(function (child, idx) {
+        const badge = child.querySelector(':scope > .tree-node-header > .tree-index-badge');
+        if (badge) badge.textContent = '[' + idx + ']';
+    });
+}
+
+function changeNodeType(node, newType, isRoot) {
+    const header = node.querySelector(':scope > .tree-node-header');
+    const ki = header.querySelector('.tree-key-input');
+    const badge = header.querySelector('.tree-index-badge');
+    const isArrayItem = !!badge;
+    const key = ki ? ki.value : null;
+    const arrayIndex = badge ? parseInt(badge.textContent.match(/\d+/)?.[0] || '0') : null;
+
+    let defaultValue;
+    switch (newType) {
+        case 'string':  defaultValue = ''; break;
+        case 'number':  defaultValue = 0; break;
+        case 'boolean': defaultValue = false; break;
+        case 'null':    defaultValue = null; break;
+        case 'object':  defaultValue = {}; break;
+        case 'array':   defaultValue = []; break;
+        default:        defaultValue = '';
+    }
+
+    const newNode = createTreeNode(key, defaultValue, isRoot, isArrayItem, arrayIndex);
+    node.parentNode.replaceChild(newNode, node);
+}
+
+function switchJsonMode(fieldId, mode) {
+    const textarea = document.getElementById(fieldId);
+    const treeContainer = document.getElementById(fieldId + '-tree');
+    const formGroup = textarea.closest('.form-group');
+    formGroup.querySelectorAll('.mode-btn').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    if (mode === 'tree') {
+        let data = {};
+        const raw = textarea.value.trim();
+        if (raw) {
+            try { data = JSON.parse(raw); } catch (e) { /* invalid JSON — start with empty object */ }
+        }
+        renderJsonTree(fieldId + '-tree', data);
+        textarea.style.display = 'none';
+        treeContainer.style.display = 'block';
+    } else {
+        const root = treeContainer.querySelector('.tree-node');
+        if (root) {
+            textarea.value = JSON.stringify(readTreeValue(root), null, 2);
+        }
+        textarea.style.display = 'block';
+        treeContainer.style.display = 'none';
+    }
+}
+
+function getJsonFieldValue(fieldId) {
+    const textarea = document.getElementById(fieldId);
+    const treeContainer = document.getElementById(fieldId + '-tree');
+    if (treeContainer && treeContainer.style.display !== 'none') {
+        const root = treeContainer.querySelector('.tree-node');
+        return root ? JSON.stringify(readTreeValue(root), null, 2) : '';
+    }
+    return textarea.value.trim();
+}
+
+function resetJsonTreeMode(fieldId) {
+    const textarea = document.getElementById(fieldId);
+    const treeContainer = document.getElementById(fieldId + '-tree');
+    textarea.style.display = 'block';
+    treeContainer.style.display = 'none';
+    textarea.closest('.form-group').querySelectorAll('.mode-btn').forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.mode === 'raw');
+    });
+}
+
 // ==================== Load Test Scenarios ====================
 
-async function loadLoadTestScenarios() {
+async function loadLoadTestScenarios(page = 1) {
     try {
-        const response = await fetch(`${API_BASE_URL}/loadtest/scenarios`);
+        const response = await fetch(`${API_BASE_URL}/loadtest/scenarios?page=${page}&page_size=10`);
         if (!response.ok) throw new Error('Failed to load load test scenarios');
 
-        loadTestScenarios = await response.json();
+        const result = await response.json();
+        loadTestScenarios = result.data;
+        pagination.loadtest = { page: result.page, totalPages: result.total_pages };
         renderLoadTestTable();
+        renderPagination('loadtest', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading load test scenarios:', error);
         showError('Failed to load load test scenarios');

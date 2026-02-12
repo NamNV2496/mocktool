@@ -43,7 +43,11 @@ flowchart TB
 
 ```
 
+<summary>
+<details>
 ![architecturet](doc/architecture.png)
+</details>
+</summary>
 
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)
 
@@ -87,10 +91,10 @@ end
 The feature_name is control by `api-service`. Which support multiple services work at the same time.
 ```go
 // Service 1
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI
+targetURL := "http://localhost:8082/forward" + c.Request().RequestURI
 
 // Service 2
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI 
+targetURL := "http://localhost:8082/forward" + c.Request().RequestURI 
 
 // parse accountId from token
 accountId := 1
@@ -108,8 +112,9 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 - Reusable because all scenario is shared
 - Setup globally scenario => All accountIds will have the same result
 
-![doc/14.png](doc/14.png)
-![doc/15.png](doc/15.png)
+![doc/2.png](doc/2.png)
+![doc/3.png](doc/3.png)
+![doc/4.png](doc/4.png)
 
 => Make sure 1 API can response expecting answer for a accountId
 
@@ -119,9 +124,10 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 
 An API path with different request body will have different response by hashing requestBody
 
-![doc/6.png](doc/6.png)
+
 ![doc/7.png](doc/7.png)
-![doc/8.png](doc/8.png)
+![doc/5.png](doc/5.png)
+![doc/6.png](doc/6.png)
 
 ## result
 
@@ -134,9 +140,6 @@ response with headers
 ![doc/12.png](doc/12.png)
 ![doc/13.png](doc/13.png)
 
-Or you can set global scenario for all account
-
-![doc/16.png](doc/16.png)
 
 # How to start
 

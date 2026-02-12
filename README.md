@@ -129,6 +129,9 @@ An API path with different request body will have different response by hashing 
 ![doc/5.png](doc/5.png)
 ![doc/6.png](doc/6.png)
 
+DB 
+![doc/8.png](doc/8.png)
+
 ## result
 
 ![doc/9.png](doc/9.png)

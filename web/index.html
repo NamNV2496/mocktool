@@ -24,13 +24,20 @@
         <div id="features" class="tab-content active">
             <div class="section-header">
                 <h2>Features</h2>
-                <button class="btn btn-primary" onclick="showCreateFeatureModal()">+ New Feature</button>
+                <div class="filter-group">
+                    <div style="display: flex; gap: 5px; flex: 1;">
+                        <input type="text" id="feature-search-query" class="filter-select" placeholder="Search by feature name..." style="flex: 1;">
+                        <button class="btn btn-outline" onclick="searchFeatures()" style="white-space: nowrap; padding: 8px 16px;">🔍 Search</button>
+                        <button class="btn btn-outline" onclick="clearFeatureSearch()" style="white-space: nowrap; padding: 8px 12px;" title="Clear search">✕</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="showCreateFeatureModal()">+ New Feature</button>
+                </div>
             </div>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
+                            <th>Features Name</th>
                             <th>Description</th>
                             <th>Active</th>
                             <th>Created At</th>
@@ -53,9 +60,7 @@
                 <h2>Scenarios</h2>
                 <div class="filter-group">
                     <input type="text" id="scenario-account-id-filter" class="filter-select" placeholder="Account ID to check active status" style="width: 250px;">
-                    <select id="scenario-feature-filter" class="filter-select">
-                        <option value="">Select a feature...</option>
-                    </select>
+                    <input type="text" id="scenario-feature-filter" class="filter-select" placeholder="Search features...">
                     <button class="btn btn-primary" onclick="showCreateScenarioModal()">+ New Scenario</button>
                 </div>
             </div>
@@ -64,7 +69,7 @@
                     <thead>
                         <tr>
                             <th>Feature</th>
-                            <th>Name</th>
+                            <th>Scenarios Name</th>
                             <th>Description</th>
                             <th>Created At</th>
                             <th>Actions</th>
@@ -85,12 +90,13 @@
             <div class="section-header">
                 <h2>Mock APIs</h2>
                 <div class="filter-group">
-                    <select id="mockapi-feature-filter" class="filter-select">
-                        <option value="">Select a feature...</option>
-                    </select>
-                    <select id="mockapi-scenario-filter" class="filter-select">
-                        <option value="">Select a scenario...</option>
-                    </select>
+                    <input type="text" id="mockapi-feature-filter" class="filter-select" placeholder="Search features...">
+                    <input type="text" id="mockapi-scenario-filter" class="filter-select" placeholder="Search scenarios...">
+                    <div style="display: flex; gap: 5px; flex: 0.8;">
+                        <input type="text" id="mockapi-search-query" class="filter-select" placeholder="Search by name or path..." style="flex: 1;">
+                        <button class="btn btn-outline" onclick="searchMockAPIs()" style="white-space: nowrap; padding: 8px 16px;">🔍 Search</button>
+                        <button class="btn btn-outline" onclick="clearMockAPISearch()" style="white-space: nowrap; padding: 8px 12px;" title="Clear search">✕</button>
+                    </div>
                     <button class="btn btn-outline" onclick="showProtoParserModal()">Parse .proto</button>
                     <button class="btn btn-primary" onclick="showCreateMockAPIModal()">+ New Mock API</button>
                 </div>
@@ -101,7 +107,8 @@
                         <tr>
                             <th>Feature</th>
                             <th>Scenario</th>
-                            <th>Name</th>
+                            <th>Mock APIs Name</th>
+                            <th>Description</th>
                             <th>Method</th>
                             <th>Path</th>
                             <th>Active</th>
@@ -111,7 +118,7 @@
                     </thead>
                     <tbody id="mockapis-table-body">
                         <tr>
-                            <td colspan="8" class="loading">Select a scenario to view mock APIs</td>
+                            <td colspan="9" class="loading">Select a scenario to view mock APIs</td>
                         </tr>
                     </tbody>
                 </table>
@@ -123,15 +130,23 @@
         <div id="loadtest" class="tab-content">
             <div class="section-header">
                 <h2>Load Test Scenarios</h2>
-                <button class="btn btn-primary" onclick="showCreateLoadTestModal()">+ New Scenario</button>
+                <div class="filter-group">
+                    <div style="display: flex; gap: 5px; flex: 1;">
+                        <input type="text" id="loadtest-search-query" class="filter-select" placeholder="Search by scenario name..." style="flex: 1;">
+                        <button class="btn btn-outline" onclick="searchLoadTestScenarios()" style="white-space: nowrap; padding: 8px 16px;">🔍 Search</button>
+                        <button class="btn btn-outline" onclick="clearLoadTestSearch()" style="white-space: nowrap; padding: 8px 12px;" title="Clear search">✕</button>
+                    </div>
+                    <input type="file" id="json-import-input" accept=".json" style="display: none;" onchange="handleJSONImport(event)">
+                    <button class="btn btn-outline" onclick="document.getElementById('json-import-input').click()">📁 Import JSON</button>
+                    <button class="btn btn-primary" onclick="showCreateLoadTestModal()">+ New Scenario</button>
+                </div>
             </div>
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
+                            <th>LoadTest_Name</th>
                             <th>Description</th>
-                            <th>Concurrency</th>
                             <th>Steps</th>
                             <th>Accounts</th>
                             <th>Active</th>
@@ -141,7 +156,7 @@
                     </thead>
                     <tbody id="loadtest-table-body">
                         <tr>
-                            <td colspan="8" class="loading">Loading load test scenarios...</td>
+                            <td colspan="7" class="loading">Loading load test scenarios...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -192,9 +207,7 @@
                 <input type="hidden" id="scenario-id">
                 <div class="form-group">
                     <label for="scenario-feature">Feature</label>
-                    <select id="scenario-feature" required>
-                        <option value="">Select a feature...</option>
-                    </select>
+                    <input type="text" id="scenario-feature" placeholder="Search features..." required>
                 </div>
                 <div class="form-group">
                     <label for="scenario-name">Scenario Name</label>
@@ -223,19 +236,19 @@
                 <input type="hidden" id="mockapi-id">
                 <div class="form-group">
                     <label for="mockapi-feature">Feature</label>
-                    <select id="mockapi-feature" required>
-                        <option value="">Select a feature...</option>
-                    </select>
+                    <input type="text" id="mockapi-feature" placeholder="Search features..." required>
                 </div>
                 <div class="form-group">
                     <label for="mockapi-scenario">Scenario</label>
-                    <select id="mockapi-scenario" required>
-                        <option value="">Select a scenario...</option>
-                    </select>
+                    <input type="text" id="mockapi-scenario" placeholder="Search scenarios..." required>
                 </div>
                 <div class="form-group">
                     <label for="mockapi-name">API Name</label>
                     <input type="text" id="mockapi-name" placeholder="Enter API name" required>
+                </div>
+                <div class="form-group">
+                    <label for="mockapi-description">Description (Optional)</label>
+                    <input type="text" id="mockapi-description" placeholder="Enter API description">
                 </div>
                 <div class="form-group">
                     <label for="mockapi-path">Path</label>
@@ -258,9 +271,12 @@
                 <div class="form-group">
                     <div class="json-field-header">
                         <label for="mockapi-hash-input">Request Input - JSON (Optional)</label>
-                        <div class="json-mode-toggle">
-                            <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-hash-input', 'raw')">Raw</button>
-                            <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-hash-input', 'tree')">Tree</button>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-format" onclick="formatJson('mockapi-hash-input')" title="Format JSON">⚡ Format</button>
+                            <div class="json-mode-toggle">
+                                <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-hash-input', 'raw')">Raw</button>
+                                <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-hash-input', 'tree')">Tree</button>
+                            </div>
                         </div>
                     </div>
                     <textarea id="mockapi-hash-input" placeholder='{"userId": 123, "action": "login"}' rows="4"></textarea>
@@ -270,9 +286,12 @@
                 <div class="form-group">
                     <div class="json-field-header">
                         <label for="mockapi-output">Response Output - JSON (Required)</label>
-                        <div class="json-mode-toggle">
-                            <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-output', 'raw')">Raw</button>
-                            <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-output', 'tree')">Tree</button>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-format" onclick="formatJson('mockapi-output')" title="Format JSON">⚡ Format</button>
+                            <div class="json-mode-toggle">
+                                <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-output', 'raw')">Raw</button>
+                                <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-output', 'tree')">Tree</button>
+                            </div>
                         </div>
                     </div>
                     <textarea id="mockapi-output" placeholder='{"message": "success", "data": {...}}' rows="8" required></textarea>
@@ -348,10 +367,6 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="loadtest-concurrency">Default Concurrency</label>
-                    <input type="number" id="loadtest-concurrency" placeholder="10" value="10" min="1">
-                </div>
-                <div class="form-group">
                     <label>Steps</label>
                     <div id="loadtest-steps-container">
                         <!-- Other steps will be added here dynamically -->
@@ -398,6 +413,20 @@
                 <label>Step Name</label>
                 <input type="text" class="step-name" placeholder="e.g., login, get_profile" required>
             </div>
+            <div class="form-group" style="background: #fff3cd; padding: 12px; border-radius: 6px; border: 1px solid #ffc107;">
+                <label style="font-weight: bold; color: #856404; display: flex; align-items: center; gap: 5px;">
+                    <span>⚡</span> Execution Condition (optional)
+                </label>
+                <input type="text" class="step-condition" placeholder='({{need_payment}} == true && {{status}} == "active") || {{count}} >= 0' style="width: 100%; margin-top: 5px;">
+                <small style="color: #856404; font-size: 0.8rem; display: block; margin-top: 5px;">
+                    <strong>Execute this step only if condition is met.</strong><br>
+                    • Simple: <code>{{need_payment}} == true</code><br>
+                    • AND: <code>{{var1}} == true && {{var2}} > 0</code><br>
+                    • OR: <code>{{var1}} == true || {{var2}} == false</code><br>
+                    • Complex: <code>({{need_payment}} == true && {{status}} == "active") || {{count}} >= 0</code><br>
+                    • Operators: ==, !=, >, <, >=, <=, &&, ||, ( )
+                </small>
+            </div>
             <div class="form-group">
                 <label>Path or cURL Command</label>
                 <textarea class="step-path" placeholder="https://api.example.com/login
@@ -425,6 +454,23 @@ curl --location 'https://api.example.com/login' \
                 <div class="form-group">
                     <label>Expected Status Code</label>
                     <input type="number" class="step-expectstatus" placeholder="200" value="200">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <div class="form-group">
+                    <label>Retry for Seconds (0 = no retry)</label>
+                    <input type="number" class="step-retry-for-seconds" placeholder="0" value="0" min="0">
+                    <small style="color: #718096; font-size: 0.8rem;">Retry failed requests for this many seconds (1s interval)</small>
+                </div>
+                <div class="form-group">
+                    <label>Max Retry Times (0 = unlimited)</label>
+                    <input type="number" class="step-max-retry-times" placeholder="1" value="1" min="0">
+                    <small style="color: #718096; font-size: 0.8rem;">Maximum retry attempts (stops when reached or time expires)</small>
+                </div>
+                <div class="form-group">
+                    <label>Wait After Seconds (0 = no wait)</label>
+                    <input type="number" class="step-wait-after-seconds" placeholder="0" value="0" min="0">
+                    <small style="color: #718096; font-size: 0.8rem;">Wait after successful execution before next step</small>
                 </div>
             </div>
             <div class="form-group">

@@ -19,13 +19,17 @@ type Scenario struct {
 
 // Step wraps domain.LoadTestStep for runtime use
 type Step struct {
-	Name          string
-	Method        string
-	Path          string
-	Headers       map[string]string
-	Body          string
-	SaveVariables map[string]string // Map of account_id -> map[variable_name]value
-	ExpectStatus  int
+	Name             string
+	Method           string
+	Path             string
+	Headers          map[string]string
+	Body             string
+	SaveVariables    map[string]string // Map of account_id -> map[variable_name]value
+	ExpectStatus     int
+	WaitAfterSeconds int    // Wait duration in seconds after step execution
+	RetryForSeconds  int    // Retry duration in seconds if request fails
+	MaxRetryTimes    int    // Maximum number of retry attempts (0 = unlimited within time limit)
+	Condition        string // Condition to execute this step (e.g., "{{need_payment}} == true")
 }
 
 // FromDomain converts domain.LoadTestScenario to loadtest.Scenario
@@ -33,19 +37,22 @@ func FromDomain(s *domain.LoadTestScenario) *Scenario {
 	steps := make([]Step, len(s.Steps))
 	for i, ds := range s.Steps {
 		steps[i] = Step{
-			Name:          ds.Name,
-			Method:        ds.Method,
-			Path:          ds.Path,
-			Headers:       ds.Headers,
-			Body:          ds.Body,
-			SaveVariables: ds.SaveVariables,
-			ExpectStatus:  ds.ExpectStatus,
+			Name:             ds.Name,
+			Method:           ds.Method,
+			Path:             ds.Path,
+			Headers:          ds.Headers,
+			Body:             ds.Body,
+			SaveVariables:    ds.SaveVariables,
+			ExpectStatus:     ds.ExpectStatus,
+			WaitAfterSeconds: ds.WaitAfterSeconds,
+			RetryForSeconds:  ds.RetryForSeconds,
+			MaxRetryTimes:    ds.MaxRetryTimes,
+			Condition:        ds.Condition,
 		}
 	}
 	return &Scenario{
-		Name:        s.Name,
-		Concurrency: s.Concurrency,
-		Steps:       steps,
+		Name:  s.Name,
+		Steps: steps,
 	}
 }
 
@@ -70,19 +77,22 @@ func ToDomain(s *Scenario, description string) *domain.LoadTestScenario {
 	steps := make([]domain.LoadTestStep, len(s.Steps))
 	for i, st := range s.Steps {
 		steps[i] = domain.LoadTestStep{
-			Name:          st.Name,
-			Method:        st.Method,
-			Path:          st.Path,
-			Headers:       st.Headers,
-			Body:          st.Body,
-			SaveVariables: st.SaveVariables,
-			ExpectStatus:  st.ExpectStatus,
+			Name:             st.Name,
+			Method:           st.Method,
+			Path:             st.Path,
+			Headers:          st.Headers,
+			Body:             st.Body,
+			SaveVariables:    st.SaveVariables,
+			ExpectStatus:     st.ExpectStatus,
+			WaitAfterSeconds: st.WaitAfterSeconds,
+			RetryForSeconds:  st.RetryForSeconds,
+			MaxRetryTimes:    st.MaxRetryTimes,
+			Condition:        st.Condition,
 		}
 	}
 	return &domain.LoadTestScenario{
 		Name:        s.Name,
 		Description: description,
-		Concurrency: s.Concurrency,
 		Steps:       steps,
 		IsActive:    true,
 	}

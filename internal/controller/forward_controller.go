@@ -56,10 +56,10 @@ func (_self *ForwardController) StartMockServer() error {
 	c.DELETE("/forward/*", _self.responseMockData)
 
 	// Public API endpoints - no X-Account-Id required, uses global scenario
-	c.GET("/public/forward/*", _self.responsePublicMockData)
-	c.POST("/public/forward/*", _self.responsePublicMockData)
-	c.PUT("/public/forward/*", _self.responsePublicMockData)
-	c.DELETE("/public/forward/*", _self.responsePublicMockData)
+	c.GET("/forward/public/*", _self.responsePublicMockData)
+	c.POST("/forward/public/*", _self.responsePublicMockData)
+	c.PUT("/forward/public/*", _self.responsePublicMockData)
+	c.DELETE("/forward/public/*", _self.responsePublicMockData)
 
 	if err := c.Start(_self.config.AppConfig.FowardHTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)

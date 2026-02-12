@@ -53,7 +53,6 @@ func InvokeServer(invokers ...any) *fx.App {
 
 			fx.Annotate(controller.NewMockController, fx.As(new(controller.IMockController))),
 			fx.Annotate(controller.NewFowardController, fx.As(new(controller.IForwardController))),
-			fx.Annotate(usecase.NewTrie, fx.As(new(usecase.ITrie))),
 			fx.Annotate(usecase.NewForwardUC, fx.As(new(usecase.IForwardUC))),
 			// load test
 			fx.Annotate(controller.NewLoadTestController, fx.As(new(controller.ILoadTestController))),

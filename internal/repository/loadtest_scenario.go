@@ -17,6 +17,7 @@ type ILoadTestScenarioRepository interface {
 	GetByID(ctx context.Context, id primitive.ObjectID) (*domain.LoadTestScenario, error)
 	GetByName(ctx context.Context, name string) (*domain.LoadTestScenario, error)
 	ListPaginated(ctx context.Context, params domain.PaginationParams) ([]domain.LoadTestScenario, int64, error)
+	SearchByName(ctx context.Context, query string, params domain.PaginationParams) ([]domain.LoadTestScenario, int64, error)
 	Delete(ctx context.Context, id primitive.ObjectID) error
 }
 
@@ -72,6 +73,33 @@ func (r *LoadTestScenarioRepository) GetByName(
 
 func (r *LoadTestScenarioRepository) ListPaginated(ctx context.Context, params domain.PaginationParams) ([]domain.LoadTestScenario, int64, error) {
 	filter := bson.M{}
+
+	total, err := r.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result []domain.LoadTestScenario
+	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
+func (r *LoadTestScenarioRepository) SearchByName(
+	ctx context.Context,
+	query string,
+	params domain.PaginationParams,
+) ([]domain.LoadTestScenario, int64, error) {
+	// Build filter with case-insensitive regex search on name
+	filter := bson.M{
+		"name": bson.M{
+			"$regex":   query,
+			"$options": "i", // case-insensitive
+		},
+	}
 
 	total, err := r.Count(ctx, filter)
 	if err != nil {

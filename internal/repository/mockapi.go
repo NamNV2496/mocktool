@@ -11,11 +11,13 @@ import (
 )
 
 type IMockAPIRepository interface {
-	ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
-	ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
+	// ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
+	// ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
 	ListByScenarioNamePaginated(ctx context.Context, scenarioName string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
+	SearchByScenarioAndNameOrPath(ctx context.Context, scenarioName, query string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	FindByFeatureScenarioPathMethodAndHash(ctx context.Context, featureName, scenarioName, path, method, hashInput string) (*domain.MockAPI, error)
 }
 type MockAPIRepository struct {
 	*BaseRepository
@@ -69,7 +71,7 @@ func (_self *MockAPIRepository) ListByScenarioName(
 	var result []domain.MockAPI
 	err := _self.FindMany(ctx, bson.M{
 		"scenario_name": scenarioName,
-		"is_active":     true,
+		// "is_active":     true,
 	}, &result)
 
 	return result, err
@@ -82,7 +84,47 @@ func (_self *MockAPIRepository) ListByScenarioNamePaginated(
 ) ([]domain.MockAPI, int64, error) {
 	filter := bson.M{
 		"scenario_name": scenarioName,
+		// "is_active":     true,
+	}
+
+	total, err := _self.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result []domain.MockAPI
+	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
+func (_self *MockAPIRepository) SearchByScenarioAndNameOrPath(
+	ctx context.Context,
+	scenarioName string,
+	query string,
+	params domain.PaginationParams,
+) ([]domain.MockAPI, int64, error) {
+	// Build filter with scenario name and search query for name or path
+	filter := bson.M{
+		"scenario_name": scenarioName,
 		"is_active":     true,
+	}
+
+	// Add search condition for name or path (case-insensitive)
+	if query != "" {
+		filter["$or"] = []bson.M{
+			{"name": bson.M{
+				"$regex":   query,
+				"$options": "i", // case-insensitive
+			}},
+			{"path": bson.M{
+				"$regex":   query,
+				"$options": "i", // case-insensitive
+			}},
+		}
 	}
 
 	total, err := _self.Count(ctx, filter)
@@ -131,6 +173,29 @@ func (_self *MockAPIRepository) FindByPathAndHash(
 		"is_active": true,
 	}).Decode(&result)
 
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+func (_self *MockAPIRepository) FindByFeatureScenarioPathMethodAndHash(
+	ctx context.Context,
+	featureName, scenarioName, path, method, hashInput string,
+) (*domain.MockAPI, error) {
+
+	var result domain.MockAPI
+	filter := bson.M{
+		"feature_name":  featureName,
+		"scenario_name": scenarioName,
+		"path":          path,
+		"method":        method,
+		"hash_input":    hashInput,
+		"is_active":     true,
+	}
+
+	err := _self.col.FindOne(ctx, filter).Decode(&result)
 	if err != nil {
 		return nil, err
 	}

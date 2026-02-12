@@ -15,13 +15,14 @@ flowchart TB
     Client[Client web/mobile] --> API[api service]
 
     API --> ISMOCK{is mock}
+    ISMOCK -- no ---> REAL[real data]
     ISMOCK -- yes --> ROOT[root]
-    ISMOCK -- no --> REAL[real data]
+
 
     %% Feature abc
     ROOT --> ABC[feature: abc]
     ABC --> ABC_S1[scenario1]
-    ABC --> ABC_S2[scenario2 - active with global - all accountId]
+    ABC --> ABC_S2[scenario2 - active global]
 
     ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
     ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
@@ -32,16 +33,17 @@ flowchart TB
 
     %% Feature xyz
     ROOT --> XYZ[feature: xyz]
-    XYZ --> XYZ_S1[scenario1 - active with accountId = 1]
-    XYZ --> XYZ_S2[scenario2 - active with accountId = 2,3,4,5]
+    XYZ --> XYZ_S1[scenario1 - active for accountId = 1,2,3]
+    XYZ --> XYZ_S2[scenario2- active for accountId = 4,5]
 
     XYZ_S1 --> XYZ_S1_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
     XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>"]
 
     XYZ_S2 --> XYZ_S2_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
+
 ```
 
-<!-- ![doc/architect.png](doc/architect.png) -->
+![architecturet](doc/architecture.png)
 
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)
 

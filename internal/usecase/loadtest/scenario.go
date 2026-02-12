@@ -68,13 +68,17 @@ func (l *ScenarioLoader) LoadScenarioFromFile(scenarioDir, scenarioName string) 
 		Name        string `yaml:"name"`
 		Concurrency int    `yaml:"concurrency"`
 		Steps       []struct {
-			Name          string            `yaml:"name"`
-			Method        string            `yaml:"method"`
-			Path          string            `yaml:"path"`
-			Headers       map[string]string `yaml:"headers"`
-			Body          string            `yaml:"body"`
-			SaveVariables map[string]string `yaml:"save_variables"` // variable_name: json_path
-			ExpectStatus  int               `yaml:"expect_status"`
+			Name             string            `yaml:"name"`
+			Method           string            `yaml:"method"`
+			Path             string            `yaml:"path"`
+			Headers          map[string]string `yaml:"headers"`
+			Body             string            `yaml:"body"`
+			SaveVariables    map[string]string `yaml:"save_variables"`     // variable_name: json_path
+			ExpectStatus     int               `yaml:"expect_status"`
+			WaitAfterSeconds int               `yaml:"wait_after_seconds"` // Wait duration in seconds after step execution
+			RetryForSeconds  int               `yaml:"retry_for_seconds"`  // Retry duration in seconds if request fails
+			MaxRetryTimes    int               `yaml:"max_retry_times"`    // Maximum number of retry attempts
+			Condition        string            `yaml:"condition"`          // Condition to execute this step
 		} `yaml:"steps"`
 	}
 
@@ -95,13 +99,17 @@ func (l *ScenarioLoader) LoadScenarioFromFile(scenarioDir, scenarioName string) 
 
 	for i, s := range yamlScenario.Steps {
 		scenario.Steps[i] = Step{
-			Name:          s.Name,
-			Method:        s.Method,
-			Path:          s.Path,
-			Headers:       s.Headers,
-			Body:          s.Body,
-			SaveVariables: s.SaveVariables,
-			ExpectStatus:  s.ExpectStatus,
+			Name:             s.Name,
+			Method:           s.Method,
+			Path:             s.Path,
+			Headers:          s.Headers,
+			Body:             s.Body,
+			SaveVariables:    s.SaveVariables,
+			ExpectStatus:     s.ExpectStatus,
+			WaitAfterSeconds: s.WaitAfterSeconds,
+			RetryForSeconds:  s.RetryForSeconds,
+			MaxRetryTimes:    s.MaxRetryTimes,
+			Condition:        s.Condition,
 		}
 	}
 

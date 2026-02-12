@@ -19,3 +19,8 @@ type APIResponse struct {
 	Output  any               `json:"output"`  // json response
 	Headers map[string]string `json:"headers"` // original map
 }
+
+type ServiceFlags struct {
+	TestWay    int
+	EnableHTTP bool
+}

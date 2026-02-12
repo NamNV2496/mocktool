@@ -15,7 +15,9 @@ import (
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
+	"github.com/namnv2496/mocktool/pkg/utils"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/grpc/codes"
 )
 
@@ -24,18 +26,18 @@ type IForwardUC interface {
 	ResponsePublicMockData(c echo.Context) error
 }
 type ForwardUC struct {
-	trie                ITrie
+	MockAPIRepo         repository.IMockAPIRepository
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
 }
 
 func NewForwardUC(
-	trie ITrie,
+	MockAPIRepo repository.IMockAPIRepository,
 	ScenarioRepo repository.IScenarioRepository,
 	AccountScenarioRepo repository.IAccountScenarioRepository,
 ) IForwardUC {
 	return &ForwardUC{
-		trie:                trie,
+		MockAPIRepo:         MockAPIRepo,
 		ScenarioRepo:        ScenarioRepo,
 		AccountScenarioRepo: AccountScenarioRepo,
 	}
@@ -100,56 +102,62 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	request.Scenario = activeScenario.Name
 	request.Method = c.Request().Method
 
-	// Store raw JSON for comparison
+	// Generate hash from request body
+	var hashInput string
 	if len(bodyBytes) > 0 {
 		// Validate it's proper JSON
 		var bodyMap map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &bodyMap); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON body")
 		}
-		// Store raw JSON bytes (comparison function handles both JSON and BSON)
-		request.HashInput = bson.Raw(bodyBytes)
+		// Generate hash from sorted input
+		hashInput = utils.GenerateHashFromInput(bson.Raw(bodyBytes))
 	} else {
-		request.HashInput = bson.Raw{}
+		hashInput = ""
 	}
 
-	response := _self.trie.Search(request)
-	if response == nil {
-		// =================================================WAY 1===================================================
-		metadata := make(map[string]string, 0)
-		metadata["x-trace-id"] = uuid.NewString()
-		return errorcustome.NewError(codes.Internal, "ERR.001", "Trie search error: %s", metadata, "not found")
-		// =================================================WAY 2===================================================
-		_, err = io.Copy(c.Response().Writer, strings.NewReader("not found"))
-		return err
+	// Query database for matching mock API
+	mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
+		context.Background(),
+		request.FeatureName,
+		activeScenario.Name,
+		request.Path,
+		request.Method,
+		hashInput,
+	)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			metadata := make(map[string]string, 0)
+			metadata["x-trace-id"] = uuid.NewString()
+			return errorcustome.NewError(codes.Internal, "ERR.001", "Mock API not found: %s", metadata, "not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to query mock API: "+err.Error())
 	}
 
 	var outputBytes []byte
 
-	// Handle different output types
-	switch v := response.Output.(type) {
-	case string:
-		outputBytes = []byte(v)
-	case bson.Raw:
-		var outputMap map[string]interface{}
-		if err := bson.Unmarshal(v, &outputMap); err != nil {
-			if err := json.Unmarshal(v, &outputMap); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to unmarshal output: "+err.Error())
-			}
-		}
-		if outputBytes, err = json.Marshal(outputMap); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output to JSON")
-		}
-	default:
-		// For any other type, try to marshal it as JSON
-		if outputBytes, err = json.Marshal(v); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "invalid response output type")
+	// Handle output - convert bson.Raw to JSON
+	var outputMap map[string]interface{}
+	if err := bson.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+		if err := json.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to unmarshal output: "+err.Error())
 		}
 	}
+	if outputBytes, err = json.Marshal(outputMap); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output to JSON")
+	}
 
+	// Set response headers
 	c.Response().Header().Set("Content-Type", "application/json")
-	for key, value := range response.Headers {
-		c.Response().Header().Set(key, value)
+
+	// Parse and set custom headers from bson.Raw
+	var headersMap map[string]string
+	if len(mockAPI.Headers) > 0 {
+		if err := bson.Unmarshal(mockAPI.Headers, &headersMap); err == nil {
+			for key, value := range headersMap {
+				c.Response().Header().Set(key, value)
+			}
+		}
 	}
 	_, err = io.Copy(c.Response().Writer, strings.NewReader(string(outputBytes)))
 	if err != nil {
@@ -208,48 +216,61 @@ func (_self *ForwardUC) ResponsePublicMockData(c echo.Context) error {
 	request.Scenario = activeScenario.Name
 	request.Method = c.Request().Method
 
-	// Store raw JSON for comparison
+	// Generate hash from request body
+	var hashInput string
 	if len(bodyBytes) > 0 {
 		var bodyMap map[string]interface{}
 		if err := json.Unmarshal(bodyBytes, &bodyMap); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON body")
 		}
-		request.HashInput = bson.Raw(bodyBytes)
+		// Generate hash from sorted input
+		hashInput = utils.GenerateHashFromInput(bson.Raw(bodyBytes))
 	} else {
-		request.HashInput = bson.Raw{}
+		hashInput = ""
 	}
 
-	response := _self.trie.Search(request)
-	if response == nil {
-		metadata := make(map[string]string, 0)
-		metadata["x-trace-id"] = uuid.NewString()
-		return errorcustome.NewError(codes.Internal, "ERR.001", "Trie search error: %s", metadata, "not found")
+	// Query database for matching mock API
+	mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
+		context.Background(),
+		request.FeatureName,
+		activeScenario.Name,
+		request.Path,
+		request.Method,
+		hashInput,
+	)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			metadata := make(map[string]string, 0)
+			metadata["x-trace-id"] = uuid.NewString()
+			return errorcustome.NewError(codes.Internal, "ERR.001", "Mock API not found: %s", metadata, "not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to query mock API: "+err.Error())
 	}
 
 	var outputBytes []byte
 
-	switch v := response.Output.(type) {
-	case string:
-		outputBytes = []byte(v)
-	case bson.Raw:
-		var outputMap map[string]interface{}
-		if err := bson.Unmarshal(v, &outputMap); err != nil {
-			if err := json.Unmarshal(v, &outputMap); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to unmarshal output: "+err.Error())
-			}
-		}
-		if outputBytes, err = json.Marshal(outputMap); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output to JSON")
-		}
-	default:
-		if outputBytes, err = json.Marshal(v); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "invalid response output type")
+	// Handle output - convert bson.Raw to JSON
+	var outputMap map[string]interface{}
+	if err := bson.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+		if err := json.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to unmarshal output: "+err.Error())
 		}
 	}
+	if outputBytes, err = json.Marshal(outputMap); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output to JSON")
+	}
 
+	// Set response headers
 	c.Response().Header().Set("Content-Type", "application/json")
-	for key, value := range response.Headers {
-		c.Response().Header().Set(key, value)
+
+	// Parse and set custom headers from bson.Raw
+	var headersMap map[string]string
+	if len(mockAPI.Headers) > 0 {
+		if err := bson.Unmarshal(mockAPI.Headers, &headersMap); err == nil {
+			for key, value := range headersMap {
+				c.Response().Header().Set(key, value)
+			}
+		}
 	}
 	_, err = io.Copy(c.Response().Writer, strings.NewReader(string(outputBytes)))
 	if err != nil {

@@ -15,8 +15,9 @@ type MockAPI struct {
 	Description  string             `bson:"description" json:"description"`
 	IsActive     bool               `bson:"is_active" json:"is_active"`
 	Path         string             `bson:"path" json:"path"`             // path
-	Method       string             `bson:"method" json:"method"`         // path
-	HashInput    bson.Raw           `bson:"hash_input" json:"hash_input"` // original JSON input for hashing
+	Method       string             `bson:"method" json:"method"`         // method
+	Input        bson.Raw           `bson:"input" json:"input"`           // original JSON input
+	HashInput    string             `bson:"hash_input" json:"hash_input"` // hash input
 	Headers      bson.Raw           `bson:"headers" json:"headers"`       // original map
 	Output       bson.Raw           `bson:"output" json:"output"`         // json response
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
@@ -37,7 +38,10 @@ func (_self MockAPI) ToMap() bson.M {
 	if _self.Path != "" {
 		update["path"] = _self.Path
 	}
-	if _self.HashInput != nil {
+	if _self.Input != nil {
+		update["input"] = _self.Input
+	}
+	if _self.HashInput != "" {
 		update["hash_input"] = _self.HashInput
 	}
 

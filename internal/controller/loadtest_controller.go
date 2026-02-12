@@ -7,8 +7,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/domain"
-	"github.com/namnv2496/mocktool/internal/loadtest"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/internal/usecase/loadtest"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -34,6 +34,7 @@ func NewLoadTestController(
 func (c *LoadTestController) RegisterRoutes(g *echo.Group) {
 	// Scenario endpoints
 	g.GET("/loadtest/scenarios", c.ListScenarios)
+	g.GET("/loadtest/scenarios/search", c.SearchScenarios)
 	g.GET("/loadtest/scenarios/:scenario_id", c.GetScenario)
 	g.POST("/loadtest/scenarios", c.CreateScenario)
 	g.PUT("/loadtest/scenarios/:scenario_id", c.UpdateScenario)
@@ -49,6 +50,29 @@ func (c *LoadTestController) ListScenarios(ctx echo.Context) error {
 	params := parsePaginationParams(ctx)
 
 	scenarios, total, err := c.scenarioRepo.ListPaginated(ctx.Request().Context(), params)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	if scenarios == nil {
+		scenarios = []domain.LoadTestScenario{}
+	}
+
+	response := domain.NewPaginatedResponse(scenarios, total, params)
+	return ctx.JSON(http.StatusOK, response)
+}
+
+/* ---------- GET /loadtest/scenarios/search ---------- */
+
+func (c *LoadTestController) SearchScenarios(ctx echo.Context) error {
+	query := ctx.QueryParam("q")
+	if query == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "search query 'q' is required")
+	}
+
+	params := parsePaginationParams(ctx)
+
+	scenarios, total, err := c.scenarioRepo.SearchByName(ctx.Request().Context(), query, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -122,13 +146,8 @@ func (c *LoadTestController) UpdateScenario(ctx echo.Context) error {
 	if req.Name != "" {
 		update["name"] = req.Name
 	}
-	if req.Description != "" {
-		update["description"] = req.Description
-	}
-
-	if req.Concurrency > 0 {
-		update["concurrency"] = req.Concurrency
-	}
+	// Always update description (even if empty)
+	update["description"] = req.Description
 	if req.Accounts != "" {
 		update["accounts"] = req.Accounts
 	}
@@ -136,6 +155,7 @@ func (c *LoadTestController) UpdateScenario(ctx echo.Context) error {
 		update["steps"] = req.Steps
 	}
 	update["is_active"] = req.IsActive
+	update["updated_at"] = time.Now().UTC()
 
 	if err := c.scenarioRepo.Update(ctx.Request().Context(), objectID, update); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())

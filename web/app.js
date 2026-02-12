@@ -5,6 +5,7 @@ let scenarios = [];
 let mockAPIs = [];
 let loadTestScenarios = [];
 let activeScenarioId = null; // Track the active scenario ID for the current accountId
+let globalActiveScenarioId = null; // Track the global active scenario ID
 
 let parsedEnums = {};
 let parsedMessages = {};
@@ -41,6 +42,33 @@ function initializeTabs() {
     });
 }
 
+function navigateToMockAPIs(featureName, scenarioName) {
+    // Switch to Mock APIs tab
+    switchTab('mockapis');
+
+    // Wait for filters to be populated, then set the values and load data
+    setTimeout(() => {
+        // Set feature filter
+        const featureSelect = document.getElementById('mockapi-feature-filter');
+        if (featureSelect) {
+            featureSelect.value = featureName;
+            featureSelect.dataset.selectedValue = featureName;
+            featureSelect.dataset.selectedText = featureName;
+        }
+
+        // Set scenario filter
+        const scenarioSelect = document.getElementById('mockapi-scenario-filter');
+        if (scenarioSelect) {
+            scenarioSelect.value = scenarioName;
+            scenarioSelect.dataset.selectedValue = scenarioName;
+            scenarioSelect.dataset.selectedText = scenarioName;
+        }
+
+        // Load Mock APIs with the selected scenario
+        loadMockAPIs(scenarioName);
+    }, 100);
+}
+
 function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -50,18 +78,49 @@ function switchTab(tabName) {
 
     if (tabName === 'features') {
         loadFeatures();
+
+        // Add Enter key support for search
+        const searchInput = document.getElementById('feature-search-query');
+        if (searchInput && !searchInput.dataset.listenerAdded) {
+            searchInput.dataset.listenerAdded = 'true';
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchFeatures();
+                }
+            });
+        }
     } else if (tabName === 'scenarios') {
         populateFeatureFilters();
     } else if (tabName === 'mockapis') {
         populateMockAPIFilters();
     } else if (tabName === 'loadtest') {
         loadLoadTestScenarios();
+
+        // Add Enter key support for search
+        const searchInput = document.getElementById('loadtest-search-query');
+        if (searchInput && !searchInput.dataset.listenerAdded) {
+            searchInput.dataset.listenerAdded = 'true';
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchLoadTestScenarios();
+                }
+            });
+        }
     }
 }
 
-async function loadFeatures(page = 1) {
+async function loadFeatures(page = 1, searchQuery = '') {
     try {
-        const response = await fetch(`${API_BASE_URL}/features?page=${page}&page_size=10`);
+        let url;
+        if (searchQuery && searchQuery.trim() !== '') {
+            // Use search endpoint
+            url = `${API_BASE_URL}/features/search?q=${encodeURIComponent(searchQuery)}&page=${page}&page_size=10`;
+        } else {
+            // Use regular list endpoint
+            url = `${API_BASE_URL}/features?page=${page}&page_size=10`;
+        }
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load features');
 
         const result = await response.json();
@@ -85,8 +144,8 @@ function renderFeaturesTable() {
 
     tbody.innerHTML = features.map(feature => `
         <tr>
-            <td><strong>${feature.name || 'N/A'}</strong></td>
-            <td>${feature.description || '-'}</td>
+            <td class="text-truncate" title="${feature.name || 'N/A'}"><strong>${feature.name || 'N/A'}</strong></td>
+            <td class="text-truncate" title="${feature.description || '-'}">${feature.description || '-'}</td>
             <td><span class="status-badge ${feature.is_active ? 'status-active' : 'status-inactive'}">
                 ${feature.is_active ? 'Active' : 'Inactive'}
             </span></td>
@@ -105,6 +164,7 @@ async function loadScenarios(featureName, page = 1) {
             '<tr><td colspan="6" class="loading">Select a feature to view scenarios</td></tr>';
         document.getElementById('scenarios-pagination').innerHTML = '';
         activeScenarioId = null;
+        globalActiveScenarioId = null;
         return;
     }
 
@@ -123,6 +183,9 @@ async function loadScenarios(featureName, page = 1) {
         } else {
             activeScenarioId = null;
         }
+
+        // Always fetch global active scenario
+        await fetchGlobalActiveScenario(featureName);
 
         renderScenariosTable();
         renderPagination('scenarios', result.page, result.total_pages);
@@ -153,6 +216,24 @@ async function fetchActiveScenario(featureName, accountId) {
     }
 }
 
+async function fetchGlobalActiveScenario(featureName) {
+    try {
+        // Fetch global active scenario (without X-Account-Id header)
+        const response = await fetch(`${API_BASE_URL}/scenarios/active?feature_name=${featureName}`);
+
+        if (response.ok) {
+            const activeScenario = await response.json();
+            globalActiveScenarioId = activeScenario.id;
+        } else {
+            // No global active scenario
+            globalActiveScenarioId = null;
+        }
+    } catch (error) {
+        console.error('Error fetching global active scenario:', error);
+        globalActiveScenarioId = null;
+    }
+}
+
 function renderScenariosTable() {
     const tbody = document.getElementById('scenarios-table-body');
 
@@ -165,39 +246,52 @@ function renderScenariosTable() {
     const filterAccountId = document.getElementById('scenario-account-id-filter')?.value.trim();
 
     tbody.innerHTML = scenarios.map(scenario => {
-        // Check if this scenario is the active one
+        // Check if this scenario is the active one for the current account
         const isActive = activeScenarioId && scenario.id === activeScenarioId;
-        const rowStyle = isActive ? 'background-color: #e6ffed;' : '';
+        // Check if this scenario is the global active one
+        const isGlobalActive = globalActiveScenarioId && scenario.id === globalActiveScenarioId;
+
+        const rowStyle = (isActive || isGlobalActive) ? 'background-color: #e6ffed;' : '';
 
         return `
             <tr style="${rowStyle}">
-                <td>${scenario.feature_name || 'N/A'}</td>
-                <td>
-                    <strong>${scenario.name || 'N/A'}</strong>
+                <td class="text-truncate" title="${scenario.feature_name || 'N/A'}">${scenario.feature_name || 'N/A'}</td>
+                <td class="text-truncate" title="${scenario.name || 'N/A'}">
+                    <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline;" onclick="navigateToMockAPIs('${scenario.feature_name}', '${scenario.name}')">${scenario.name || 'N/A'}</strong>
                     ${isActive ? '<span class="status-badge status-active" style="margin-left: 8px;">ACTIVE</span>' : ''}
+                    ${isGlobalActive ? '<span class="status-badge" style="margin-left: 8px; background-color: #9f7aea; color: white;">ACTIVE GLOBAL</span>' : ''}
                 </td>
-                <td>${scenario.description || '-'}</td>
+                <td class="text-truncate" title="${scenario.description || '-'}">${scenario.description || '-'}</td>
                 <td>${formatDate(scenario.created_at)}</td>
                 <td class="actions">
                     <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'>Edit</button>
                     <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">Delete</button>
-                    ${filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}')">Activate for ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}')">Activate Globally</button>`}
+                    ${!isActive && !isGlobalActive ? (filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}')">Activate for ACCOUNT_ID ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}')">Activate Globally</button>`) : ''}
                 </td>
             </tr>
         `;
     }).join('');
 }
 
-async function loadMockAPIs(scenarioName, page = 1) {
+async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
     if (!scenarioName) {
         document.getElementById('mockapis-table-body').innerHTML =
-            '<tr><td colspan="7" class="loading">Select a scenario to view mock APIs</td></tr>';
+            '<tr><td colspan="8" class="loading">Select a scenario to view mock APIs</td></tr>';
         document.getElementById('mockapis-pagination').innerHTML = '';
         return;
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/mockapis?scenario_name=${scenarioName}&page=${page}&page_size=10`);
+        let url;
+        if (searchQuery && searchQuery.trim() !== '') {
+            // Use search endpoint
+            url = `${API_BASE_URL}/mockapis/search?scenario_name=${encodeURIComponent(scenarioName)}&q=${encodeURIComponent(searchQuery)}&page=${page}&page_size=10`;
+        } else {
+            // Use regular list endpoint
+            url = `${API_BASE_URL}/mockapis?scenario_name=${encodeURIComponent(scenarioName)}&page=${page}&page_size=10`;
+        }
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load mock APIs');
 
         const result = await response.json();
@@ -215,23 +309,25 @@ function renderMockAPIsTable() {
     const tbody = document.getElementById('mockapis-table-body');
 
     if (!mockAPIs || mockAPIs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">No mock APIs found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="loading">No mock APIs found</td></tr>';
         return;
     }
 
     tbody.innerHTML = mockAPIs.map(api => `
         <tr>
-            <td>${api.feature_name || 'N/A'}</td>
-            <td>${api.scenario_name || 'N/A'}</td>
-            <td><strong>${api.name || 'N/A'}</strong></td>
+            <td class="text-truncate" title="${api.feature_name || 'N/A'}">${api.feature_name || 'N/A'}</td>
+            <td class="text-truncate" title="${api.scenario_name || 'N/A'}">${api.scenario_name || 'N/A'}</td>
+            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong></td>
+            <td class="text-truncate" title="${api.description || '-'}">${api.description || '-'}</td>
             <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
-            <td><code>${api.path || 'N/A'}</code></td>
+            <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
             <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
                 ${api.is_active ? 'Active' : 'Inactive'}
             </span></td>
             <td>${formatDate(api.created_at)}</td>
             <td class="actions">
                 <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>Edit</button>
+                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>Duplicate</button>
                 <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">Delete</button>
             </td>
         </tr>
@@ -240,7 +336,7 @@ function renderMockAPIsTable() {
 
 async function fetchAllFeatures() {
     try {
-        const response = await fetch(`${API_BASE_URL}/features?page_size=1000`);
+        const response = await fetch(`${API_BASE_URL}/features?page_size=100`);
         if (!response.ok) throw new Error('Failed to load features');
         const result = await response.json();
         return result.data;
@@ -253,7 +349,7 @@ async function fetchAllFeatures() {
 async function fetchAllScenarios(featureName) {
     if (!featureName) return [];
     try {
-        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}&page_size=1000`);
+        const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}&page_size=100`);
         if (!response.ok) throw new Error('Failed to load scenarios');
         const result = await response.json();
         return result.data;
@@ -303,38 +399,46 @@ function renderPagination(entity, currentPage, totalPages) {
 
 function loadPage(entity, page) {
     if (entity === 'features') {
-        loadFeatures(page);
+        const searchInput = document.getElementById('feature-search-query');
+        const searchQuery = searchInput ? searchInput.value.trim() : '';
+        loadFeatures(page, searchQuery);
     } else if (entity === 'scenarios') {
-        const featureName = document.getElementById('scenario-feature-filter').value;
+        const featureInput = document.getElementById('scenario-feature-filter');
+        const featureName = featureInput.dataset.selectedValue || featureInput.value;
         loadScenarios(featureName, page);
     } else if (entity === 'mockapis') {
-        const scenarioName = document.getElementById('mockapi-scenario-filter').value;
-        loadMockAPIs(scenarioName, page);
+        const scenarioInput = document.getElementById('mockapi-scenario-filter');
+        const scenarioName = scenarioInput.dataset.selectedValue || scenarioInput.value;
+        const searchInput = document.getElementById('mockapi-search-query');
+        const searchQuery = searchInput ? searchInput.value.trim() : '';
+        loadMockAPIs(scenarioName, page, searchQuery);
     } else if (entity === 'loadtest') {
-        loadLoadTestScenarios(page);
+        const searchInput = document.getElementById('loadtest-search-query');
+        const searchQuery = searchInput ? searchInput.value.trim() : '';
+        loadLoadTestScenarios(page, searchQuery);
     }
 }
 
 async function populateFeatureFilters() {
-    const allFeatures = await fetchAllFeatures();
-
     const scenarioFilter = document.getElementById('scenario-feature-filter');
-    scenarioFilter.innerHTML = '<option value="">Select a feature...</option>';
 
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        scenarioFilter.appendChild(option);
-    });
-
-    scenarioFilter.onchange = (e) => loadScenarios(e.target.value);
+    // Check if searchable select is already initialized
+    if (!scenarioFilter.classList.contains('searchable-select-input')) {
+        scenarioFilter.placeholder = 'Search features...';
+        createSearchableSelect('scenario-feature-filter', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                loadScenarios(featureName);
+            }
+        });
+    }
 
     // Add event listener to accountId filter to re-render table when it changes
     const accountIdFilter = document.getElementById('scenario-account-id-filter');
     accountIdFilter.addEventListener('input', async () => {
         const accountId = accountIdFilter.value.trim();
-        const featureName = scenarioFilter.value;
+        const featureName = scenarioFilter.dataset.selectedValue;
 
         if (featureName && accountId) {
             await fetchActiveScenario(featureName, accountId);
@@ -347,45 +451,136 @@ async function populateFeatureFilters() {
 }
 
 async function populateMockAPIFilters() {
-    const allFeatures = await fetchAllFeatures();
-
     const featureFilter = document.getElementById('mockapi-feature-filter');
-    featureFilter.innerHTML = '<option value="">Select a feature...</option>';
-
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        featureFilter.appendChild(option);
-    });
-
-    featureFilter.onchange = async (e) => {
-        const featureName = e.target.value;
-        if (!featureName) {
-            document.getElementById('mockapi-scenario-filter').innerHTML = '<option value="">Select a scenario...</option>';
-            return;
-        }
-
-        try {
-            const scenarios = await fetchAllScenarios(featureName);
-
-            const scenarioFilter = document.getElementById('mockapi-scenario-filter');
-            scenarioFilter.innerHTML = '<option value="">Select a scenario...</option>';
-
-            scenarios.forEach(scenario => {
-                const option = document.createElement('option');
-                option.value = scenario.name;
-                option.textContent = scenario.name;
-                scenarioFilter.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error loading scenarios:', error);
-            showError('Failed to load scenarios');
-        }
-    };
-
     const scenarioFilter = document.getElementById('mockapi-scenario-filter');
-    scenarioFilter.onchange = (e) => loadMockAPIs(e.target.value);
+
+    // Initialize feature searchable select
+    if (!featureFilter.classList.contains('searchable-select-input')) {
+        featureFilter.placeholder = 'Search features...';
+        createSearchableSelect('mockapi-feature-filter', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: async (featureName) => {
+                // Update scenario filter to search within this feature
+                scenarioFilter.dataset.featureName = featureName;
+                scenarioFilter.value = '';
+                scenarioFilter.dataset.selectedValue = '';
+                scenarioFilter.placeholder = 'Search scenarios...';
+
+                // Clear mock APIs
+                document.getElementById('mockapis-table-body').innerHTML =
+                    '<tr><td colspan="8" class="loading">Select a scenario to view mock APIs</td></tr>';
+            }
+        });
+    }
+
+    // Initialize scenario searchable select
+    if (!scenarioFilter.classList.contains('searchable-select-input')) {
+        scenarioFilter.placeholder = 'Search scenarios...';
+        createSearchableSelect('mockapi-scenario-filter', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...',
+            onChange: (scenarioName) => {
+                loadMockAPIs(scenarioName);
+            }
+        });
+    }
+
+    // Add search query input handler (Enter key support)
+    const searchInput = document.getElementById('mockapi-search-query');
+    if (searchInput && !searchInput.dataset.listenerAdded) {
+        searchInput.dataset.listenerAdded = 'true';
+
+        // Trigger search on Enter key
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchMockAPIs();
+            }
+        });
+    }
+}
+
+// Search Mock APIs by name or path
+function searchMockAPIs() {
+    const searchInput = document.getElementById('mockapi-search-query');
+    const scenarioInput = document.getElementById('mockapi-scenario-filter');
+    const scenarioName = scenarioInput.dataset.selectedValue || scenarioInput.value;
+    const query = searchInput.value.trim();
+
+    if (!scenarioName) {
+        showError('Please select a scenario first');
+        return;
+    }
+
+    if (!query) {
+        showError('Please enter a search term');
+        return;
+    }
+
+    loadMockAPIs(scenarioName, 1, query);
+}
+
+// Clear Mock API search
+function clearMockAPISearch() {
+    const searchInput = document.getElementById('mockapi-search-query');
+    const scenarioInput = document.getElementById('mockapi-scenario-filter');
+    const scenarioName = scenarioInput.dataset.selectedValue || scenarioInput.value;
+
+    // Clear the search input
+    searchInput.value = '';
+
+    // Reload all Mock APIs for the current scenario
+    if (scenarioName) {
+        loadMockAPIs(scenarioName, 1, '');
+    }
+}
+
+// Search Load Test Scenarios by name
+function searchLoadTestScenarios() {
+    const searchInput = document.getElementById('loadtest-search-query');
+    const query = searchInput.value.trim();
+
+    if (!query) {
+        showError('Please enter a search term');
+        return;
+    }
+
+    loadLoadTestScenarios(1, query);
+}
+
+// Clear Load Test Scenario search
+function clearLoadTestSearch() {
+    const searchInput = document.getElementById('loadtest-search-query');
+
+    // Clear the search input
+    searchInput.value = '';
+
+    // Reload all load test scenarios
+    loadLoadTestScenarios(1, '');
+}
+
+// Search Features by name
+function searchFeatures() {
+    const searchInput = document.getElementById('feature-search-query');
+    const query = searchInput.value.trim();
+
+    if (!query) {
+        showError('Please enter a search term');
+        return;
+    }
+
+    loadFeatures(1, query);
+}
+
+// Clear Feature search
+function clearFeatureSearch() {
+    const searchInput = document.getElementById('feature-search-query');
+
+    // Clear the search input
+    searchInput.value = '';
+
+    // Reload all features
+    loadFeatures(1, '');
 }
 
 function showCreateFeatureModal() {
@@ -412,8 +607,21 @@ async function saveFeature() {
     const description = document.getElementById('feature-description').value.trim();
     const isActive = document.getElementById('feature-active').checked;
 
+    // Clear previous errors
+    clearFieldError('feature-name');
+
     if (!name) {
-        showError('Feature name is required');
+        showFieldError('feature-name', 'Feature name is required');
+        return;
+    }
+
+    if (name.includes(' ')) {
+        showFieldError('feature-name', 'Feature name cannot contain spaces');
+        return;
+    }
+
+    if (name.length > 100) {
+        showFieldError('feature-name', 'Feature name is too long (max 100 characters)');
         return;
     }
 
@@ -450,15 +658,20 @@ async function showCreateScenarioModal() {
     document.getElementById('scenario-name').value = '';
     document.getElementById('scenario-description').value = '';
 
-    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('scenario-feature');
-    featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        featureSelect.appendChild(option);
-    });
+
+    // Initialize searchable select if not already done
+    if (!featureSelect.classList.contains('searchable-select-input')) {
+        featureSelect.placeholder = 'Search features...';
+        createSearchableSelect('scenario-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...'
+        });
+    } else {
+        // Reset the input
+        featureSelect.value = '';
+        featureSelect.dataset.selectedValue = '';
+    }
 
     showModal('scenario-modal');
 }
@@ -469,30 +682,53 @@ async function editScenario(scenario) {
     document.getElementById('scenario-name').value = scenario.name;
     document.getElementById('scenario-description').value = scenario.description || '';
 
-    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('scenario-feature');
-    featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        if (feature.name === scenario.feature_name) {
-            option.selected = true;
-        }
-        featureSelect.appendChild(option);
-    });
+
+    // Initialize searchable select if not already done
+    if (!featureSelect.classList.contains('searchable-select-input')) {
+        featureSelect.placeholder = 'Search features...';
+        createSearchableSelect('scenario-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...'
+        });
+    }
+
+    // Set the selected value
+    featureSelect.value = scenario.feature_name;
+    featureSelect.dataset.selectedValue = scenario.feature_name;
+    featureSelect.dataset.selectedText = scenario.feature_name;
 
     showModal('scenario-modal');
 }
 
 async function saveScenario() {
     const id = document.getElementById('scenario-id').value;
-    const featureName = document.getElementById('scenario-feature').value;
+    const featureInput = document.getElementById('scenario-feature');
+    const featureName = featureInput.dataset.selectedValue || featureInput.value;
     const name = document.getElementById('scenario-name').value.trim();
     const description = document.getElementById('scenario-description').value.trim();
 
-    if (!featureName || !name) {
-        showError('Feature and scenario name are required');
+    // Clear previous errors
+    clearFieldError('scenario-feature');
+    clearFieldError('scenario-name');
+
+    if (!featureName) {
+        showFieldError('scenario-feature', 'Feature is required');
+        return;
+    }
+
+    if (!name) {
+        showFieldError('scenario-name', 'Scenario name is required');
+        return;
+    }
+
+    if (name.includes(' ')) {
+        showFieldError('scenario-name', 'Scenario name cannot contain spaces');
+        return;
+    }
+
+    if (name.length > 100) {
+        showFieldError('scenario-name', 'Scenario name is too long (max 100 characters)');
         return;
     }
 
@@ -517,7 +753,8 @@ async function saveScenario() {
         closeModal('scenario-modal');
         showSuccess(id ? 'Scenario updated successfully' : 'Scenario created successfully');
 
-        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        const featureInput = document.getElementById('scenario-feature-filter');
+        const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
         if (currentFeature) {
             loadScenarios(currentFeature);
         }
@@ -541,7 +778,8 @@ async function activateScenario(scenarioId, accountId) {
 
         // Update active scenario ID and reload
         activeScenarioId = scenarioId;
-        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        const featureInput = document.getElementById('scenario-feature-filter');
+        const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
         if (currentFeature) {
             loadScenarios(currentFeature);
         }
@@ -565,7 +803,8 @@ async function activateScenarioGlobal(scenarioId) {
 
         // Clear active scenario ID since this is a global activation
         activeScenarioId = null;
-        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        const featureInput = document.getElementById('scenario-feature-filter');
+        const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
         if (currentFeature) {
             loadScenarios(currentFeature);
         }
@@ -579,6 +818,7 @@ async function showCreateMockAPIModal() {
     document.getElementById('mockapi-modal-title').textContent = 'Create Mock API';
     document.getElementById('mockapi-id').value = '';
     document.getElementById('mockapi-name').value = '';
+    document.getElementById('mockapi-description').value = '';
     document.getElementById('mockapi-path').value = '';
     document.getElementById('mockapi-method').value = 'GET';
     document.getElementById('mockapi-regex-path').value = '';
@@ -586,36 +826,40 @@ async function showCreateMockAPIModal() {
     document.getElementById('mockapi-output').value = '';
     document.getElementById('mockapi-active').checked = true;
 
-    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('mockapi-feature');
-    featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        featureSelect.appendChild(option);
-    });
+    const scenarioSelect = document.getElementById('mockapi-scenario');
 
-    featureSelect.onchange = async (e) => {
-        const featureName = e.target.value;
-        const scenarioSelect = document.getElementById('mockapi-scenario');
-        scenarioSelect.innerHTML = '<option value="">Select a scenario...</option>';
+    // Initialize feature searchable select if not already done
+    if (!featureSelect.classList.contains('searchable-select-input')) {
+        featureSelect.placeholder = 'Search features...';
+        createSearchableSelect('mockapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                // Update scenario filter
+                scenarioSelect.dataset.featureName = featureName;
+                scenarioSelect.value = '';
+                scenarioSelect.dataset.selectedValue = '';
+                scenarioSelect.placeholder = 'Search scenarios...';
+            }
+        });
+    } else {
+        featureSelect.value = '';
+        featureSelect.dataset.selectedValue = '';
+    }
 
-        if (!featureName) return;
-
-        try {
-            const scenarios = await fetchAllScenarios(featureName);
-
-            scenarios.forEach(scenario => {
-                const option = document.createElement('option');
-                option.value = scenario.name;
-                option.textContent = scenario.name;
-                scenarioSelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error('Error loading scenarios:', error);
-        }
-    };
+    // Initialize scenario searchable select if not already done
+    if (!scenarioSelect.classList.contains('searchable-select-input')) {
+        scenarioSelect.placeholder = 'Search scenarios...';
+        createSearchableSelect('mockapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    } else {
+        scenarioSelect.value = '';
+        scenarioSelect.dataset.selectedValue = '';
+        scenarioSelect.dataset.featureName = '';
+    }
 
     resetJsonTreeMode('mockapi-hash-input');
     resetJsonTreeMode('mockapi-output');
@@ -626,15 +870,16 @@ async function editMockAPI(api) {
     document.getElementById('mockapi-modal-title').textContent = 'Edit Mock API';
     document.getElementById('mockapi-id').value = api.id;
     document.getElementById('mockapi-name').value = api.name;
+    document.getElementById('mockapi-description').value = api.description || '';
     document.getElementById('mockapi-path').value = api.path;
     document.getElementById('mockapi-method').value = api.method || 'GET';
     document.getElementById('mockapi-regex-path').value = api.regex_path || '';
 
-    // Populate hash_input if it exists
+    // Populate input if it exists
     try {
-        if (api.hash_input && api.hash_input !== null) {
+        if (api.input && api.input !== null) {
             document.getElementById('mockapi-hash-input').value =
-                typeof api.hash_input === 'string' ? api.hash_input : JSON.stringify(api.hash_input, null, 2);
+                typeof api.input === 'string' ? api.input : JSON.stringify(api.input, null, 2);
         } else {
             document.getElementById('mockapi-hash-input').value = '';
         }
@@ -666,47 +911,160 @@ async function editMockAPI(api) {
 
     document.getElementById('mockapi-active').checked = api.is_active;
 
-    const allFeatures = await fetchAllFeatures();
     const featureSelect = document.getElementById('mockapi-feature');
-    featureSelect.innerHTML = '<option value="">Select a feature...</option>';
-    allFeatures.forEach(feature => {
-        const option = document.createElement('option');
-        option.value = feature.name;
-        option.textContent = feature.name;
-        if (feature.name === api.feature_name) {
-            option.selected = true;
-        }
-        featureSelect.appendChild(option);
-    });
+    const scenarioSelect = document.getElementById('mockapi-scenario');
 
-    loadScenariosForEdit(api.feature_name, api.scenario_name);
+    // Initialize feature searchable select if not already done
+    if (!featureSelect.classList.contains('searchable-select-input')) {
+        featureSelect.placeholder = 'Search features...';
+        createSearchableSelect('mockapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioSelect.dataset.featureName = featureName;
+                scenarioSelect.value = '';
+                scenarioSelect.dataset.selectedValue = '';
+            }
+        });
+    }
+
+    // Set feature value
+    featureSelect.value = api.feature_name;
+    featureSelect.dataset.selectedValue = api.feature_name;
+    featureSelect.dataset.selectedText = api.feature_name;
+
+    // Initialize scenario searchable select if not already done
+    if (!scenarioSelect.classList.contains('searchable-select-input')) {
+        scenarioSelect.placeholder = 'Search scenarios...';
+        createSearchableSelect('mockapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    }
+
+    // Set scenario value
+    scenarioSelect.dataset.featureName = api.feature_name;
+    scenarioSelect.value = api.scenario_name;
+    scenarioSelect.dataset.selectedValue = api.scenario_name;
+    scenarioSelect.dataset.selectedText = api.scenario_name;
+
     resetJsonTreeMode('mockapi-hash-input');
     resetJsonTreeMode('mockapi-output');
     showModal('mockapi-modal');
 }
 
-async function loadScenariosForEdit(featureName, selectedScenario) {
-    const scenarios = await fetchAllScenarios(featureName);
+async function duplicateMockAPI(api) {
+    document.getElementById('mockapi-modal-title').textContent = 'Duplicate Mock API';
 
-    const scenarioSelect = document.getElementById('mockapi-scenario');
-    scenarioSelect.innerHTML = '<option value="">Select a scenario...</option>';
+    // Clear ID so it creates a new record
+    document.getElementById('mockapi-id').value = '';
 
-    scenarios.forEach(scenario => {
-        const option = document.createElement('option');
-        option.value = scenario.name;
-        option.textContent = scenario.name;
-        if (scenario.name === selectedScenario) {
-            option.selected = true;
+    // Generate versioned name
+    let newName = api.name;
+    const versionRegex = / v(\d+)$/;
+    const match = newName.match(versionRegex);
+
+    if (match) {
+        // Increment existing version number
+        const currentVersion = parseInt(match[1]);
+        newName = newName.replace(versionRegex, ` v${currentVersion + 1}`);
+    } else {
+        // Append v2 for first duplicate
+        newName = `${newName} v2`;
+    }
+
+    document.getElementById('mockapi-name').value = newName;
+    document.getElementById('mockapi-description').value = api.description || '';
+    document.getElementById('mockapi-path').value = api.path;
+    document.getElementById('mockapi-method').value = api.method || 'GET';
+    document.getElementById('mockapi-regex-path').value = api.regex_path || '';
+
+    // Populate input if it exists
+    try {
+        if (api.input && api.input !== null) {
+            document.getElementById('mockapi-hash-input').value =
+                typeof api.input === 'string' ? api.input : JSON.stringify(api.input, null, 2);
+        } else {
+            document.getElementById('mockapi-hash-input').value = '';
         }
-        scenarioSelect.appendChild(option);
-    });
+    } catch (e) {
+        document.getElementById('mockapi-hash-input').value = '';
+    }
+
+    // Populate output
+    try {
+        document.getElementById('mockapi-output').value =
+            typeof api.output === 'string' ? api.output : JSON.stringify(api.output, null, 2);
+    } catch (e) {
+        document.getElementById('mockapi-output').value = '';
+    }
+
+    // Populate headers if they exist
+    try {
+        if (api.headers && api.headers !== null) {
+            let headerStr = typeof api.headers === 'string' ? api.headers : JSON.stringify(api.headers, null, 2);
+            // Remove outer braces and trim
+            headerStr = headerStr.replace(/^\{\n?/, '').replace(/\n?\}$/, '').trim();
+            document.getElementById('mockapi-output-header').value = headerStr;
+        } else {
+            document.getElementById('mockapi-output-header').value = '';
+        }
+    } catch (e) {
+        document.getElementById('mockapi-output-header').value = '';
+    }
+
+    document.getElementById('mockapi-active').checked = api.is_active;
+
+    const featureSelect = document.getElementById('mockapi-feature');
+    const scenarioSelect = document.getElementById('mockapi-scenario');
+
+    // Initialize feature searchable select if not already done
+    if (!featureSelect.classList.contains('searchable-select-input')) {
+        featureSelect.placeholder = 'Search features...';
+        createSearchableSelect('mockapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioSelect.dataset.featureName = featureName;
+                scenarioSelect.value = '';
+                scenarioSelect.dataset.selectedValue = '';
+            }
+        });
+    }
+
+    // Set feature value
+    featureSelect.value = api.feature_name;
+    featureSelect.dataset.selectedValue = api.feature_name;
+    featureSelect.dataset.selectedText = api.feature_name;
+
+    // Initialize scenario searchable select if not already done
+    if (!scenarioSelect.classList.contains('searchable-select-input')) {
+        scenarioSelect.placeholder = 'Search scenarios...';
+        createSearchableSelect('mockapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    }
+
+    // Set scenario value
+    scenarioSelect.dataset.featureName = api.feature_name;
+    scenarioSelect.value = api.scenario_name;
+    scenarioSelect.dataset.selectedValue = api.scenario_name;
+    scenarioSelect.dataset.selectedText = api.scenario_name;
+
+    resetJsonTreeMode('mockapi-hash-input');
+    resetJsonTreeMode('mockapi-output');
+    showModal('mockapi-modal');
 }
 
 async function saveMockAPI() {
     const id = document.getElementById('mockapi-id').value;
-    const featureName = document.getElementById('mockapi-feature').value;
-    const scenarioName = document.getElementById('mockapi-scenario').value;
+    const featureInput = document.getElementById('mockapi-feature');
+    const scenarioInput = document.getElementById('mockapi-scenario');
+    const featureName = featureInput.dataset.selectedValue || featureInput.value;
+    const scenarioName = scenarioInput.dataset.selectedValue || scenarioInput.value;
     const name = document.getElementById('mockapi-name').value.trim();
+    const description = document.getElementById('mockapi-description').value.trim();
     const path = document.getElementById('mockapi-path').value.trim();
     const method = document.getElementById('mockapi-method').value;
     const regexPath = document.getElementById('mockapi-regex-path').value.trim();
@@ -715,8 +1073,45 @@ async function saveMockAPI() {
     const outputHeaders = document.getElementById('mockapi-output-header').value.trim();
     const isActive = document.getElementById('mockapi-active').checked;
 
-    if (!featureName || !scenarioName || !name || !path || !method || !outputStr) {
-        showError('Feature, scenario, name, path, method, and output are required');
+    // Clear previous errors
+    clearFieldError('mockapi-feature');
+    clearFieldError('mockapi-scenario');
+    clearFieldError('mockapi-name');
+    clearFieldError('mockapi-path');
+    clearFieldError('mockapi-output');
+
+    if (!featureName) {
+        showFieldError('mockapi-feature', 'Feature is required');
+        return;
+    }
+
+    if (!scenarioName) {
+        showFieldError('mockapi-scenario', 'Scenario is required');
+        return;
+    }
+
+    if (!name) {
+        showFieldError('mockapi-name', 'Mock API name is required');
+        return;
+    }
+
+    if (name.includes(' ')) {
+        showFieldError('mockapi-name', 'Mock API name cannot contain spaces');
+        return;
+    }
+
+    if (name.length > 100) {
+        showFieldError('mockapi-name', 'Mock API name is too long (max 100 characters)');
+        return;
+    }
+
+    if (!path) {
+        showFieldError('mockapi-path', 'Path is required');
+        return;
+    }
+
+    if (!method || !outputStr) {
+        showError('Method and output are required');
         return;
     }
 
@@ -729,13 +1124,13 @@ async function saveMockAPI() {
         return;
     }
 
-    // Parse hash_input JSON if provided - will be automatically minified when sent to server
-    let hashInput = null;
+    // Parse input JSON if provided - will be automatically minified when sent to server
+    let input = null;
     if (hashInputStr) {
         try {
-            hashInput = JSON.parse(hashInputStr);
+            input = JSON.parse(hashInputStr);
         } catch (e) {
-            showError('Invalid JSON in hash input field');
+            showError('Invalid JSON in input field');
             return;
         }
     }
@@ -744,10 +1139,11 @@ async function saveMockAPI() {
         feature_name: featureName,
         scenario_name: scenarioName,
         name: name,
+        description: description,
         path: path,
         method: method,
         regex_path: regexPath,
-        hash_input: hashInput,
+        input: input,
         output: output,
         headers: outputHeaders,
         is_active: isActive
@@ -768,7 +1164,8 @@ async function saveMockAPI() {
         closeModal('mockapi-modal');
         showSuccess(id ? 'Mock API updated successfully' : 'Mock API created successfully');
 
-        const currentScenario = document.getElementById('mockapi-scenario-filter').value;
+        const scenarioInput = document.getElementById('mockapi-scenario-filter');
+        const currentScenario = scenarioInput.dataset.selectedValue || scenarioInput.value;
         if (currentScenario) {
             loadMockAPIs(currentScenario);
         }
@@ -800,6 +1197,74 @@ function showSuccess(message) {
     alert('Success: ' + message);
 }
 
+function showFieldError(fieldId, message) {
+    // Remove any existing error message for this field
+    clearFieldError(fieldId);
+
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    // Create error message element
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'field-error-message';
+    errorDiv.id = `${fieldId}-error`;
+    errorDiv.textContent = message;
+    errorDiv.style.color = '#e53e3e';
+    errorDiv.style.fontSize = '0.875rem';
+    errorDiv.style.marginTop = '0.25rem';
+    errorDiv.style.marginBottom = '0.5rem';
+
+    // Add red border to the input field
+    field.style.borderColor = '#e53e3e';
+
+    // Insert error message after the field
+    field.parentNode.insertBefore(errorDiv, field.nextSibling);
+}
+
+function clearFieldError(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    // Remove error message
+    const errorDiv = document.getElementById(`${fieldId}-error`);
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+
+    // Reset border color
+    field.style.borderColor = '';
+}
+
+function clearAllFieldErrors() {
+    const errorMessages = document.querySelectorAll('.field-error-message');
+    errorMessages.forEach(error => error.remove());
+
+    const inputs = document.querySelectorAll('input[style*="border-color"]');
+    inputs.forEach(input => input.style.borderColor = '');
+}
+
+// Add event listeners to clear errors when user starts typing
+function setupFieldErrorClearOnInput(fieldIds) {
+    fieldIds.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', function() {
+                clearFieldError(fieldId);
+            });
+        }
+    });
+}
+
+// Setup error clearing on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setupFieldErrorClearOnInput([
+        'feature-name',
+        'scenario-name',
+        'mockapi-name',
+        'loadtest-name'
+    ]);
+});
+
 async function deleteFeature(id) {
     if (!confirm('Are you sure you want to delete this feature?')) return;
 
@@ -829,7 +1294,8 @@ async function deleteScenario(id) {
         if (!response.ok) throw new Error('Failed to delete scenario');
 
         showSuccess('Scenario deleted successfully');
-        const currentFeature = document.getElementById('scenario-feature-filter').value;
+        const featureInput = document.getElementById('scenario-feature-filter');
+        const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
         if (currentFeature) {
             loadScenarios(currentFeature);
         }
@@ -850,7 +1316,8 @@ async function deleteMockAPI(id) {
         if (!response.ok) throw new Error('Failed to delete mock API');
 
         showSuccess('Mock API deleted successfully');
-        const currentScenario = document.getElementById('mockapi-scenario-filter').value;
+        const scenarioInput = document.getElementById('mockapi-scenario-filter');
+        const currentScenario = scenarioInput.dataset.selectedValue || scenarioInput.value;
         if (currentScenario) {
             loadMockAPIs(currentScenario);
         }
@@ -1224,6 +1691,16 @@ function createTreeNode(key, value, isRoot, isArrayItem, arrayIndex) {
         header.appendChild(addBtn);
     }
 
+    // Duplicate button (non-root only)
+    if (!isRoot) {
+        const dupBtn = document.createElement('button');
+        dupBtn.className = 'tree-duplicate-btn';
+        dupBtn.textContent = '⧉';
+        dupBtn.title = 'Duplicate';
+        dupBtn.onclick = function () { duplicateTreeNode(node); };
+        header.appendChild(dupBtn);
+    }
+
     // Remove button (non-root only)
     if (!isRoot) {
         const rmBtn = document.createElement('button');
@@ -1326,6 +1803,42 @@ function removeTreeNode(node) {
     }
 }
 
+function duplicateTreeNode(node) {
+    const parent = node.parentNode;
+    const grandparent = parent ? parent.parentNode : null;
+
+    // Read the value of the current node (including all children)
+    const value = readTreeValue(node);
+
+    // Get the key from the node header
+    const header = node.querySelector(':scope > .tree-node-header');
+    const ki = header.querySelector('.tree-key-input');
+    const badge = header.querySelector('.tree-index-badge');
+
+    const isArrayItem = !!badge;
+    let key = null;
+
+    if (ki) {
+        // For object properties, copy the key and append "_copy" if it's a duplicate
+        key = ki.value + '_copy';
+    }
+
+    // Create a new node with the same value
+    const newNode = createTreeNode(key, value, false, isArrayItem, 0);
+
+    // Insert the new node after the current node
+    if (node.nextSibling) {
+        parent.insertBefore(newNode, node.nextSibling);
+    } else {
+        parent.appendChild(newNode);
+    }
+
+    // Reindex array children if we're in an array
+    if (grandparent && grandparent.dataset.type === 'array') {
+        reindexArrayChildren(grandparent);
+    }
+}
+
 function reindexArrayChildren(parentNode) {
     const ch = parentNode.querySelector(':scope > .tree-children');
     if (!ch) return;
@@ -1405,11 +1918,271 @@ function resetJsonTreeMode(fieldId) {
     });
 }
 
+// Helper function to recursively sort JSON object keys alphabetically
+function sortJsonKeys(obj) {
+    if (obj === null || typeof obj !== 'object') {
+        return obj;
+    }
+
+    if (Array.isArray(obj)) {
+        return obj.map(sortJsonKeys);
+    }
+
+    const sorted = {};
+    Object.keys(obj)
+        .sort()
+        .forEach(key => {
+            sorted[key] = sortJsonKeys(obj[key]);
+        });
+
+    return sorted;
+}
+
+function formatJson(fieldId) {
+    const textarea = document.getElementById(fieldId);
+    if (!textarea) {
+        console.error('Textarea not found:', fieldId);
+        showError('Field not found');
+        return;
+    }
+
+    const treeContainer = document.getElementById(fieldId + '-tree');
+
+    // Check if we're in tree mode or raw mode
+    const isTreeMode = treeContainer && treeContainer.style.display !== 'none';
+
+    if (isTreeMode) {
+        // Switch to raw mode first, then format
+        switchJsonMode(fieldId, 'raw');
+        // The textarea value is already set by switchJsonMode, so we can format it
+    }
+
+    const rawValue = textarea.value.trim();
+
+    if (!rawValue) {
+        showError('No JSON to format');
+        return;
+    }
+
+    try {
+        // Parse the JSON
+        const parsed = JSON.parse(rawValue);
+
+        // Sort the JSON keys recursively
+        const sortedJson = sortJsonKeys(parsed);
+
+        // Re-stringify with proper indentation
+        const formatted = JSON.stringify(sortedJson, null, 2);
+
+        // Update the textarea
+        textarea.value = formatted;
+
+        showSuccess('JSON formatted and sorted successfully!');
+    } catch (e) {
+        // Provide more helpful error message
+        let errorMsg = 'Invalid JSON';
+        if (e.message) {
+            errorMsg += ':\n' + e.message;
+        }
+
+        // Try to identify common issues
+        if (rawValue.includes('}{')) {
+            errorMsg += '\n\nTip: You may have extra braces. Check for duplicate { or } characters.';
+        } else if (rawValue.match(/,\s*[}\]]/)) {
+            errorMsg += '\n\nTip: Remove trailing commas before } or ].';
+        } else if (!rawValue.startsWith('{') && !rawValue.startsWith('[')) {
+            errorMsg += '\n\nTip: JSON must start with { or [.';
+        }
+
+        showError(errorMsg);
+        console.error('JSON parse error:', e);
+    }
+}
+
+// ==================== Searchable Select ====================
+
+let searchDebounceTimers = {};
+
+function createSearchableSelect(inputId, options = {}) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'searchable-select-wrapper';
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'searchable-select-dropdown';
+    dropdown.id = inputId + '-dropdown';
+
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    wrapper.appendChild(dropdown);
+
+    input.classList.add('searchable-select-input');
+    input.setAttribute('autocomplete', 'off');
+    input.dataset.selectedValue = '';
+    input.dataset.searchType = options.searchType || 'feature';
+
+    // Handle input focus - show dropdown
+    input.addEventListener('focus', function() {
+        if (input.value.trim() === '' || input.value === input.placeholder) {
+            input.value = '';
+            loadInitialOptions(inputId, options);
+        }
+        dropdown.classList.add('show');
+    });
+
+    // Handle input typing - search
+    input.addEventListener('input', function() {
+        const query = input.value.trim();
+        input.dataset.selectedValue = '';
+
+        clearTimeout(searchDebounceTimers[inputId]);
+        searchDebounceTimers[inputId] = setTimeout(() => {
+            searchOptions(inputId, query, options);
+        }, 300);
+    });
+
+    // Handle clicking outside to close dropdown
+    document.addEventListener('click', function(e) {
+        if (!wrapper.contains(e.target)) {
+            dropdown.classList.remove('show');
+            // Restore selected value text if nothing was selected
+            if (input.dataset.selectedValue) {
+                input.value = input.dataset.selectedText || input.dataset.selectedValue;
+            } else if (input.value.trim() !== '') {
+                input.value = '';
+                input.placeholder = options.placeholder || 'Select...';
+            }
+        }
+    });
+
+    return { input, dropdown, wrapper };
+}
+
+async function loadInitialOptions(inputId, options) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(inputId + '-dropdown');
+    const searchType = input.dataset.searchType;
+
+    try {
+        let items = [];
+        if (searchType === 'feature') {
+            const response = await fetch(`${API_BASE_URL}/features?page_size=10`);
+            if (response.ok) {
+                const result = await response.json();
+                items = result.data || [];
+            }
+        } else if (searchType === 'scenario') {
+            const featureName = options.featureName || input.dataset.featureName;
+            if (featureName) {
+                const response = await fetch(`${API_BASE_URL}/scenarios?feature_name=${featureName}&page_size=10`);
+                if (response.ok) {
+                    const result = await response.json();
+                    items = result.data || [];
+                }
+            }
+        }
+
+        renderDropdownOptions(inputId, items, options);
+    } catch (error) {
+        console.error('Error loading options:', error);
+    }
+}
+
+async function searchOptions(inputId, query, options) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(inputId + '-dropdown');
+    const searchType = input.dataset.searchType;
+
+    if (!query) {
+        loadInitialOptions(inputId, options);
+        return;
+    }
+
+    try {
+        let items = [];
+        if (searchType === 'feature') {
+            const response = await fetch(`${API_BASE_URL}/features/search?q=${encodeURIComponent(query)}`);
+            if (response.ok) {
+                const result = await response.json();
+                items = result.data || result || [];
+            }
+        } else if (searchType === 'scenario') {
+            const featureName = options.featureName || input.dataset.featureName;
+            const url = featureName
+                ? `${API_BASE_URL}/scenarios/search?q=${encodeURIComponent(query)}&feature_name=${featureName}`
+                : `${API_BASE_URL}/scenarios/search?q=${encodeURIComponent(query)}`;
+            const response = await fetch(url);
+            if (response.ok) {
+                const result = await response.json();
+                items = result.data || result || [];
+            }
+        }
+
+        renderDropdownOptions(inputId, items, options);
+    } catch (error) {
+        console.error('Error searching:', error);
+        dropdown.innerHTML = '<div class="searchable-select-option disabled">Error searching...</div>';
+    }
+}
+
+function renderDropdownOptions(inputId, items, options) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(inputId + '-dropdown');
+
+    if (!items || items.length === 0) {
+        dropdown.innerHTML = '<div class="searchable-select-option disabled">No results found</div>';
+        return;
+    }
+
+    dropdown.innerHTML = '';
+    items.forEach(item => {
+        const option = document.createElement('div');
+        option.className = 'searchable-select-option';
+        option.textContent = item.name;
+        option.dataset.value = item.name;
+
+        if (input.dataset.selectedValue === item.name) {
+            option.classList.add('selected');
+        }
+
+        option.addEventListener('click', function() {
+            input.dataset.selectedValue = item.name;
+            input.dataset.selectedText = item.name;
+            input.value = item.name;
+            dropdown.classList.remove('show');
+
+            // Trigger change event
+            if (options.onChange) {
+                options.onChange(item.name);
+            }
+
+            // Update all options to show selected state
+            dropdown.querySelectorAll('.searchable-select-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            option.classList.add('selected');
+        });
+
+        dropdown.appendChild(option);
+    });
+}
+
 // ==================== Load Test Scenarios ====================
 
-async function loadLoadTestScenarios(page = 1) {
+async function loadLoadTestScenarios(page = 1, searchQuery = '') {
     try {
-        const response = await fetch(`${API_BASE_URL}/loadtest/scenarios?page=${page}&page_size=10`);
+        let url;
+        if (searchQuery && searchQuery.trim() !== '') {
+            // Use search endpoint
+            url = `${API_BASE_URL}/loadtest/scenarios/search?q=${encodeURIComponent(searchQuery)}&page=${page}&page_size=10`;
+        } else {
+            // Use regular list endpoint
+            url = `${API_BASE_URL}/loadtest/scenarios?page=${page}&page_size=10`;
+        }
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load load test scenarios');
 
         const result = await response.json();
@@ -1427,7 +2200,7 @@ async function renderLoadTestTable() {
     const tbody = document.getElementById('loadtest-table-body');
 
     if (!loadTestScenarios || loadTestScenarios.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">No load test scenarios found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">No load test scenarios found</td></tr>';
         return;
     }
 
@@ -1446,8 +2219,6 @@ async function renderLoadTestTable() {
         <tr>
             <td><strong>${scenario.name || 'N/A'}</strong></td>
             <td>${scenario.description || '-'}</td>
-            <td><code>${scenario.base_url || '-'}</code></td>
-            <td>${scenario.concurrency || 10}</td>
             <td>${scenario.steps ? scenario.steps.length : 0} steps</td>
             <td>${accountCounts[scenario.id] || 0} accounts</td>
             <td><span class="status-badge ${scenario.is_active ? 'status-active' : 'status-inactive'}">
@@ -1457,6 +2228,8 @@ async function renderLoadTestTable() {
             <td class="actions">
                 <button class="btn btn-primary" onclick='runLoadTestScenario("${scenario.id}")' style="background: #10b981;">▶ Run</button>
                 <button class="btn btn-edit" onclick='editLoadTestScenario("${scenario.id}")'>Edit</button>
+                <button class="btn btn-duplicate" onclick='duplicateLoadTestScenario("${scenario.id}")'>Duplicate</button>
+                <button class="btn btn-outline" onclick='exportScenarioToJSON("${scenario.id}")'>📥 Export</button>
                 <button class="btn btn-delete" onclick="deleteLoadTestScenario('${scenario.id}')">Delete</button>
             </td>
         </tr>
@@ -1469,7 +2242,6 @@ function showCreateLoadTestModal() {
     document.getElementById('loadtest-name').value = '';
     document.getElementById('loadtest-description').value = '';
     document.getElementById('loadtest-accounts-input').value = '098888888-Test123456,09575757-Test123456,0966666666-Password789';
-    document.getElementById('loadtest-concurrency').value = '10';
     document.getElementById('loadtest-active').checked = true;
 
     // Update account count display
@@ -1560,12 +2332,12 @@ function getStepsFromForm() {
 
     stepDivs.forEach((stepDiv, index) => {
         const variables = getSimpleVariablesFromStep(stepDiv);
-        
+
         const stepName = stepDiv.querySelector('.step-name').value.trim();
         const stepPath = stepDiv.querySelector('.step-path').value.trim();
-        
+
         console.log(`Step ${index + 1}:`, { name: stepName, path: stepPath });
-        
+
         const step = {
             name: stepName,
             method: stepDiv.querySelector('.step-method').value,
@@ -1583,6 +2355,30 @@ function getStepsFromForm() {
             } catch (e) {
                 step.headers = {};
             }
+        }
+
+        // Add retry_for_seconds if provided and > 0
+        const retryForSeconds = parseInt(stepDiv.querySelector('.step-retry-for-seconds').value) || 0;
+        if (retryForSeconds > 0) {
+            step.retry_for_seconds = retryForSeconds;
+        }
+
+        // Add max_retry_times if provided and > 0
+        const maxRetryTimes = parseInt(stepDiv.querySelector('.step-max-retry-times').value) || 0;
+        if (maxRetryTimes > 0) {
+            step.max_retry_times = maxRetryTimes;
+        }
+
+        // Add wait_after_seconds if provided and > 0
+        const waitAfterSeconds = parseInt(stepDiv.querySelector('.step-wait-after-seconds').value) || 0;
+        if (waitAfterSeconds > 0) {
+            step.wait_after_seconds = waitAfterSeconds;
+        }
+
+        // Add condition if provided
+        const condition = stepDiv.querySelector('.step-condition').value.trim();
+        if (condition) {
+            step.condition = condition;
         }
 
         // Always push steps that have at least a name or path
@@ -1635,6 +2431,14 @@ function populateStepsInForm(steps) {
         stepDiv.querySelector('.step-body').value = step.body || '';
         stepDiv.querySelector('.step-expectstatus').value = step.expect_status || 200;
 
+        // Populate retry and wait fields
+        stepDiv.querySelector('.step-retry-for-seconds').value = step.retry_for_seconds || 0;
+        stepDiv.querySelector('.step-max-retry-times').value = step.max_retry_times || 0;
+        stepDiv.querySelector('.step-wait-after-seconds').value = step.wait_after_seconds || 0;
+
+        // Populate condition field
+        stepDiv.querySelector('.step-condition').value = step.condition || '';
+
         if (step.headers && Object.keys(step.headers).length > 0) {
             stepDiv.querySelector('.step-headers').value = JSON.stringify(step.headers, null, 2);
         } else {
@@ -1652,7 +2456,7 @@ async function runLoadTestScenario(id) {
     if (!confirm('Are you sure you want to run this load test?')) return;
 
     try {
-        showSuccess('Running load test... This may take a while.');
+        // showSuccess('Running load test... This may take a while.');
         
         const response = await fetch(`${API_BASE_URL}/loadtest/scenarios/${id}/run`, {
             method: 'POST'
@@ -1667,7 +2471,7 @@ async function runLoadTestScenario(id) {
 
         // Display results
         displayLoadTestResults(result);
-        showSuccess('Load test completed successfully!');
+        // showSuccess('Load test completed successfully!');
     } catch (error) {
         console.error('Error running load test:', error);
         showError('Failed to run load test: ' + error.message);
@@ -1751,7 +2555,6 @@ async function editLoadTestScenario(id) {
         document.getElementById('loadtest-name').value = scenario.name || '';
         document.getElementById('loadtest-description').value = scenario.description || '';
         document.getElementById('loadtest-accounts-input').value = scenario.accounts || '';
-        document.getElementById('loadtest-concurrency').value = scenario.concurrency || 10;
         document.getElementById('loadtest-active').checked = scenario.is_active;
 
         // Update account count display
@@ -1766,19 +2569,76 @@ async function editLoadTestScenario(id) {
     }
 }
 
+async function duplicateLoadTestScenario(id) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/loadtest/scenarios/${id}`);
+        if (!response.ok) throw new Error('Failed to load scenario');
+
+        const scenario = await response.json();
+
+        document.getElementById('loadtest-modal-title').textContent = 'Duplicate Load Test Scenario';
+
+        // Clear ID so it creates a new record
+        document.getElementById('loadtest-id').value = '';
+
+        // Generate versioned name
+        let newName = scenario.name || '';
+        const versionRegex = / v(\d+)$/;
+        const match = newName.match(versionRegex);
+
+        if (match) {
+            // Increment existing version number
+            const currentVersion = parseInt(match[1]);
+            newName = newName.replace(versionRegex, ` v${currentVersion + 1}`);
+        } else {
+            // Append v2 for first duplicate
+            newName = `${newName} v2`;
+        }
+
+        document.getElementById('loadtest-name').value = newName;
+        document.getElementById('loadtest-description').value = scenario.description || '';
+        document.getElementById('loadtest-accounts-input').value = scenario.accounts || '';
+        document.getElementById('loadtest-active').checked = scenario.is_active;
+
+        // Update account count display
+        updateAccountCount();
+
+        populateStepsInForm(scenario.steps);
+
+        showModal('loadtest-modal');
+    } catch (error) {
+        console.error('Error loading scenario:', error);
+        showError('Failed to load scenario for duplicating');
+    }
+}
+
 async function saveLoadTestScenario() {
     const id = document.getElementById('loadtest-id').value;
     const name = document.getElementById('loadtest-name').value.trim();
     const description = document.getElementById('loadtest-description').value.trim();
     const accounts = document.getElementById('loadtest-accounts-input').value.trim();
-    const concurrency = parseInt(document.getElementById('loadtest-concurrency').value) || 10;
+    const concurrency = 10; // Default concurrency
     const isActive = document.getElementById('loadtest-active').checked;
     const steps = getStepsFromForm();
 
+    // Clear previous errors
+    clearFieldError('loadtest-name');
+
     if (!name) {
-        showError('Scenario name is required');
+        showFieldError('loadtest-name', 'Scenario name is required');
         return;
     }
+
+    if (name.includes(' ')) {
+        showFieldError('loadtest-name', 'Load test scenario name cannot contain spaces');
+        return;
+    }
+
+    if (name.length > 100) {
+        showFieldError('loadtest-name', 'Load test scenario name is too long (max 100 characters)');
+        return;
+    }
+
     if (steps.length === 0) {
         showError('At least one step is required');
         return;
@@ -1944,5 +2804,124 @@ async function clearAllAccounts() {
     } catch (error) {
         console.error('Error clearing accounts:', error);
         showError('Failed to clear accounts');
+    }
+}
+
+/* ==================== JSON Import/Export ==================== */
+
+async function handleJSONImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const jsonText = e.target.result;
+            const scenario = JSON.parse(jsonText);
+
+            // Validate required fields
+            if (!scenario.name) {
+                throw new Error('Scenario name is required');
+            }
+            if (!scenario.steps || scenario.steps.length === 0) {
+                throw new Error('At least one step is required');
+            }
+
+            // Check if scenario with same name already exists
+            const existingScenario = loadTestScenarios.find(s =>
+                s.name.toLowerCase() === scenario.name.toLowerCase()
+            );
+
+            if (existingScenario) {
+                const confirmImport = confirm(
+                    `A scenario with the name "${scenario.name}" already exists.\n\n` +
+                    'Do you want to import anyway? This will create a duplicate.\n\n' +
+                    'Click OK to import as duplicate, or Cancel to abort.'
+                );
+
+                if (!confirmImport) {
+                    showError('Import cancelled - scenario name already exists');
+                    event.target.value = '';
+                    return;
+                }
+
+                // Optionally append timestamp to make name unique
+                scenario.name = `${scenario.name} (imported ${new Date().toLocaleString()})`;
+            }
+
+            // Ensure is_active is set
+            if (scenario.is_active === undefined) {
+                scenario.is_active = true;
+            }
+
+            // Remove id if present (will be generated by backend)
+            delete scenario.id;
+            delete scenario._id;
+            delete scenario.created_at;
+            delete scenario.updated_at;
+
+            // Create the scenario via API
+            const response = await fetch(`${API_BASE_URL}/loadtest/scenarios`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(scenario)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to import scenario');
+            }
+
+            showSuccess(`Scenario "${scenario.name}" imported successfully!`);
+            loadLoadTestScenarios();
+
+            // Reset file input
+            event.target.value = '';
+        } catch (error) {
+            console.error('Error importing JSON:', error);
+            showError('Failed to import JSON: ' + error.message);
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+async function exportScenarioToJSON(scenarioId) {
+    try {
+        const scenario = loadTestScenarios.find(s => s.id === scenarioId);
+        if (!scenario) {
+            showError('Scenario not found');
+            return;
+        }
+
+        // Create a clean copy without id and timestamps
+        const exportData = {
+            name: scenario.name,
+            description: scenario.description || '',
+            accounts: scenario.accounts || '',
+            steps: scenario.steps || [],
+            is_active: scenario.is_active !== undefined ? scenario.is_active : true
+        };
+
+        // Convert to JSON with pretty formatting
+        const jsonContent = JSON.stringify(exportData, null, 2);
+
+        // Create download link
+        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${scenario.name}.json`);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showSuccess('Scenario exported successfully!');
+    } catch (error) {
+        console.error('Error exporting scenario:', error);
+        showError('Failed to export scenario');
     }
 }

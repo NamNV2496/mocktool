@@ -72,7 +72,9 @@ header h1 {
 
 .tab-content {
     display: none;
-    padding: 30px;
+    padding: 50px;
+    min-height: 600px;
+    width: 100%;
 }
 
 .tab-content.active {
@@ -158,6 +160,17 @@ header h1 {
     background: #2c5aa0;
 }
 
+.btn-duplicate {
+    background: #ed8936;
+    color: white;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-duplicate:hover {
+    background: #dd6b20;
+}
+
 .btn-delete {
     background: #e53e3e;
     color: white;
@@ -200,6 +213,15 @@ td {
     padding: 15px;
     border-bottom: 1px solid #e2e8f0;
     color: #4a5568;
+}
+
+/* Handle long text in table cells - always show full text with wrapping */
+td.text-truncate {
+    max-width: 300px;
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: normal;
+    overflow-wrap: break-word;
 }
 
 tr:hover {
@@ -589,23 +611,44 @@ tr:hover {
     color: white;
 }
 
+.btn-format {
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border: none;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.btn-format:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+    transform: translateY(-1px);
+}
+
 .json-tree {
     border: 2px solid #e2e8f0;
     border-radius: 6px;
-    padding: 10px 12px 8px;
+    padding: 16px;
     background: #fafbfc;
-    min-height: 50px;
+    min-height: 60px;
 }
 
 .tree-node {
-    margin: 2px 0;
+    margin: 4px 0;
 }
 
 .tree-node-header {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 2px 0;
+    gap: 8px;
+    padding: 4px 0;
 }
 
 .tree-expand-btn {
@@ -614,9 +657,9 @@ tr:hover {
     min-width: 20px;
     border: none;
     background: rgba(102, 126, 234, 0.08);
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: #667eea;
     display: flex;
     align-items: center;
@@ -634,11 +677,11 @@ tr:hover {
 }
 
 .tree-key-input {
-    width: 90px;
-    padding: 2px 6px;
+    width: 120px;
+    padding: 4px 8px;
     border: 1px solid #e2e8f0;
-    border-radius: 3px;
-    font-size: 0.82rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
     font-family: 'Courier New', monospace;
     color: #d6336c;
     background: white;
@@ -652,27 +695,28 @@ tr:hover {
 }
 
 .tree-index-badge {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: #a0aec0;
     font-family: 'Courier New', monospace;
-    min-width: 24px;
+    min-width: 20px;
 }
 
 .tree-colon {
     color: #4a5568;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
 
 .tree-type-select {
-    padding: 2px 4px;
+    padding: 4px 8px;
     border: 1px solid #e2e8f0;
-    border-radius: 3px;
-    font-size: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
     color: #718096;
     background: white;
     cursor: pointer;
     transition: border-color 0.15s;
+    min-width: 50px;
 }
 
 .tree-type-select:focus {
@@ -681,13 +725,14 @@ tr:hover {
 }
 
 .tree-value-input {
-    padding: 2px 6px;
+    padding: 6px 10px;
     border: 1px solid #e2e8f0;
-    border-radius: 3px;
-    font-size: 0.82rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
     font-family: 'Courier New', monospace;
-    min-width: 70px;
-    max-width: 220px;
+    min-width: 200px;
+    max-width: 500px;
+    height: 50px;
     flex: 1;
     background: white;
     transition: border-color 0.15s;
@@ -707,17 +752,18 @@ select.tree-value-input {
 .tree-null-label {
     color: #a0aec0;
     font-style: italic;
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     font-family: 'Courier New', monospace;
 }
 
 .tree-add-btn,
-.tree-remove-btn {
-    width: 22px;
-    height: 22px;
-    min-width: 22px;
+.tree-remove-btn,
+.tree-duplicate-btn {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
     border: 1px solid #e2e8f0;
-    border-radius: 3px;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
     line-height: 1;
@@ -740,6 +786,16 @@ select.tree-value-input {
     border-color: #38a169;
 }
 
+.tree-duplicate-btn {
+    color: #667eea;
+    font-size: 0.65rem;
+}
+
+.tree-duplicate-btn:hover {
+    background: #e6e9ff;
+    border-color: #667eea;
+}
+
 .tree-remove-btn {
     color: #e53e3e;
 }
@@ -755,6 +811,92 @@ select.tree-value-input {
     border-left: 2px solid #e2e8f0;
     margin-top: 3px;
     margin-bottom: 2px;
+}
+
+/* === Searchable Select === */
+.searchable-select-wrapper {
+    position: relative;
+    display: inline-block;
+    min-width: 200px;
+}
+
+.searchable-select-input {
+    width: 100%;
+    padding: 10px 35px 10px 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.searchable-select-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    cursor: text;
+}
+
+.searchable-select-wrapper::after {
+    content: '▼';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #718096;
+    font-size: 0.7rem;
+}
+
+.searchable-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid #667eea;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: none;
+}
+
+.searchable-select-dropdown.show {
+    display: block;
+}
+
+.searchable-select-option {
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 0.95rem;
+    color: #4a5568;
+}
+
+.searchable-select-option:hover {
+    background: #f0f4ff;
+    color: #667eea;
+}
+
+.searchable-select-option.selected {
+    background: #e6e9ff;
+    color: #667eea;
+    font-weight: 600;
+}
+
+.searchable-select-option.disabled {
+    color: #a0aec0;
+    font-style: italic;
+    cursor: default;
+}
+
+.searchable-select-option.disabled:hover {
+    background: white;
+    color: #a0aec0;
 }
 
 @media (max-width: 768px) {

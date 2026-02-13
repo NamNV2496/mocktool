@@ -236,11 +236,11 @@ func TestFeatureRepository_Update(t *testing.T) {
 		"description": "Updated via Update method",
 	}
 
-	// This will fail because we're using ObjectID, not int64 ID
-	// But it tests that the method signature is correct
+	// This will not error even though we're using ObjectID, not int64 ID
+	// MongoDB's UpdateOne succeeds even if it matches 0 documents
 	err = repo.Update(ctx, 123, update)
-	// We expect this to not panic, even if it doesn't find the document
-	assert.Error(t, err) // Should error because no document with int64 ID exists
+	// We expect this to not error, as UpdateOne doesn't error on 0 matched docs
+	assert.NoError(t, err)
 }
 
 func TestFeatureRepository_EmptyDatabase(t *testing.T) {

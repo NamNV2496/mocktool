@@ -28,7 +28,7 @@ func SetupTestDB(t *testing.T) *TestHelper {
 	// Get MongoDB URI from environment or use default
 	mongoURI := os.Getenv("MONGO_URI")
 	if mongoURI == "" {
-		mongoURI = "mongodb://root:rootpassword@localhost:27017/mocktool_test?authSource=admin"
+		mongoURI = "mongodb://root:rootpassword@localhost:27017/mocktool?authSource=admin"
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

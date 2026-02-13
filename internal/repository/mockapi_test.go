@@ -2,6 +2,7 @@ package repository
 
 import (
 	"testing"
+	"time"
 
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func jsonToBSON(t *testing.T, jsonStr string) bson.Raw {
+	var raw bson.Raw
+	err := bson.UnmarshalExtJSON([]byte(jsonStr), true, &raw)
+	require.NoError(t, err)
+	return raw
+}
 
 func TestMockAPIRepository_Create(t *testing.T) {
 	helper := SetupTestDB(t)
@@ -24,9 +32,11 @@ func TestMockAPIRepository_Create(t *testing.T) {
 		Path:         "/api/v1/test",
 		Method:       "POST",
 		HashInput:    "test-hash",
-		Input:        bson.Raw(`{"key": "value"}`),
-		Output:       bson.Raw(`{"result": "success"}`),
+		Input:        jsonToBSON(t, `{"key": "value"}`),
+		Output:       jsonToBSON(t, `{"result": "success"}`),
 		IsActive:     true,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
 	}
 
 	err := repo.Create(ctx, mockAPI)
@@ -49,9 +59,11 @@ func TestMockAPIRepository_FindByFeatureScenarioPathMethodAndHash(t *testing.T) 
 			Path:         "/api/v1/login",
 			Method:       "POST",
 			HashInput:    "hash-1",
-			Input:        bson.Raw(`{"username": "test"}`),
-			Output:       bson.Raw(`{"token": "abc123"}`),
+			Input:        jsonToBSON(t, `{"username": "test"}`),
+			Output:       jsonToBSON(t, `{"token": "abc123"}`),
 			IsActive:     true,
+			CreatedAt:    time.Now().UTC(),
+			UpdatedAt:    time.Now().UTC(),
 		},
 		{
 			FeatureName:  "auth",
@@ -59,9 +71,11 @@ func TestMockAPIRepository_FindByFeatureScenarioPathMethodAndHash(t *testing.T) 
 			Path:         "/api/v1/login",
 			Method:       "POST",
 			HashInput:    "hash-2",
-			Input:        bson.Raw(`{"username": "admin"}`),
-			Output:       bson.Raw(`{"token": "xyz789"}`),
+			Input:        jsonToBSON(t, `{"username": "admin"}`),
+			Output:       jsonToBSON(t, `{"token": "xyz789"}`),
 			IsActive:     true,
+			CreatedAt:    time.Now().UTC(),
+			UpdatedAt:    time.Now().UTC(),
 		},
 		{
 			FeatureName:  "auth",
@@ -69,9 +83,11 @@ func TestMockAPIRepository_FindByFeatureScenarioPathMethodAndHash(t *testing.T) 
 			Path:         "/api/v1/login",
 			Method:       "POST",
 			HashInput:    "hash-1",
-			Input:        bson.Raw(`{"username": "test"}`),
-			Output:       bson.Raw(`{"error": "invalid credentials"}`),
+			Input:        jsonToBSON(t, `{"username": "test"}`),
+			Output:       jsonToBSON(t, `{"error": "invalid credentials"}`),
 			IsActive:     true,
+			CreatedAt:    time.Now().UTC(),
+			UpdatedAt:    time.Now().UTC(),
 		},
 	}
 
@@ -501,8 +517,8 @@ func TestMockAPIRepository_ComplexQuery(t *testing.T) {
 			Path:         "/api/v1/cart/validate",
 			Method:       "POST",
 			HashInput:    "cart-hash-1",
-			Input:        bson.Raw(`{"items": [1,2,3]}`),
-			Output:       bson.Raw(`{"valid": true}`),
+			Input:        jsonToBSON(t, `{"items": [1,2,3]}`),
+			Output:       jsonToBSON(t, `{"valid": true}`),
 			IsActive:     true,
 		},
 		{
@@ -512,8 +528,8 @@ func TestMockAPIRepository_ComplexQuery(t *testing.T) {
 			Path:         "/api/v1/payment/process",
 			Method:       "POST",
 			HashInput:    "payment-hash-1",
-			Input:        bson.Raw(`{"amount": 100}`),
-			Output:       bson.Raw(`{"status": "success"}`),
+			Input:        jsonToBSON(t, `{"amount": 100}`),
+			Output:       jsonToBSON(t, `{"status": "success"}`),
 			IsActive:     true,
 		},
 		{
@@ -523,8 +539,8 @@ func TestMockAPIRepository_ComplexQuery(t *testing.T) {
 			Path:         "/api/v1/email/send",
 			Method:       "POST",
 			HashInput:    "email-hash-1",
-			Input:        bson.Raw(`{"to": "user@example.com"}`),
-			Output:       bson.Raw(`{"sent": true}`),
+			Input:        jsonToBSON(t, `{"to": "user@example.com"}`),
+			Output:       jsonToBSON(t, `{"sent": true}`),
 			IsActive:     true,
 		},
 	}
@@ -554,7 +570,7 @@ func TestMockAPIRepository_ComplexQuery(t *testing.T) {
 	assert.Equal(t, int64(3), total)
 
 	// Test search by path
-	apis, total, err = repo.SearchByScenarioAndNameOrPath(ctx, "checkout-success", "payment", params)
+	apis, _, err = repo.SearchByScenarioAndNameOrPath(ctx, "checkout-success", "payment", params)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(apis))
 	assert.Equal(t, "process-payment", apis[0].Name)

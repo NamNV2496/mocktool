@@ -16,10 +16,10 @@ type MockAPI struct {
 	IsActive     bool               `bson:"is_active" json:"is_active"`
 	Path         string             `bson:"path" json:"path" validate:"required,no_spaces"`
 	Method       string             `bson:"method" json:"method" validate:"required,no_spaces"`
-	Input        bson.Raw           `bson:"input" json:"input"`
+	Input        bson.Raw           `bson:"input,omitempty" json:"input"`
 	HashInput    string             `bson:"hash_input" json:"hash_input"`
-	Headers      bson.Raw           `bson:"headers" json:"headers"`
-	Output       bson.Raw           `bson:"output" json:"output"`
+	Headers      bson.Raw           `bson:"headers,omitempty" json:"headers"`
+	Output       bson.Raw           `bson:"output,omitempty" json:"output"`
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time          `bson:"updated_at" json:"updated_at"`
 }

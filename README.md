@@ -190,6 +190,7 @@ Ref: [example grpc](./example/grpc/README.md)
 - mongoDB: "go.mongodb.org/mongo-driver/mongo"
 - echo: "github.com/labstack/echo/v4"
 - Hash: "crypto/sha256"
+- Monitoring: "github.com/prometheus/client_golang/prometheus"
 ```
 
 ## Build errorResponse

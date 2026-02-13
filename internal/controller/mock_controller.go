@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,9 +19,11 @@ import (
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/pkg/observability"
 	"github.com/namnv2496/mocktool/pkg/security"
 	"github.com/namnv2496/mocktool/pkg/utils"
 	customValidator "github.com/namnv2496/mocktool/pkg/validator"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -59,18 +62,37 @@ func NewMockController(
 
 func (_self *MockController) StartHttpServer() error {
 	c := echo.New()
-
-	// Set custom validator
 	c.Validator = customValidator.NewValidator()
 
-	// Middleware
-	c.Use(middleware.CORS())          // enable CORS for web interface
-	c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
-	c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+	cleanup, err := observability.InitTracing("mocktool", "1.0.0")
+	if err != nil {
+		slog.Error("Failed to initialize tracing", "error", err)
+	} else {
+		defer cleanup()
+		slog.Info("OpenTelemetry tracing initialized")
+	}
+
+	observability.AppInfo.WithLabelValues("1.0.0", runtime.Version()).Set(1)
+
+	startTime := time.Now()
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			observability.UptimeSeconds.Set(time.Since(startTime).Seconds())
+		}
+	}()
+
+	c.Use(observability.TracingMiddleware()) // OpenTelemetry tracing
+	c.Use(observability.MetricsMiddleware()) // Prometheus metrics
+	c.Use(middleware.CORS())                 // enable CORS for web interface
+	c.Use(middleware.RequestLogger())        // use the default RequestLogger middleware with slog logger
+	c.Use(middleware.Recover())              // recover panics as errors for proper error handling
 
 	// Health check endpoints
 	c.GET("/health", _self.HealthCheck)
 	c.GET("/ready", _self.ReadinessCheck)
+	c.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// Routes
 	v1 := c.Group("/api/v1/mocktool")

@@ -251,7 +251,7 @@ func TestMockController_CreateNewFeature(t *testing.T) {
 }
 
 func TestMockController_ListScenarioByFeature(t *testing.T) {
-	controller, ctrl, _, scenarioRepo, _, _ := setupTestController(t)
+	controller, ctrl, _, scenarioRepo, accountScenarioRepo, _ := setupTestController(t)
 	defer ctrl.Finish()
 
 	tests := []struct {
@@ -265,12 +265,28 @@ func TestMockController_ListScenarioByFeature(t *testing.T) {
 			name:        "successful list",
 			featureName: "test-feature",
 			setupMocks: func() {
+				scenarioID := primitive.NewObjectID()
 				scenarios := []domain.Scenario{
 					{Name: "scenario1"},
 				}
+				accountScenario := &domain.AccountScenario{
+					ScenarioID: scenarioID,
+				}
+				scenario := &domain.Scenario{
+					ID:          scenarioID,
+					FeatureName: "test-feature",
+					Name:        "test-scenario",
+				}
+				scenarioRepo.EXPECT().
+					GetByObjectID(gomock.Any(), scenarioID).
+					Return(scenario, nil)
 				scenarioRepo.EXPECT().
 					ListByFeatureNamePaginated(gomock.Any(), "test-feature", gomock.Any()).
 					Return(scenarios, int64(1), nil)
+				accountScenarioRepo.EXPECT().
+					GetActiveScenario(gomock.Any(), "test-feature", gomock.Any()).
+					Return(accountScenario, nil)
+
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,

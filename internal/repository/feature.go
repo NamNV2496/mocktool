@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IFeatureRepository interface {
 	ListAllPaginated(ctx context.Context, params domain.PaginationParams) ([]domain.Feature, int64, error)
 	SearchByName(ctx context.Context, query string, params domain.PaginationParams) ([]domain.Feature, int64, error)

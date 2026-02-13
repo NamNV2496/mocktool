@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"log/slog"
 	"time"
 
 	"github.com/namnv2496/mocktool/internal/configs"
@@ -43,8 +45,8 @@ func init() {
 func InvokeServer(invokers ...any) *fx.App {
 	config := configs.LoadConfig()
 	app := fx.New(
-		fx.StartTimeout(time.Second*10),
-		fx.StopTimeout(time.Second*10),
+		fx.StartTimeout(time.Second*15),
+		fx.StopTimeout(time.Second*30),
 		fx.Provide(
 			fx.Annotate(repository.NewFeatureRepository, fx.As(new(repository.IFeatureRepository))),
 			fx.Annotate(repository.NewScenarioRepository, fx.As(new(repository.IScenarioRepository))),
@@ -73,7 +75,34 @@ func startServer(
 	lc fx.Lifecycle,
 	forwardController controller.IForwardController,
 	mockController controller.IMockController,
-) error {
-	go forwardController.StartMockServer()
-	return mockController.StartHttpServer()
+) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			slog.Info("Starting mocktool servers...")
+
+			// Start forward controller in background
+			go func() {
+				if err := forwardController.StartMockServer(); err != nil {
+					slog.Error("Forward server error", "error", err)
+				}
+			}()
+
+			// Start mock controller in background
+			go func() {
+				if err := mockController.StartHttpServer(); err != nil {
+					slog.Error("Mock server error", "error", err)
+				}
+			}()
+
+			slog.Info("Mocktool servers started successfully")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			slog.Info("Shutting down mocktool servers gracefully...")
+			// Give servers time to finish processing requests
+			time.Sleep(2 * time.Second)
+			slog.Info("Mocktool servers stopped")
+			return nil
+		},
+	})
 }

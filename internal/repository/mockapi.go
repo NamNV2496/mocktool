@@ -10,6 +10,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IMockAPIRepository interface {
 	// ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
 	// ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)

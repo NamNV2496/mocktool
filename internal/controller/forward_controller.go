@@ -25,21 +25,18 @@ type ForwardController struct {
 	config    *configs.Config
 	forwardUc usecase.IForwardUC
 	TestWay   int
-	// trie      usecase.ITrie
 }
 
 func NewFowardController(
 	config *configs.Config,
 	forwardUc usecase.IForwardUC,
 	flags entity.ServiceFlags,
-	// trie usecase.ITrie,
 ) IForwardController {
 
 	return &ForwardController{
 		config:    config,
 		forwardUc: forwardUc,
 		TestWay:   flags.TestWay,
-		// trie:      trie,
 	}
 }
 

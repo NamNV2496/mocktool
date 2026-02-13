@@ -10,6 +10,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IScenarioRepository interface {
 	Create(ctx context.Context, s *domain.Scenario) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error

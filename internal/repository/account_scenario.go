@@ -10,6 +10,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IAccountScenarioRepository interface {
 	Create(ctx context.Context, as *domain.AccountScenario) error
 	GetActiveScenario(ctx context.Context, featureName string, accountId *string) (*domain.AccountScenario, error)

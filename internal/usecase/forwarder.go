@@ -15,12 +15,14 @@ import (
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
+	"github.com/namnv2496/mocktool/pkg/security"
 	"github.com/namnv2496/mocktool/pkg/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"google.golang.org/grpc/codes"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/usecase/$GOFILE.mock.go -package=$GOPACKAGE
 type IForwardUC interface {
 	ResponseMockData(c echo.Context) error
 	ResponsePublicMockData(c echo.Context) error
@@ -150,11 +152,16 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	// Set response headers
 	c.Response().Header().Set("Content-Type", "application/json")
 
-	// Parse and set custom headers from bson.Raw
+	// Parse and set custom headers from bson.Raw with security validation
 	var headersMap map[string]string
 	if len(mockAPI.Headers) > 0 {
 		if err := bson.Unmarshal(mockAPI.Headers, &headersMap); err == nil {
-			for key, value := range headersMap {
+			// Sanitize headers before setting them in response
+			sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+			if len(warnings) > 0 {
+				slog.Warn("Response headers sanitized", "warnings", warnings)
+			}
+			for key, value := range sanitizedHeaders {
 				c.Response().Header().Set(key, value)
 			}
 		}
@@ -263,11 +270,16 @@ func (_self *ForwardUC) ResponsePublicMockData(c echo.Context) error {
 	// Set response headers
 	c.Response().Header().Set("Content-Type", "application/json")
 
-	// Parse and set custom headers from bson.Raw
+	// Parse and set custom headers from bson.Raw with security validation
 	var headersMap map[string]string
 	if len(mockAPI.Headers) > 0 {
 		if err := bson.Unmarshal(mockAPI.Headers, &headersMap); err == nil {
-			for key, value := range headersMap {
+			// Sanitize headers before setting them in response
+			sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+			if len(warnings) > 0 {
+				slog.Warn("Response headers sanitized", "warnings", warnings)
+			}
+			for key, value := range sanitizedHeaders {
 				c.Response().Header().Set(key, value)
 			}
 		}

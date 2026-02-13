@@ -2,13 +2,24 @@
 
 Mocktool is a simple tool written in the Go language. It supports controlling API responses based on feature scenarios.
 
-During software development, you may encounter bottlenecks where you have to wait for backend developers (BE) to provide APIs or responses to frontend developers (FE) or testers. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
+## Problem Statement
 
-At the same time we have:
-- Multiple active feature
+During software development, you may encounter bottlenecks where:
+- Frontend developers and testers must wait for backend developers to provide APIs or finalize responses.
+- Backend APIs change during development, requiring frontend code updates.
+- Mocking solutions are limited to hardcoding responses by URL path, without request body filtering.
+- Multiple stakeholders cannot work in parallel (for example: FE completes development but lacks test data, or QA cannot set up edge cases for testing).
+
+That is exactly pain point in development. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
+
+## Key Features
+
+This tool provides the following capabilities:
+
+- Multiple active features
+- Multiple scenarios of a features
 - Only 1 active scenario for each feature for each accountId
-- Multiple API for each scenario (same API path but different requestBody)
-
+- Multiple APIs for each scenario (same API path with different request bodies distinguished by hash)
 
 ```mermaid
 flowchart TB
@@ -45,7 +56,9 @@ flowchart TB
 
 <summary>
 <details>
+
 ![architecturet](doc/architecture.png)
+
 </details>
 </summary>
 
@@ -174,9 +187,9 @@ Ref: [example grpc](./example/grpc/README.md)
 # Technologies
 
 ```bash
-- Trie algorythm
 - mongoDB: "go.mongodb.org/mongo-driver/mongo"
 - echo: "github.com/labstack/echo/v4"
+- Hash: "crypto/sha256"
 ```
 
 ## Build errorResponse

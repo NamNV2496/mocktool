@@ -14,7 +14,9 @@ import (
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/pkg/security"
 	"github.com/namnv2496/mocktool/pkg/utils"
+	customValidator "github.com/namnv2496/mocktool/pkg/validator"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -53,10 +55,19 @@ func NewMockController(
 
 func (_self *MockController) StartHttpServer() error {
 	c := echo.New()
+
+	// Set custom validator
+	c.Validator = customValidator.NewValidator()
+
 	// Middleware
 	c.Use(middleware.CORS())          // enable CORS for web interface
 	c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
 	c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+
+	// Health check endpoints
+	c.GET("/health", _self.HealthCheck)
+	c.GET("/ready", _self.ReadinessCheck)
+
 	// Routes
 	v1 := c.Group("/api/v1/mocktool")
 	v1.GET("/features", _self.GetFeatures)                 // list all features
@@ -150,21 +161,33 @@ func parsePaginationParams(c echo.Context) domain.PaginationParams {
 func (_self *MockController) CreateNewFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req domain.Feature
+	var req struct {
+		Name        string `json:"name" validate:"required,no_spaces"`
+		Description string `json:"description"`
+	}
+
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
-	req.IsActive = true
+	// Validate the request
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
 
-	if err := _self.FeatureRepo.Create(ctx, &req); err != nil {
+	feature := &domain.Feature{
+		Name:        req.Name,
+		Description: req.Description,
+		IsActive:    true,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
+
+	if err := _self.FeatureRepo.Create(ctx, feature); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, req)
+	return c.JSON(http.StatusCreated, feature)
 }
 
 /* ---------- PUT /features/:feature_id ---------- */
@@ -286,21 +309,35 @@ func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
 func (_self *MockController) CreateNewScenarioByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req domain.Scenario
+	var req struct {
+		FeatureName string `json:"feature_name" validate:"required,no_spaces"`
+		Name        string `json:"name" validate:"required,no_spaces"`
+		Description string `json:"description"`
+	}
+
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
+	// Validate the request
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+
+	scenario := &domain.Scenario{
+		FeatureName: req.FeatureName,
+		Name:        req.Name,
+		Description: req.Description,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
 
 	// Just create the scenario - activation is handled separately via AccountScenario
-	if err := _self.ScenarioRepo.Create(ctx, &req); err != nil {
+	if err := _self.ScenarioRepo.Create(ctx, scenario); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, req)
+	return c.JSON(http.StatusCreated, scenario)
 }
 
 /* ---------- PUT /scenarios/:scenario_id ---------- */
@@ -589,12 +626,12 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 
 	// Use a temporary struct for binding with json.RawMessage
 	var reqBody struct {
-		FeatureName  string          `json:"feature_name"`
-		ScenarioName string          `json:"scenario_name"`
-		Name         string          `json:"name"`
+		FeatureName  string          `json:"feature_name" validate:"required,no_spaces"`
+		ScenarioName string          `json:"scenario_name" validate:"required,no_spaces"`
+		Name         string          `json:"name" validate:"required,no_spaces"`
 		Description  string          `json:"description"`
-		Path         string          `json:"path"`
-		Method       string          `json:"method"`
+		Path         string          `json:"path" validate:"required,no_spaces"`
+		Method       string          `json:"method" validate:"required,no_spaces"`
 		Input        json.RawMessage `json:"input"`
 		Headers      json.RawMessage `json:"headers"`
 		Output       json.RawMessage `json:"output"`
@@ -602,6 +639,11 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 
 	if err := c.Bind(&reqBody); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	// Validate the request
+	if err := c.Validate(&reqBody); err != nil {
+		return err // Already formatted as HTTPError by CustomValidator
 	}
 
 	// Convert to domain.MockAPI
@@ -697,8 +739,14 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 			)
 		}
 
+		// Step 3.5: Validate and sanitize headers for security
+		sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+		if len(warnings) > 0 {
+			slog.Warn("Headers sanitized or blocked", "warnings", warnings)
+		}
+
 		// Step 4: map -> bson.Raw
-		headerData, err := bson.Marshal(headersMap)
+		headerData, err := bson.Marshal(sanitizedHeaders)
 		if err != nil {
 			return echo.NewHTTPError(
 				http.StatusInternalServerError,
@@ -885,8 +933,14 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 			)
 		}
 
+		// Step 3.5: Validate and sanitize headers for security
+		sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+		if len(warnings) > 0 {
+			slog.Warn("Headers sanitized or blocked", "warnings", warnings)
+		}
+
 		// Step 4: map -> bson.Raw
-		headerData, err := bson.Marshal(headersMap)
+		headerData, err := bson.Marshal(sanitizedHeaders)
 		if err != nil {
 			return echo.NewHTTPError(
 				http.StatusInternalServerError,
@@ -904,4 +958,41 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+/* ---------- Health Check Endpoints ---------- */
+
+// HealthCheck returns the basic health status of the application
+func (_self *MockController) HealthCheck(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":  "healthy",
+		"service": "mocktool",
+	})
+}
+
+// ReadinessCheck verifies that the application is ready to serve requests
+// This includes checking database connectivity
+func (_self *MockController) ReadinessCheck(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// Try to ping the database through a simple query
+	// We'll just try to list features with a limit to check connectivity
+	_, _, err := _self.FeatureRepo.ListAllPaginated(ctx, domain.PaginationParams{
+		Page:     1,
+		PageSize: 1,
+	})
+
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"status":  "not ready",
+			"service": "mocktool",
+			"error":   "database connection failed",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":   "ready",
+		"service":  "mocktool",
+		"database": "connected",
+	})
 }

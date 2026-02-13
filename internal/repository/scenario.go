@@ -10,11 +10,13 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IScenarioRepository interface {
 	Create(ctx context.Context, s *domain.Scenario) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error)
-	ListByFeatureName(ctx context.Context, featureName string) ([]domain.Scenario, error)
+	ListByFeatureNamePaginated(ctx context.Context, featureName string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
+	SearchByFeatureAndName(ctx context.Context, featureName, query string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
 }
 type ScenarioRepository struct {
 	*BaseRepository
@@ -26,15 +28,58 @@ func NewScenarioRepository(db *mongo.Database) *ScenarioRepository {
 	}
 }
 
-func (r *ScenarioRepository) ListByFeatureName(
+func (r *ScenarioRepository) ListByFeatureNamePaginated(
 	ctx context.Context,
 	featureName string,
-) ([]domain.Scenario, error) {
+	params domain.PaginationParams,
+) ([]domain.Scenario, int64, error) {
+	filter := bson.M{"feature_name": featureName}
+
+	total, err := r.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	var result []domain.Scenario
-	err := r.FindMany(ctx, bson.M{
-		"feature_name": featureName,
-	}, &result)
-	return result, err
+	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
+func (r *ScenarioRepository) SearchByFeatureAndName(
+	ctx context.Context,
+	featureName string,
+	query string,
+	params domain.PaginationParams,
+) ([]domain.Scenario, int64, error) {
+	// Build filter
+	filter := bson.M{
+		"name": bson.M{
+			"$regex":   query,
+			"$options": "i", // case-insensitive
+		},
+	}
+
+	// Add feature filter if provided
+	if featureName != "" {
+		filter["feature_name"] = featureName
+	}
+
+	total, err := r.Count(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result []domain.Scenario
+	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
 }
 
 func (r *ScenarioRepository) Create(ctx context.Context, s *domain.Scenario) error {

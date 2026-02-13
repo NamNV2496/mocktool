@@ -2,45 +2,65 @@
 
 Mocktool is a simple tool written in the Go language. It supports controlling API responses based on feature scenarios.
 
-During software development, you may encounter bottlenecks where you have to wait for backend developers (BE) to provide APIs or responses to frontend developers (FE) or testers. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
+## Problem Statement
 
-At the same time we have:
-- Multiple active feature
+During software development, you may encounter bottlenecks where:
+- Frontend developers and testers must wait for backend developers to provide APIs or finalize responses.
+- Backend APIs change during development, requiring frontend code updates.
+- Mocking solutions are limited to hardcoding responses by URL path, without request body filtering.
+- Multiple stakeholders cannot work in parallel (for example: FE completes development but lacks test data, or QA cannot set up edge cases for testing).
+
+That is exactly pain point in development. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
+
+## Key Features
+
+This tool provides the following capabilities:
+
+- Multiple active features
+- Multiple scenarios of a features
 - Only 1 active scenario for each feature for each accountId
-- Multiple API for each scenario (same API path but different requestBody)
-
+- Multiple APIs for each scenario (same API path with different request bodies distinguished by hash)
 
 ```mermaid
 flowchart TB
     Client[Client web/mobile] --> API[api service]
 
     API --> ISMOCK{is mock}
+    ISMOCK -- no ---> REAL[real data]
     ISMOCK -- yes --> ROOT[root]
-    ISMOCK -- no --> REAL[real data]
+
 
     %% Feature abc
     ROOT --> ABC[feature: abc]
     ABC --> ABC_S1[scenario1]
-    ABC --> ABC_S2[scenario2]
+    ABC --> ABC_S2[scenario2 - active global]
 
     ABC_S1 --> ABC_S1_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data2<br/>output:<br/>- out1: data_out1"]
     ABC_S1 --> ABC_S1_P2["path: /api/v1/def<br/>input:<br/>- field1: data1<br/>- field3: data3<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
 
     ABC_S2 --> ABC_S2_P1["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2"]
-    ABC_S2 --> ABC_S2_P2["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/> field2: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
-    ABC_S2 --> ABC_S2_P3["path: /api/v1/{id}/def<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3<br/>- id: {id}"]
+    ABC_S2 --> ABC_S2_P2["path: /api/v1/abc<br/>input:<br/>- field1: data1<br/>- field2: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3"]
+    ABC_S2 --> ABC_S2_P3["path: /api/v1/:id/def<br/>input:<br/>- field1: data1<br/>output:<br/>- out1: data_out1<br/>- out2: data_out2<br/>- out3: data_out3<br/>- id: id"]
 
     %% Feature xyz
     ROOT --> XYZ[feature: xyz]
-    XYZ --> XYZ_S1[scenario1]
-    XYZ --> XYZ_S2[scenario2]
+    XYZ --> XYZ_S1[scenario1 - active for accountId = 1,2,3]
+    XYZ --> XYZ_S2[scenario2- active for accountId = 4,5]
 
     XYZ_S1 --> XYZ_S1_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
-    XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>+ token => need to parse"]
+    XYZ_S1 --> XYZ_S1_P2["path: /api/v1/jqk<br/>input:<br/>- field1: data1<br/>"]
 
     XYZ_S2 --> XYZ_S2_P1["path: /api/v1/mno<br/>input:<br/>- field1: data1<br/>- field2: data2"]
+
 ```
-<!-- ![doc/architect.png](doc/architect.png) -->
+
+<summary>
+<details>
+
+![architecturet](doc/architecture.png)
+
+</details>
+</summary>
 
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)
 
@@ -57,7 +77,7 @@ FE->BE-service: request (/api/v1/insert)
 alt is mock data?
 BE-service->BE-service: add suffix /forward (/forward/api/v1/insert)
 BE-service->mock-service: send request (/forward/api/v1/insert)
-mock-service->mock-service: find usecase
+mock-service->mock-service: find by featureName and active scenario by accountId
 mock-service--> BE-service: response
 BE-service-->FE: response
 else
@@ -84,10 +104,10 @@ end
 The feature_name is control by `api-service`. Which support multiple services work at the same time.
 ```go
 // Service 1
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI
+targetURL := "http://localhost:8082/forward" + c.Request().RequestURI
 
 // Service 2
-targetURL := "http://localhost:8081/forward" + c.Request().RequestURI 
+targetURL := "http://localhost:8082/forward" + c.Request().RequestURI 
 
 // parse accountId from token
 accountId := 1
@@ -105,8 +125,9 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 - Reusable because all scenario is shared
 - Setup globally scenario => All accountIds will have the same result
 
-![doc/14.png](doc/14.png)
-![doc/15.png](doc/15.png)
+![doc/2.png](doc/2.png)
+![doc/3.png](doc/3.png)
+![doc/4.png](doc/4.png)
 
 => Make sure 1 API can response expecting answer for a accountId
 
@@ -116,8 +137,12 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 
 An API path with different request body will have different response by hashing requestBody
 
-![doc/6.png](doc/6.png)
+
 ![doc/7.png](doc/7.png)
+![doc/5.png](doc/5.png)
+![doc/6.png](doc/6.png)
+
+DB 
 ![doc/8.png](doc/8.png)
 
 ## result
@@ -162,9 +187,9 @@ Ref: [example grpc](./example/grpc/README.md)
 # Technologies
 
 ```bash
-- Trie algorythm
 - mongoDB: "go.mongodb.org/mongo-driver/mongo"
 - echo: "github.com/labstack/echo/v4"
+- Hash: "crypto/sha256"
 ```
 
 ## Build errorResponse
@@ -192,3 +217,17 @@ return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s"
     "trace_id": "jk3k49-234kfd934-fdk239d3-dk93dk3-d"
 }
 ```
+
+# Load test feature
+
+![doc/17.png](doc/17.png)
+
+You can run test scenario
+
+![doc/18.png](doc/18.png)
+
+example at `/doc/mocktool.loadtest_scenarios.json`
+
+result
+
+![doc/19.png](doc/19.png)

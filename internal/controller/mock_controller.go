@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,9 +13,10 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
-	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
-	"github.com/namnv2496/mocktool/internal/usecase"
+	"github.com/namnv2496/mocktool/pkg/security"
+	"github.com/namnv2496/mocktool/pkg/utils"
+	customValidator "github.com/namnv2496/mocktool/pkg/validator"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -29,8 +31,7 @@ type MockController struct {
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
 	MockAPIRepo         repository.IMockAPIRepository
-	forwardUc           usecase.IForwardUC
-	trie                usecase.ITrie
+	loadTestController  ILoadTestController
 }
 
 func NewMockController(
@@ -39,8 +40,7 @@ func NewMockController(
 	scenarioRepo repository.IScenarioRepository,
 	accountScenarioRepo repository.IAccountScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
-	forwardUc usecase.IForwardUC,
-	trie usecase.ITrie,
+	loadTestController ILoadTestController,
 ) IMockController {
 
 	return &MockController{
@@ -49,39 +49,47 @@ func NewMockController(
 		ScenarioRepo:        scenarioRepo,
 		AccountScenarioRepo: accountScenarioRepo,
 		MockAPIRepo:         mockAPIRepo,
-		forwardUc:           forwardUc,
-		trie:                trie,
+		loadTestController:  loadTestController,
 	}
 }
 
 func (_self *MockController) StartHttpServer() error {
 	c := echo.New()
+
+	// Set custom validator
+	c.Validator = customValidator.NewValidator()
+
 	// Middleware
 	c.Use(middleware.CORS())          // enable CORS for web interface
 	c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
 	c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+
+	// Health check endpoints
+	c.GET("/health", _self.HealthCheck)
+	c.GET("/ready", _self.ReadinessCheck)
+
 	// Routes
 	v1 := c.Group("/api/v1/mocktool")
-	v1.GET("/features", _self.GetFeatures)               // list all features
-	v1.POST("/features", _self.CreateNewFeature)         // create new feature
-	v1.PUT("/features/:feature_id", _self.UpdateFeature) // update or inactive
+	v1.GET("/features", _self.GetFeatures)                 // list all features
+	v1.GET("/features/search", _self.SearchFeaturesByName) // list all features has name likely
+	v1.POST("/features", _self.CreateNewFeature)           // create new feature
+	v1.PUT("/features/:feature_id", _self.UpdateFeature)   // update or inactive
 
-	v1.GET("/scenarios", _self.ListScenarioByFeature)                          // list all scenarios by feature
-	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)             // get active scenario for feature+account
-	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                    // create new scenario
-	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)           // update scenario
-	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)        // activate scenario for account
+	v1.GET("/scenarios", _self.ListScenarioByFeature)                         // list all scenarios by feature
+	v1.GET("/scenarios/search", _self.SearchScenarioByFeatureAndName)         // list all scenarios by feature has name likely
+	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)            // get active scenario for feature+account
+	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                   // create new scenario
+	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)          // update scenario
+	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)       // activate scenario for account
 	v1.DELETE("/scenarios/:scenario_id/deactivate", _self.DeactivateScenario) // deactivate scenario for account
 
-	v1.GET("/mockapis", _self.ListMockAPIsByScenario)          // list all APIs by scenario
-	v1.POST("/mockapis", _self.CreateMockAPIByScenario)        // create new scenario
-	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario) // update or inactive scenario
+	v1.GET("/mockapis", _self.ListMockAPIsByScenario)                       // list all APIs by scenario
+	v1.GET("/mockapis/search", _self.SearchMockAPIsByScenarioAndNameOrPath) // search APIs by scenario and name/path
+	v1.POST("/mockapis", _self.CreateMockAPIByScenario)                     // create new scenario
+	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario)              // update or inactive scenario
 
-	c.GET("/forward/*", _self.responseMockData)
-	c.POST("/forward/*", _self.responseMockData)
-	c.PUT("/forward/*", _self.responseMockData)
-	c.DELETE("/forward/*", _self.responseMockData)
-
+	// Load test scenarios - delegate to LoadTestController
+	_self.loadTestController.RegisterRoutes(v1)
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err
@@ -89,22 +97,63 @@ func (_self *MockController) StartHttpServer() error {
 	return nil
 }
 
-// handler
-func (_self *MockController) responseMockData(c echo.Context) error {
-	return _self.forwardUc.ResponseMockData(c)
-}
-
 /* ---------- GET /features ---------- */
 
-func (_self *MockController) GetFeatures(c echo.Context) error {
+func (_self *MockController) SearchFeaturesByName(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	features, err := _self.FeatureRepo.ListAll(ctx)
+	// Get search query from query parameter
+	query := c.QueryParam("q")
+	if query == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "search query 'q' is required")
+	}
+
+	params := parsePaginationParams(c)
+
+	features, total, err := _self.FeatureRepo.SearchByName(ctx, query, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, features)
+	response := domain.NewPaginatedResponse(features, total, params)
+	return c.JSON(http.StatusOK, response)
+}
+
+func (_self *MockController) GetFeatures(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	params := parsePaginationParams(c)
+
+	features, total, err := _self.FeatureRepo.ListAllPaginated(ctx, params)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	response := domain.NewPaginatedResponse(features, total, params)
+	return c.JSON(http.StatusOK, response)
+}
+
+// parsePaginationParams extracts and validates pagination parameters from query string
+func parsePaginationParams(c echo.Context) domain.PaginationParams {
+	params := domain.PaginationParams{
+		Page:     domain.DefaultPage,
+		PageSize: domain.DefaultPageSize,
+	}
+
+	if pageStr := c.QueryParam("page"); pageStr != "" {
+		if page, err := strconv.Atoi(pageStr); err == nil {
+			params.Page = page
+		}
+	}
+
+	if pageSizeStr := c.QueryParam("page_size"); pageSizeStr != "" {
+		if pageSize, err := strconv.Atoi(pageSizeStr); err == nil {
+			params.PageSize = pageSize
+		}
+	}
+
+	params.Normalize()
+	return params
 }
 
 /* ---------- POST /features ---------- */
@@ -112,21 +161,33 @@ func (_self *MockController) GetFeatures(c echo.Context) error {
 func (_self *MockController) CreateNewFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req domain.Feature
+	var req struct {
+		Name        string `json:"name" validate:"required,no_spaces"`
+		Description string `json:"description"`
+	}
+
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
-	req.IsActive = true
+	// Validate the request
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
 
-	if err := _self.FeatureRepo.Create(ctx, &req); err != nil {
+	feature := &domain.Feature{
+		Name:        req.Name,
+		Description: req.Description,
+		IsActive:    true,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
+
+	if err := _self.FeatureRepo.Create(ctx, feature); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, req)
+	return c.JSON(http.StatusCreated, feature)
 }
 
 /* ---------- PUT /features/:feature_id ---------- */
@@ -169,6 +230,28 @@ func (_self *MockController) UpdateFeature(c echo.Context) error {
 
 /* ---------- GET /scenarios?feature_name= ---------- */
 
+func (_self *MockController) SearchScenarioByFeatureAndName(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// Get search query from query parameter
+	query := c.QueryParam("q")
+	if query == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "search query 'q' is required")
+	}
+
+	// Feature name is optional - if provided, will filter by feature
+	featureName := c.QueryParam("feature_name")
+
+	params := parsePaginationParams(c)
+
+	scenarios, total, err := _self.ScenarioRepo.SearchByFeatureAndName(ctx, featureName, query, params)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	response := domain.NewPaginatedResponse(scenarios, total, params)
+	return c.JSON(http.StatusOK, response)
+}
 func (_self *MockController) ListScenarioByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -177,12 +260,15 @@ func (_self *MockController) ListScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
 	}
 
-	scenarios, err := _self.ScenarioRepo.ListByFeatureName(ctx, featureName)
+	params := parsePaginationParams(c)
+
+	scenarios, total, err := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	return c.JSON(http.StatusOK, scenarios)
+	response := domain.NewPaginatedResponse(scenarios, total, params)
+	return c.JSON(http.StatusOK, response)
 }
 
 /* ---------- GET /scenarios?feature_name= ---------- */
@@ -195,14 +281,16 @@ func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
 	}
 
-	// Extract accountId from header - REQUIRED
+	// Extract accountId from header - OPTIONAL
+	// If not provided, will fetch global active scenario
+	var accountId *string
 	accountIdHeader := c.Request().Header.Get("X-Account-Id")
-	if accountIdHeader == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "X-Account-Id header is required")
+	if accountIdHeader != "" {
+		accountId = &accountIdHeader
 	}
 
-	// Get active scenario mapping for this feature and account
-	accountScenario, err := _self.AccountScenarioRepo.GetActiveScenario(ctx, featureName, &accountIdHeader)
+	// Get active scenario mapping for this feature and account (or global if accountId is nil)
+	accountScenario, err := _self.AccountScenarioRepo.GetActiveScenario(ctx, featureName, accountId)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -221,21 +309,35 @@ func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
 func (_self *MockController) CreateNewScenarioByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var req domain.Scenario
+	var req struct {
+		FeatureName string `json:"feature_name" validate:"required,no_spaces"`
+		Name        string `json:"name" validate:"required,no_spaces"`
+		Description string `json:"description"`
+	}
+
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
+	// Validate the request
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+
+	scenario := &domain.Scenario{
+		FeatureName: req.FeatureName,
+		Name:        req.Name,
+		Description: req.Description,
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
 
 	// Just create the scenario - activation is handled separately via AccountScenario
-	if err := _self.ScenarioRepo.Create(ctx, &req); err != nil {
+	if err := _self.ScenarioRepo.Create(ctx, scenario); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, req)
+	return c.JSON(http.StatusCreated, scenario)
 }
 
 /* ---------- PUT /scenarios/:scenario_id ---------- */
@@ -287,6 +389,14 @@ func (_self *MockController) ActivateScenario(c echo.Context) error {
 		accountId = &accountIdParam
 	}
 
+	// If activating globally (accountId is nil), remove ALL account-specific mappings for this feature
+	if accountId == nil {
+		// Delete all account-specific mappings
+		if err := _self.AccountScenarioRepo.DeactivateAllAccountSpecificMappings(ctx, scenario.FeatureName); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate account-specific scenarios: "+err.Error())
+		}
+	}
+
 	// Deactivate existing active scenario for this feature+account
 	if err := _self.AccountScenarioRepo.DeactivateByFeatureAndAccount(ctx, scenario.FeatureName, accountId); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate existing scenario: "+err.Error())
@@ -304,27 +414,6 @@ func (_self *MockController) ActivateScenario(c echo.Context) error {
 
 	if err := _self.AccountScenarioRepo.Create(ctx, accountScenario); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to activate scenario: "+err.Error())
-	}
-
-	// Load the activated scenario's APIs into the trie
-	apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenario.Name)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get scenario APIs: "+err.Error())
-	}
-
-	for _, api := range apis {
-		if api.IsActive {
-			if err := _self.trie.Insert(entity.APIRequest{
-				FeatureName: api.FeatureName,
-				Scenario:    api.ScenarioName,
-				Path:        api.Path,
-				Method:      api.Method,
-				HashInput:   api.HashInput,
-				Output:      api.Output,
-			}); err != nil {
-				slog.Error("failed to insert API into trie", "error", err, "path", api.Path)
-			}
-		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"message": "scenario activated successfully"})
@@ -359,9 +448,6 @@ func (_self *MockController) DeactivateScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
 	}
 
-	// Remove the scenario's APIs from trie
-	_self.trie.RemoveScenario(scenario.FeatureName, scenario.Name)
-
 	return c.JSON(http.StatusOK, map[string]string{"message": "scenario deactivated successfully"})
 }
 
@@ -375,20 +461,22 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "scenario_name is required")
 	}
 
-	apis, err := _self.MockAPIRepo.ListByScenarioName(ctx, scenarioName)
+	params := parsePaginationParams(c)
+
+	apis, total, err := _self.MockAPIRepo.ListByScenarioNamePaginated(ctx, scenarioName, params)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	// Convert to response format with JSON objects for frontend
-	var response []map[string]any
+	var data []map[string]any
 	for _, api := range apis {
-		// Convert bson.Raw to JSON object
-		var hashInputJSON any = nil
-		if len(api.HashInput) > 0 {
+		// Convert bson.Raw to JSON object for input
+		var inputJSON any = nil
+		if len(api.Input) > 0 {
 			var result bson.M
-			if err := bson.Unmarshal(api.HashInput, &result); err == nil {
-				hashInputJSON = result
+			if err := bson.Unmarshal(api.Input, &result); err == nil {
+				inputJSON = result
 			}
 		}
 
@@ -410,7 +498,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			}
 		}
 
-		response = append(response, map[string]any{
+		data = append(data, map[string]any{
 			"id":            api.ID.Hex(),
 			"feature_name":  api.FeatureName,
 			"scenario_name": api.ScenarioName,
@@ -419,12 +507,113 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"is_active":     api.IsActive,
 			"path":          api.Path,
 			"method":        api.Method,
-			"hash_input":    hashInputJSON,
-			"output":        outputJSON,
-			"headers":       headers,
-			"created_at":    api.CreatedAt.Format(time.RFC3339),
-			"updated_at":    api.UpdatedAt.Format(time.RFC3339),
+			"input":         inputJSON,
+			// "hash_input":    api.HashInput,
+			"output":     outputJSON,
+			"headers":    headers,
+			"created_at": api.CreatedAt.Format(time.RFC3339),
+			"updated_at": api.UpdatedAt.Format(time.RFC3339),
 		})
+	}
+
+	// Calculate total pages
+	totalPages := int(total) / params.PageSize
+	if int(total)%params.PageSize > 0 {
+		totalPages++
+	}
+
+	response := map[string]any{
+		"data":        data,
+		"total":       total,
+		"page":        params.Page,
+		"page_size":   params.PageSize,
+		"total_pages": totalPages,
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+/* ---------- GET /mockapis/search ---------- */
+
+func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	scenarioName := c.QueryParam("scenario_name")
+	if scenarioName == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "scenario_name is required")
+	}
+
+	query := c.QueryParam("q")
+	if query == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "search query 'q' is required")
+	}
+
+	params := parsePaginationParams(c)
+
+	apis, total, err := _self.MockAPIRepo.SearchByScenarioAndNameOrPath(ctx, scenarioName, query, params)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Convert to response format with JSON objects for frontend
+	var data []map[string]any
+	for _, api := range apis {
+		// Convert bson.Raw to JSON object for input
+		var inputJSON any = nil
+		if len(api.Input) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(api.Input, &result); err == nil {
+				inputJSON = result
+			}
+		}
+
+		// Convert bson.Raw to JSON object
+		var outputJSON any = nil
+		if len(api.Output) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(api.Output, &result); err == nil {
+				outputJSON = result
+			}
+		}
+
+		// Convert bson.Raw to JSON object
+		var headers any = nil
+		if len(api.Headers) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(api.Headers, &result); err == nil {
+				headers = result
+			}
+		}
+
+		data = append(data, map[string]any{
+			"id":            api.ID.Hex(),
+			"feature_name":  api.FeatureName,
+			"scenario_name": api.ScenarioName,
+			"name":          api.Name,
+			"description":   api.Description,
+			"path":          api.Path,
+			"method":        api.Method,
+			"input":         inputJSON,
+			"hash_input":    api.HashInput,
+			"headers":       headers,
+			"output":        outputJSON,
+			"is_active":     api.IsActive,
+			"created_at":    api.CreatedAt,
+		})
+	}
+
+	// Calculate total pages
+	totalPages := int(total) / params.PageSize
+	if int(total)%params.PageSize > 0 {
+		totalPages++
+	}
+
+	response := map[string]any{
+		"data":        data,
+		"total":       total,
+		"page":        params.Page,
+		"page_size":   params.PageSize,
+		"total_pages": totalPages,
 	}
 
 	return c.JSON(http.StatusOK, response)
@@ -437,19 +626,24 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 
 	// Use a temporary struct for binding with json.RawMessage
 	var reqBody struct {
-		FeatureName  string          `json:"feature_name"`
-		ScenarioName string          `json:"scenario_name"`
-		Name         string          `json:"name"`
+		FeatureName  string          `json:"feature_name" validate:"required,no_spaces"`
+		ScenarioName string          `json:"scenario_name" validate:"required,no_spaces"`
+		Name         string          `json:"name" validate:"required,no_spaces"`
 		Description  string          `json:"description"`
-		Path         string          `json:"path"`
-		Method       string          `json:"method"`
-		HashInput    json.RawMessage `json:"hash_input"`
+		Path         string          `json:"path" validate:"required,no_spaces"`
+		Method       string          `json:"method" validate:"required,no_spaces"`
+		Input        json.RawMessage `json:"input"`
 		Headers      json.RawMessage `json:"headers"`
 		Output       json.RawMessage `json:"output"`
 	}
 
 	if err := c.Bind(&reqBody); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	// Validate the request
+	if err := c.Validate(&reqBody); err != nil {
+		return err // Already formatted as HTTPError by CustomValidator
 	}
 
 	// Convert to domain.MockAPI
@@ -466,27 +660,32 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 	req.UpdatedAt = now
 	req.IsActive = true
 
-	// Process hash input - store original JSON and compute hash
-	// Only process if not empty and not null
-	var inputData any
-	if err := json.Unmarshal(reqBody.HashInput, &inputData); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
-	}
-
-	// If the output is a string, try to parse it as JSON
-	if intputStr, ok := inputData.(string); ok {
-		var parsedData any
-		if err := json.Unmarshal([]byte(intputStr), &parsedData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+	// Process input - store original JSON and compute hash
+	if len(reqBody.Input) > 0 && string(reqBody.Input) != "null" {
+		var inputData any
+		if err := json.Unmarshal(reqBody.Input, &inputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
 		}
-		inputData = parsedData
-	}
 
-	inputBsonData, err := bson.Marshal(inputData)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		// If the input is a string, try to parse it as JSON
+		if inputStr, ok := inputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(inputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in input: "+err.Error())
+			}
+			inputData = parsedData
+		}
+
+		// Store original input as bson.Raw
+		inputBsonData, err := bson.Marshal(inputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert input to BSON: "+err.Error())
+		}
+		req.Input = inputBsonData
+
+		// Generate hash from sorted input
+		req.HashInput = utils.GenerateHashFromInput(inputBsonData)
 	}
-	req.HashInput = inputBsonData
 
 	// Process output - required field
 	if len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "" {
@@ -540,8 +739,14 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 			)
 		}
 
+		// Step 3.5: Validate and sanitize headers for security
+		sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+		if len(warnings) > 0 {
+			slog.Warn("Headers sanitized or blocked", "warnings", warnings)
+		}
+
 		// Step 4: map -> bson.Raw
-		headerData, err := bson.Marshal(headersMap)
+		headerData, err := bson.Marshal(sanitizedHeaders)
 		if err != nil {
 			return echo.NewHTTPError(
 				http.StatusInternalServerError,
@@ -557,24 +762,10 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	if err := _self.trie.Insert(entity.APIRequest{
-		FeatureName: req.FeatureName,
-		Scenario:    req.ScenarioName,
-		Path:        req.Path,
-		Method:      req.Method,
-		HashInput:   req.HashInput,
-		Output:      req.Output,
-	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert into trie: "+err.Error())
-	}
-
 	// Convert response to JSON-friendly format for frontend
-	var hashInputJSON any
-	if len(req.HashInput) > 0 {
-		var result bson.M
-		if err := bson.Unmarshal(req.HashInput, &result); err == nil {
-			hashInputJSON = result
-		}
+	var inputJSON any
+	if err := json.Unmarshal(reqBody.Input, &inputJSON); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
 	}
 
 	var outputJSON any
@@ -594,11 +785,12 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"is_active":     req.IsActive,
 		"path":          req.Path,
 		"method":        req.Method,
-		"hash_input":    hashInputJSON,
-		"output":        outputJSON,
-		"headers":       req.Headers,
-		"created_at":    req.CreatedAt.Format(time.RFC3339),
-		"updated_at":    req.UpdatedAt.Format(time.RFC3339),
+		"input":         inputJSON,
+		// "hash_input":    req.HashInput,
+		"output":     outputJSON,
+		"headers":    req.Headers,
+		"created_at": req.CreatedAt.Format(time.RFC3339),
+		"updated_at": req.UpdatedAt.Format(time.RFC3339),
 	}
 
 	return c.JSON(http.StatusCreated, response)
@@ -623,7 +815,7 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		Description  string          `json:"description"`
 		Path         string          `json:"path"`
 		Method       string          `json:"method"`
-		HashInput    json.RawMessage `json:"hash_input"`
+		Input        json.RawMessage `json:"input"`
 		Headers      json.RawMessage `json:"headers"`
 		Output       json.RawMessage `json:"output"`
 		IsActive     bool            `json:"is_active"`
@@ -654,35 +846,32 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		update["scenario_name"] = reqBody.ScenarioName
 	}
 
-	// Process hash input if provided
-	// Only process if not empty and not null
-	var inputData any
-	if err := json.Unmarshal(reqBody.HashInput, &inputData); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
-	}
-
-	// If the output is a string, try to parse it as JSON
-	if intputStr, ok := inputData.(string); ok {
-		var parsedData any
-		if err := json.Unmarshal([]byte(intputStr), &parsedData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+	// Process input if provided
+	if len(reqBody.Input) > 0 && string(reqBody.Input) != "null" {
+		var inputData any
+		if err := json.Unmarshal(reqBody.Input, &inputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
 		}
-		inputData = parsedData
-	}
 
-	inputBsonData, err := bson.Marshal(inputData)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
-	}
-	var hashInputJSON any
-	if len(inputBsonData) > 0 {
-		var result bson.M
-		if err := bson.Unmarshal(inputBsonData, &result); err == nil {
-			hashInputJSON = result
+		// If the input is a string, try to parse it as JSON
+		if inputStr, ok := inputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(inputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in input: "+err.Error())
+			}
+			inputData = parsedData
 		}
-	}
 
-	update["hash_input"] = hashInputJSON
+		inputBsonData, err := bson.Marshal(inputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert input to BSON: "+err.Error())
+		}
+		// Store original input
+		update["input"] = inputData
+
+		// Generate and store hash
+		update["hash_input"] = utils.GenerateHashFromInput(inputBsonData)
+	}
 
 	// Process output if provided
 	// Only process if not empty and not null
@@ -744,8 +933,14 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 			)
 		}
 
+		// Step 3.5: Validate and sanitize headers for security
+		sanitizedHeaders, warnings := security.ValidateAndSanitizeHeaders(headersMap)
+		if len(warnings) > 0 {
+			slog.Warn("Headers sanitized or blocked", "warnings", warnings)
+		}
+
 		// Step 4: map -> bson.Raw
-		headerData, err := bson.Marshal(headersMap)
+		headerData, err := bson.Marshal(sanitizedHeaders)
 		if err != nil {
 			return echo.NewHTTPError(
 				http.StatusInternalServerError,
@@ -763,4 +958,41 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+/* ---------- Health Check Endpoints ---------- */
+
+// HealthCheck returns the basic health status of the application
+func (_self *MockController) HealthCheck(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":  "healthy",
+		"service": "mocktool",
+	})
+}
+
+// ReadinessCheck verifies that the application is ready to serve requests
+// This includes checking database connectivity
+func (_self *MockController) ReadinessCheck(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// Try to ping the database through a simple query
+	// We'll just try to list features with a limit to check connectivity
+	_, _, err := _self.FeatureRepo.ListAllPaginated(ctx, domain.PaginationParams{
+		Page:     1,
+		PageSize: 1,
+	})
+
+	if err != nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]interface{}{
+			"status":  "not ready",
+			"service": "mocktool",
+			"error":   "database connection failed",
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status":   "ready",
+		"service":  "mocktool",
+		"database": "connected",
+	})
 }

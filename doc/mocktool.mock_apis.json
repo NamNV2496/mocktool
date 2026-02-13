@@ -1,106 +1,62 @@
 [{
   "_id": {
-    "$oid": "694580822e6d69582e30a66d"
+    "$oid": "698dba87e0b21530a6aac3f1"
   },
   "feature_name": "test_feature",
   "scenario_name": "happy_case",
-  "name": "testAPI",
-  "description": "",
-  "is_active": true,
-  "path": "/api/v1/test",
-  "regex_path": "",
-  "hash_input": {
-    "id": 123,
-    "name": "test"
-  },
-  "hash_value": "17031540538161738135",
-  "output": {
-    "id": 123,
-    "name": "happy case"
-  },
-  "created_at": {
-    "$date": "2025-12-19T16:42:42.828Z"
-  },
-  "updated_at": {
-    "$date": "2025-12-20T04:34:26.713Z"
-  },
-  "method": "GET"
-},
-{
-  "_id": {
-    "$oid": "694580a02e6d69582e30a66e"
-  },
-  "feature_name": "test_feature",
-  "scenario_name": "unhappy_case",
-  "name": "testAPI",
-  "description": "",
-  "is_active": true,
-  "path": "/api/v1/test",
-  "regex_path": "",
-  "hash_input": {
-    "id": 123,
-    "name": "test"
-  },
-  "hash_value": "",
-  "output": {
-    "name": "unhappy case",
-    "id": 123
-  },
-  "created_at": {
-    "$date": "2025-12-19T16:43:12.162Z"
-  },
-  "updated_at": {
-    "$date": "2025-12-20T04:09:03.149Z"
-  },
-  "method": "GET"
-},
-{
-  "_id": {
-    "$oid": "69462404787870b9630a0f54"
-  },
-  "feature_name": "test_feature",
-  "scenario_name": "happy_case",
-  "name": "testAPI2",
-  "description": "",
+  "name": "test_get_data_status_200",
+  "description": "get data 1",
   "is_active": true,
   "path": "/api/v1/test",
   "method": "GET",
-  "hash_input": {
-    "id": 123,
-    "name": "testAPI2"
+  "input": {
+    "id": 1
   },
+  "hash_input": "037c9214eef74cc3887f3a4f085b4e17d76280dafd273b0ee160c09c4ba1cfd4",
+  "headers": {},
   "output": {
-    "id": 123,
-    "name": "testAPI2"
+    "id": 1,
+    "name": "test case number 1"
   },
   "created_at": {
-    "$date": "2025-12-20T04:20:20.917Z"
+    "$date": "2026-02-12T11:33:27.339Z"
   },
   "updated_at": {
-    "$date": "2025-12-20T04:20:20.917Z"
+    "$date": "2026-02-12T11:33:27.339Z"
   }
 },
 {
   "_id": {
-    "$oid": "694768eb05c505f3ea7d34b9"
+    "$oid": "698dbb0ee0b21530a6aac3f2"
   },
-  "feature_name": "feature2",
-  "scenario_name": "test_header",
-  "name": "test header",
-  "description": "",
+  "feature_name": "test_feature",
+  "scenario_name": "happy_case",
+  "name": "test_get_data_status_200_list",
+  "description": "get data 2",
   "is_active": true,
   "path": "/api/v1/test",
-  "method": "PUT",
-  "hash_input": {},
-  "headers": {
-    "x-corr-id": "jfd4-dsf3-3dde",
-    "x-corr": "jfd4-fsdsd-ds"
+  "method": "GET",
+  "input": {
+    "id": 2
   },
-  "output": {},
+  "hash_input": "9e7e65453739bbc64ba155eed18a37bd5fb1196c7f29ded1da660b94414d7ad8",
+  "headers": {},
+  "output": {
+    "data": [
+      {
+        "id": 1,
+        "name": "name number 1"
+      },
+      {
+        "id": 2,
+        "name": "name number 2"
+      }
+    ]
+  },
   "created_at": {
-    "$date": "2025-12-21T03:26:17.027Z"
+    "$date": "2026-02-12T11:35:42.825Z"
   },
   "updated_at": {
-    "$date": "2025-12-21T03:26:17.027Z"
+    "$date": "2026-02-12T11:35:42.825Z"
   }
 }]

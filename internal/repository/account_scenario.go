@@ -10,10 +10,12 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IAccountScenarioRepository interface {
 	Create(ctx context.Context, as *domain.AccountScenario) error
 	GetActiveScenario(ctx context.Context, featureName string, accountId *string) (*domain.AccountScenario, error)
 	DeactivateByFeatureAndAccount(ctx context.Context, featureName string, accountId *string) error
+	DeactivateAllAccountSpecificMappings(ctx context.Context, featureName string) error
 }
 
 type AccountScenarioRepository struct {
@@ -82,7 +84,6 @@ func (r *AccountScenarioRepository) GetActiveScenario(
 	if err != nil {
 		return nil, err
 	}
-
 	return &result, nil
 }
 
@@ -97,6 +98,21 @@ func (r *AccountScenarioRepository) DeactivateByFeatureAndAccount(
 		filter["account_id"] = *accountId
 	} else {
 		filter["account_id"] = nil
+	}
+
+	_, err := r.BaseRepository.col.DeleteMany(ctx, filter)
+	return err
+}
+
+// DeactivateAllAccountSpecificMappings deletes all account-specific mappings for a feature
+// (keeps only the global mapping with account_id = nil)
+func (r *AccountScenarioRepository) DeactivateAllAccountSpecificMappings(
+	ctx context.Context,
+	featureName string,
+) error {
+	filter := bson.M{
+		"feature_name": featureName,
+		"account_id":   bson.M{"$ne": nil}, // Delete all where account_id is NOT nil
 	}
 
 	_, err := r.BaseRepository.col.DeleteMany(ctx, filter)

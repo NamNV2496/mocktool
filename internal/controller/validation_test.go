@@ -177,7 +177,7 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 
 			tt.setupMocks()
 
-			err := controller.CreateNewScenarioByFeature(c)
+			err := controller.CreateNewScenariosByFeature(c)
 
 			if tt.expectedStatus == http.StatusCreated {
 				assert.NoError(t, err)

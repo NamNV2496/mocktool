@@ -7,7 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -62,7 +66,13 @@ func (_self *ForwardController) StartMockServer() error {
 		slog.Error("failed to start server", "error", err)
 		return err
 	}
-	return nil
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return c.Shutdown(ctx)
 }
 
 // handler

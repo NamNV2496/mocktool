@@ -88,11 +88,9 @@ func startServer(
 			}()
 
 			// Start mock controller in background
-			go func() {
-				if err := mockController.StartHttpServer(); err != nil {
-					slog.Error("Mock server error", "error", err)
-				}
-			}()
+			if err := mockController.StartHttpServer(); err != nil {
+				slog.Error("Mock server error", "error", err)
+			}
 
 			slog.Info("Mocktool servers started successfully")
 			return nil

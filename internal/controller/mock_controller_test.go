@@ -297,7 +297,7 @@ func TestMockController_ListScenarioByFeature(t *testing.T) {
 
 			tt.setupMocks()
 
-			err := controller.ListScenarioByFeature(c)
+			err := controller.ListScenariosByFeature(c)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -326,7 +326,7 @@ func TestMockController_CreateNewScenarioByFeature(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := controller.CreateNewScenarioByFeature(c)
+	err := controller.CreateNewScenariosByFeature(c)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 }
@@ -397,7 +397,7 @@ func TestMockController_ListActiveScenarioByFeature(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err := controller.ListActiveScenarioByFeature(c)
+	err := controller.ListActiveScenariosByFeature(c)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
 

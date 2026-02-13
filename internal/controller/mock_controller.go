@@ -1,12 +1,16 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -75,10 +79,10 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/features", _self.CreateNewFeature)           // create new feature
 	v1.PUT("/features/:feature_id", _self.UpdateFeature)   // update or inactive
 
-	v1.GET("/scenarios", _self.ListScenarioByFeature)                         // list all scenarios by feature
-	v1.GET("/scenarios/search", _self.SearchScenarioByFeatureAndName)         // list all scenarios by feature has name likely
-	v1.GET("/scenarios/active", _self.ListActiveScenarioByFeature)            // get active scenario for feature+account
-	v1.POST("/scenarios", _self.CreateNewScenarioByFeature)                   // create new scenario
+	v1.GET("/scenarios", _self.ListScenariosByFeature)                        // list all scenarios by feature
+	v1.GET("/scenarios/search", _self.SearchScenariosByFeatureAndName)        // list all scenarios by feature has name likely
+	v1.GET("/scenarios/active", _self.ListActiveScenariosByFeature)           // get active scenario for feature+account
+	v1.POST("/scenarios", _self.CreateNewScenariosByFeature)                  // create new scenario
 	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)          // update scenario
 	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario)       // activate scenario for account
 	v1.DELETE("/scenarios/:scenario_id/deactivate", _self.DeactivateScenario) // deactivate scenario for account
@@ -94,7 +98,13 @@ func (_self *MockController) StartHttpServer() error {
 		slog.Error("failed to start server", "error", err)
 		return err
 	}
-	return nil
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return c.Shutdown(ctx)
 }
 
 /* ---------- GET /features ---------- */
@@ -230,7 +240,7 @@ func (_self *MockController) UpdateFeature(c echo.Context) error {
 
 /* ---------- GET /scenarios?feature_name= ---------- */
 
-func (_self *MockController) SearchScenarioByFeatureAndName(c echo.Context) error {
+func (_self *MockController) SearchScenariosByFeatureAndName(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	// Get search query from query parameter
@@ -252,28 +262,57 @@ func (_self *MockController) SearchScenarioByFeatureAndName(c echo.Context) erro
 	response := domain.NewPaginatedResponse(scenarios, total, params)
 	return c.JSON(http.StatusOK, response)
 }
-func (_self *MockController) ListScenarioByFeature(c echo.Context) error {
+func (_self *MockController) ListScenariosByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	featureName := c.QueryParam("feature_name")
 	if featureName == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
 	}
-
-	params := parsePaginationParams(c)
-
-	scenarios, total, err := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, params)
+	var resp []domain.Scenario
+	var globalScenarioId primitive.ObjectID
+	// always put global active scenario in first line of first page
+	pagination := parsePaginationParams(c)
+	if pagination.Page == 1 {
+		globalScenarioActive, err := _self.AccountScenarioRepo.GetActiveScenario(ctx, featureName, nil)
+		if err == nil {
+			// has global scenario
+			// Get the actual scenario details
+			globalScenario, err := _self.ScenarioRepo.GetByObjectID(ctx, globalScenarioActive.ScenarioID)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+			if globalScenario != nil {
+				globalScenarioId = globalScenario.ID
+				resp = append(resp, domain.Scenario{
+					ID:          globalScenario.ID,
+					FeatureName: globalScenario.FeatureName,
+					Name:        globalScenario.Name,
+					Description: globalScenario.Description,
+					CreatedAt:   globalScenario.CreatedAt,
+					UpdatedAt:   globalScenario.UpdatedAt,
+				})
+			}
+		}
+	}
+	scenarios, total, err := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, pagination)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+	for _, scenario := range scenarios {
+		if scenario.ID == globalScenarioId {
+			continue
+		}
+		resp = append(resp, scenario)
+	}
 
-	response := domain.NewPaginatedResponse(scenarios, total, params)
+	response := domain.NewPaginatedResponse(resp, total, pagination)
 	return c.JSON(http.StatusOK, response)
 }
 
 /* ---------- GET /scenarios?feature_name= ---------- */
 
-func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
+func (_self *MockController) ListActiveScenariosByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	featureName := c.QueryParam("feature_name")
@@ -306,7 +345,7 @@ func (_self *MockController) ListActiveScenarioByFeature(c echo.Context) error {
 
 /* ---------- POST /scenarios ---------- */
 
-func (_self *MockController) CreateNewScenarioByFeature(c echo.Context) error {
+func (_self *MockController) CreateNewScenariosByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	var req struct {

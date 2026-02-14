@@ -56,6 +56,17 @@ var (
 	)
 )
 
+// Cache metrics
+var (
+	MockAPICacheHits = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "mocktool_mock_api_cache_hits_total",
+			Help: "Total number of cache hits/misses",
+		},
+		[]string{"result"}, // hit, miss
+	)
+)
+
 // Database Metrics
 var (
 	// DBOperationsTotal counts database operations by type and status
@@ -114,15 +125,6 @@ var (
 			Help:    "Duration of mock API lookups in seconds",
 			Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5},
 		},
-	)
-
-	// MockAPICacheHits counts cache hits vs misses
-	MockAPICacheHits = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "mocktool_mock_api_cache_hits_total",
-			Help: "Total number of cache hits/misses",
-		},
-		[]string{"result"}, // hit, miss
 	)
 
 	// ActiveScenariosTotal counts active scenarios by feature

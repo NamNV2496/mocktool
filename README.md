@@ -99,6 +99,7 @@ end
 - Redis: "github.com/go-redis/redis/v8"
 - grpc: "google.golang.org/grpc"
 - validator: "github.com/go-playground/validator/v10"
+- Unittest: "go.uber.org/mock/gomock" - coverage: 87.5% of statements
 ```
 
 # Pros and cons

@@ -16,17 +16,6 @@ COLOR_BLUE := \033[34m
 # Default target
 .DEFAULT_GOAL := help
 
-## help: Display this help message
-help:
-	@echo "$(COLOR_BLUE)Available commands:$(COLOR_RESET)"
-	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
-
-## build: Build the application binary
-build:
-	@echo "$(COLOR_GREEN)Building $(APP_NAME)...$(COLOR_RESET)"
-	$(GO) build $(GOFLAGS) $(LDFLAGS) -o bin/$(APP_NAME) .
-	@echo "$(COLOR_GREEN)Build complete: bin/$(APP_NAME)$(COLOR_RESET)"
-
 ## run: Run the application
 run:
 	@echo "$(COLOR_GREEN)Starting $(APP_NAME)...$(COLOR_RESET)"
@@ -69,39 +58,11 @@ vet:
 	@echo "$(COLOR_GREEN)Running go vet...$(COLOR_RESET)"
 	$(GO) vet ./...
 
-## tidy: Tidy go modules
 tidy:
 	@echo "$(COLOR_GREEN)Tidying go modules...$(COLOR_RESET)"
 	$(GO) mod tidy
 	$(GO) mod verify
 
-## docker-up: Start docker containers
-docker-up:
-	@echo "$(COLOR_GREEN)Starting Docker containers...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) up -d
-	@echo "$(COLOR_GREEN)Docker containers started$(COLOR_RESET)"
-
-## docker-down: Stop docker containers
-docker-down:
-	@echo "$(COLOR_YELLOW)Stopping Docker containers...$(COLOR_RESET)"
-	$(DOCKER_COMPOSE) down
-
-## docker-restart: Restart docker containers
-docker-restart: docker-down docker-up
-
-## docker-logs: View docker logs
-docker-logs:
-	$(DOCKER_COMPOSE) logs -f
-
-## clean: Clean build artifacts and cache
-clean:
-	@echo "$(COLOR_YELLOW)Cleaning...$(COLOR_RESET)"
-	rm -rf bin/
-	rm -f coverage.out coverage.html
-	$(GO) clean -cache -testcache -modcache
-	@echo "$(COLOR_GREEN)Clean complete$(COLOR_RESET)"
-
-## install-tools: Install development tools
 install-tools:
 	@echo "$(COLOR_GREEN)Installing development tools...$(COLOR_RESET)"
 	$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -109,38 +70,21 @@ install-tools:
 	$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	$(GO) install go.uber.org/mock/mockgen@latest
+	$(GO) install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+	$(GO) install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
 	@echo "$(COLOR_GREEN)Tools installed$(COLOR_RESET)"
 
-## proto: Generate protobuf files
 proto:
 	@echo "$(COLOR_GREEN)Generating protobuf files...$(COLOR_RESET)"
 	protoc --go_out=pkg/generated --go-grpc_out=pkg/generated pkg/errorcustome/error_detail.proto
 	@echo "$(COLOR_GREEN)Protobuf generation complete$(COLOR_RESET)"
 
-## mocks: Generate mock files using go generate
 mocks:
 	@echo "$(COLOR_GREEN)Generating mocks...$(COLOR_RESET)"
-# 	@mkdir -p mocks
 	$(GO) generate ./internal/...
 	@echo "$(COLOR_GREEN)Mock generation complete$(COLOR_RESET)"
 
-## dev: Start development environment (docker + app)
-dev: docker-up
-	@echo "$(COLOR_GREEN)Starting development environment...$(COLOR_RESET)"
-	@sleep 2
-	$(MAKE) run
 
-## check: Run all checks (fmt, vet, lint, test)
-check: fmt vet lint test
-	@echo "$(COLOR_GREEN)All checks passed!$(COLOR_RESET)"
-
-## deps: Download dependencies
-deps:
-	@echo "$(COLOR_GREEN)Downloading dependencies...$(COLOR_RESET)"
-	$(GO) mod download
-	@echo "$(COLOR_GREEN)Dependencies downloaded$(COLOR_RESET)"
-
-## web: Open web interface
 web:
 	@echo "$(COLOR_GREEN)Opening web interface...$(COLOR_RESET)"
 	@open web/index.html || xdg-open web/index.html || start web/index.html

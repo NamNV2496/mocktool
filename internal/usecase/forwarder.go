@@ -35,17 +35,20 @@ type ForwardUC struct {
 	MockAPIRepo         repository.IMockAPIRepository
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
+	cacheRepo           repository.ICache
 }
 
 func NewForwardUC(
 	MockAPIRepo repository.IMockAPIRepository,
 	ScenarioRepo repository.IScenarioRepository,
 	AccountScenarioRepo repository.IAccountScenarioRepository,
+	cacheRepo repository.ICache,
 ) IForwardUC {
 	return &ForwardUC{
 		MockAPIRepo:         MockAPIRepo,
 		ScenarioRepo:        ScenarioRepo,
 		AccountScenarioRepo: AccountScenarioRepo,
+		cacheRepo:           cacheRepo,
 	}
 }
 
@@ -167,6 +170,21 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 		attribute.String("db.scenario", activeScenario.Name),
 	)
 
+	// get from cache first
+	outputBytesCached, err := _self.cacheRepo.Get(ctx, fmt.Sprintf(repository.KeyMockAPITemplate,
+		request.FeatureName,
+		activeScenario.Name,
+		*accountId,
+		request.Path,
+		request.Method,
+		hashInput,
+	))
+	// cache hit
+	if err == nil {
+		_, err = io.Copy(c.Response().Writer, strings.NewReader(outputBytesCached.(string)))
+		return nil
+	}
+	// cache miss
 	mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
 		ctx,
 		request.FeatureName,
@@ -233,6 +251,14 @@ func (_self *ForwardUC) ResponseMockData(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	_self.cacheRepo.Set(ctx, fmt.Sprintf(repository.KeyMockAPITemplate,
+		request.FeatureName,
+		activeScenario.Name,
+		*accountId,
+		request.Path,
+		request.Method,
+		hashInput,
+	), outputBytes)
 	return nil
 }
 

@@ -32,6 +32,7 @@ func setupTestController(t *testing.T) (*MockController, *gomock.Controller, *re
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	// Setup expectation for RegisterRoutes which is called in StartHttpServer
 	loadTestController.EXPECT().RegisterRoutes(gomock.Any()).AnyTimes()
@@ -43,6 +44,7 @@ func setupTestController(t *testing.T) (*MockController, *gomock.Controller, *re
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	return controller, ctrl, featureRepo, scenarioRepo, accountScenarioRepo, mockAPIRepo
@@ -480,6 +482,7 @@ func TestNewMockController(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -488,6 +491,7 @@ func TestNewMockController(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	)
 
 	assert.NotNil(t, controller)

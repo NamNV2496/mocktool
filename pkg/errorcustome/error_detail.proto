@@ -4,8 +4,10 @@ package error;
 
 option go_package = "github.com/namnv/mockTool/pkg/errorcustome";
 
-//go:generate buf generate
 message ErrorDetail {
   string error_code = 1;
   map<string, string> metadata = 2;
 }
+
+
+// run "buf generate" first

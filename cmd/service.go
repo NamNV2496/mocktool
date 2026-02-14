@@ -59,6 +59,7 @@ func InvokeServer(invokers ...any) *fx.App {
 			// load test
 			fx.Annotate(controller.NewLoadTestController, fx.As(new(controller.ILoadTestController))),
 			fx.Annotate(repository.NewLoadTestScenarioRepository, fx.As(new(repository.ILoadTestScenarioRepository))),
+			fx.Annotate(repository.NewCache, fx.As(new(repository.ICache))),
 
 			repository.NewMongoConnect,
 		),

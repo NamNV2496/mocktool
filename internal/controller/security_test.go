@@ -26,6 +26,7 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -34,6 +35,7 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	tests := []struct {
@@ -167,6 +169,7 @@ func TestSecurity_ValidationPreventsInjection(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -175,6 +178,7 @@ func TestSecurity_ValidationPreventsInjection(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	tests := []struct {

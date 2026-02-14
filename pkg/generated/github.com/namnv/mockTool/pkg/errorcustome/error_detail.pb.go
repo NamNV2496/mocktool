@@ -21,7 +21,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-//go:generate buf generate
 type ErrorDetail struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ErrorCode     string                 `protobuf:"bytes,1,opt,name=error_code,json=errorCode,proto3" json:"error_code,omitempty"`

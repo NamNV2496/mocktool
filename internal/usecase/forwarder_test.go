@@ -3,6 +3,7 @@ package usecase
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/domain"
 	mocks "github.com/namnv2496/mocktool/mocks/repository"
+	repositoryMocks "github.com/namnv2496/mocktool/mocks/repository"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -24,8 +26,9 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	tests := []struct {
 		name           string
@@ -78,6 +81,13 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 					GetByObjectID(gomock.Any(), scenarioID).
 					Return(scenario, nil)
 
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
+
+				cacheRepo.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 				mockAPIRepo.EXPECT().
 					FindByFeatureScenarioPathMethodAndHash(
 						gomock.Any(),
@@ -88,6 +98,7 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(mockAPI, nil)
+
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
@@ -171,6 +182,13 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(nil, mongo.ErrNoDocuments)
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
+
+				cacheRepo.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 			},
 			expectedStatus: http.StatusInternalServerError,
 			wantErr:        true,
@@ -218,6 +236,9 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						"", // Empty hash for empty body
 					).
 					Return(mockAPI, nil)
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -258,8 +279,9 @@ func TestForwardUC_ResponsePublicMockData(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	tests := []struct {
 		name           string
@@ -357,8 +379,9 @@ func TestForwardUC_WithQueryParameters(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	t.Run("request with query parameters", func(t *testing.T) {
 		body := map[string]interface{}{"field1": "value1"}
@@ -407,7 +430,13 @@ func TestForwardUC_WithQueryParameters(t *testing.T) {
 				gomock.Any(),
 			).
 			Return(mockAPI, nil)
+		cacheRepo.EXPECT().
+			Get(gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("not found"))
 
+		cacheRepo.EXPECT().
+			Set(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
 		err := uc.ResponseMockData(c)
 		assert.NoError(t, err)
 	})
@@ -420,8 +449,9 @@ func TestForwardUC_WithCustomHeaders(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	t.Run("response with custom headers", func(t *testing.T) {
 		body := map[string]interface{}{"field1": "value1"}
@@ -477,7 +507,13 @@ func TestForwardUC_WithCustomHeaders(t *testing.T) {
 				gomock.Any(),
 			).
 			Return(mockAPI, nil)
+		cacheRepo.EXPECT().
+			Get(gomock.Any(), gomock.Any()).
+			Return(nil, fmt.Errorf("not found"))
 
+		cacheRepo.EXPECT().
+			Set(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
 		err := uc.ResponseMockData(c)
 		assert.NoError(t, err)
 
@@ -494,13 +530,14 @@ func TestForwardUC_HeaderSanitization(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	tests := []struct {
-		name           string
-		headers        map[string]string
-		expectedSet    map[string]string
+		name            string
+		headers         map[string]string
+		expectedSet     map[string]string
 		expectedBlocked []string
 	}{
 		{
@@ -603,6 +640,13 @@ func TestForwardUC_HeaderSanitization(t *testing.T) {
 					gomock.Any(),
 				).
 				Return(mockAPI, nil)
+			cacheRepo.EXPECT().
+				Get(gomock.Any(), gomock.Any()).
+				Return(nil, fmt.Errorf("not found"))
+
+			cacheRepo.EXPECT().
+				Set(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(nil)
 
 			err := uc.ResponseMockData(c)
 			assert.NoError(t, err)
@@ -628,8 +672,9 @@ func TestNewForwardUC(t *testing.T) {
 	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
 	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
 
 	assert.NotNil(t, uc)
 	assert.Implements(t, (*IForwardUC)(nil), uc)

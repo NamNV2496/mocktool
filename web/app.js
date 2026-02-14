@@ -266,7 +266,7 @@ function renderScenariosTable() {
                 <td class="actions">
                     <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'>Edit</button>
                     <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">Delete</button>
-                    ${!isActive && !isGlobalActive ? (filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}')">Activate for ACCOUNT_ID ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}')">Activate Globally</button>`) : ''}
+                    ${!isActive && !isGlobalActive ? (filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}', '${activeScenarioId}')">Activate for ACCOUNT_ID ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}', '${globalActiveScenarioId}')">Activate Globally</button>`) : ''}
                 </td>
             </tr>
         `;
@@ -305,34 +305,126 @@ async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
     }
 }
 
-function renderMockAPIsTable() {
-    const tbody = document.getElementById('mockapis-table-body');
+function renderScenariosTable() {
+    const tbody = document.getElementById('scenarios-table-body');
 
-    if (!mockAPIs || mockAPIs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">No mock APIs found</td></tr>';
+    if (!scenarios || scenarios.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No scenarios found</td></tr>';
         return;
     }
 
-    tbody.innerHTML = mockAPIs.map(api => `
-        <tr>
-            <td class="text-truncate" title="${api.feature_name || 'N/A'}">${api.feature_name || 'N/A'}</td>
-            <td class="text-truncate" title="${api.scenario_name || 'N/A'}">${api.scenario_name || 'N/A'}</td>
-            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong></td>
-            <td class="text-truncate" title="${api.description || '-'}">${api.description || '-'}</td>
-            <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
-            <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
-            <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
-                ${api.is_active ? 'Active' : 'Inactive'}
-            </span></td>
-            <td>${formatDate(api.created_at)}</td>
-            <td class="actions">
-                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>Edit</button>
-                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>Duplicate</button>
-                <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">Delete</button>
-            </td>
-        </tr>
-    `).join('');
+    // Get the accountId filter value
+    const filterAccountId = document.getElementById('scenario-account-id-filter')?.value.trim();
+
+    tbody.innerHTML = scenarios.map(scenario => {
+
+        // Check if this scenario is the active one for the current account
+        const isActive = activeScenarioId && scenario.id === activeScenarioId;
+
+        // Check if this scenario is the global active one
+        const isGlobalActive = globalActiveScenarioId && scenario.id === globalActiveScenarioId;
+
+        // Highlight row if active or global active
+        const rowStyle = (isActive || isGlobalActive)
+            ? 'background-color: #e6ffed;'
+            : '';
+
+        /**
+         * CORE FIX LOGIC
+         *
+         * Case 1:
+         * globalActiveScenarioId != activeScenarioId
+         * → show button on ACTIVE GLOBAL row
+         *
+         * Case 2:
+         * globalActiveScenarioId == activeScenarioId
+         * → show button on other rows
+         */
+        const shouldShowActiveForAccount =
+            filterAccountId &&
+            (
+                (globalActiveScenarioId !== activeScenarioId && scenario.id === globalActiveScenarioId)
+                ||
+                (globalActiveScenarioId === activeScenarioId && scenario.id !== globalActiveScenarioId)
+            );
+
+        return `
+            <tr style="${rowStyle}">
+                <td class="text-truncate" title="${scenario.feature_name || 'N/A'}">
+                    ${scenario.feature_name || 'N/A'}
+                </td>
+
+                <td class="text-truncate" title="${scenario.name || 'N/A'}">
+
+                    <strong
+                        style="cursor:pointer;color:#3b82f6;text-decoration:underline;"
+                        onclick="navigateToMockAPIs('${scenario.feature_name}', '${scenario.name}')"
+                    >
+                        ${scenario.name || 'N/A'}
+                    </strong>
+
+                    ${isActive
+                        ? '<span class="status-badge status-active" style="margin-left:8px;">ACTIVE</span>'
+                        : ''
+                    }
+
+                    ${isGlobalActive
+                        ? '<span class="status-badge" style="margin-left:8px;background-color:#9f7aea;color:white;">ACTIVE GLOBAL</span>'
+                        : ''
+                    }
+
+                </td>
+
+                <td class="text-truncate" title="${scenario.description || '-'}">
+                    ${scenario.description || '-'}
+                </td>
+
+                <td>
+                    ${formatDate(scenario.created_at)}
+                </td>
+
+                <td class="actions">
+
+                    <button
+                        class="btn btn-edit"
+                        onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'
+                    >
+                        Edit
+                    </button>
+
+                    <button
+                        class="btn btn-delete"
+                        onclick="deleteScenario('${scenario.id}')"
+                    >
+                        Delete
+                    </button>
+
+                    ${
+                        shouldShowActiveForAccount
+                        ? `<button
+                                class="btn btn-primary"
+                                onclick="activateScenario('${scenario.id}', '${filterAccountId}', '${activeScenarioId}')"
+                           >
+                                ACTIVE FOR ACCOUNT_ID ${filterAccountId}
+                           </button>`
+                        : (!filterAccountId && !isGlobalActive
+                            ? `<button
+                                    class="btn btn-primary"
+                                    onclick="activateScenarioGlobal('${scenario.id}', '${globalActiveScenarioId}')"
+                               >
+                                    Activate Globally
+                               </button>`
+                            : ''
+                        )
+                    }
+
+                </td>
+            </tr>
+        `;
+
+    }).join('');
 }
+
 
 async function fetchAllFeatures() {
     try {
@@ -764,12 +856,16 @@ async function saveScenario() {
     }
 }
 
-async function activateScenario(scenarioId, accountId) {
+async function activateScenario(scenarioId, accountId, prevScenarioId) {
     try {
+        const data = {
+            prev_scenario_id: prevScenarioId,
+        };
         const url = `${API_BASE_URL}/scenarios/${scenarioId}/activate?account_id=${encodeURIComponent(accountId)}`;
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
 
         if (!response.ok) throw new Error('Failed to activate scenario');
@@ -789,12 +885,16 @@ async function activateScenario(scenarioId, accountId) {
     }
 }
 
-async function activateScenarioGlobal(scenarioId) {
+async function activateScenarioGlobal(scenarioId, prevScenarioId) {
     try {
+        const data = {
+            prev_scenario_id: prevScenarioId,
+        };
         const url = `${API_BASE_URL}/scenarios/${scenarioId}/activate`;
         const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
 
         if (!response.ok) throw new Error('Failed to activate scenario');

@@ -26,6 +26,7 @@ func TestValidation_CreateNewFeature(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -34,6 +35,7 @@ func TestValidation_CreateNewFeature(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	tests := []struct {
@@ -115,6 +117,7 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -123,6 +126,7 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	tests := []struct {
@@ -204,6 +208,7 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 	accountScenarioRepo := repositoryMocks.NewMockIAccountScenarioRepository(ctrl)
 	mockAPIRepo := repositoryMocks.NewMockIMockAPIRepository(ctrl)
 	loadTestController := controllerMocks.NewMockILoadTestController(ctrl)
+	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
 	controller := NewMockController(
 		config,
@@ -212,6 +217,7 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 		accountScenarioRepo,
 		mockAPIRepo,
 		loadTestController,
+		cacheRepo,
 	).(*MockController)
 
 	tests := []struct {

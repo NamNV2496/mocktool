@@ -89,6 +89,18 @@ end
 </details>
 </summary>
 
+# Technologies
+
+```bash
+- mongoDB: "go.mongodb.org/mongo-driver/mongo"
+- echo: "github.com/labstack/echo/v4"
+- Hash: "crypto/sha256"
+- Monitoring: "github.com/prometheus/client_golang/prometheus"
+- Redis: "github.com/go-redis/redis/v8"
+- grpc: "google.golang.org/grpc"
+- validator: "github.com/go-playground/validator/v10"
+```
+
 # Pros and cons
 
 ## Pros
@@ -191,14 +203,6 @@ go run ./example/grpc/main.go
 Ref: [example http](./example/http/README.md)
 Ref: [example grpc](./example/grpc/README.md)
 
-# Technologies
-
-```bash
-- mongoDB: "go.mongodb.org/mongo-driver/mongo"
-- echo: "github.com/labstack/echo/v4"
-- Hash: "crypto/sha256"
-- Monitoring: "github.com/prometheus/client_golang/prometheus"
-```
 
 ## Build errorResponse
 

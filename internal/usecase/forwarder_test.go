@@ -336,6 +336,13 @@ func TestForwardUC_ResponsePublicMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(mockAPI, nil)
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
+
+				cacheRepo.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,

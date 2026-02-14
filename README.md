@@ -126,8 +126,15 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 - Setup globally scenario => All accountIds will have the same result
 
 ![doc/2.png](doc/2.png)
+
+Can re-active global scenario by account_id
+
 ![doc/3.png](doc/3.png)
 ![doc/4.png](doc/4.png)
+
+Cache in Redis with template: `mocktool:<feature>:<scenario>:<account_id>:<path>:<method>:<hash_input>`
+
+![doc/4_1.png](doc/4_1.png)
 
 => Make sure 1 API can response expecting answer for a accountId
 

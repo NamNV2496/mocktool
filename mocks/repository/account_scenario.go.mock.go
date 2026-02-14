@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	domain "github.com/namnv2496/mocktool/internal/domain"
+	primitive "go.mongodb.org/mongo-driver/bson/primitive"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -81,6 +82,20 @@ func (m *MockIAccountScenarioRepository) DeactivateByFeatureAndAccount(ctx conte
 func (mr *MockIAccountScenarioRepositoryMockRecorder) DeactivateByFeatureAndAccount(ctx, featureName, accountId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateByFeatureAndAccount", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).DeactivateByFeatureAndAccount), ctx, featureName, accountId)
+}
+
+// DeactivateByScenarioId mocks base method.
+func (m *MockIAccountScenarioRepository) DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeactivateByScenarioId", ctx, scenarioId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeactivateByScenarioId indicates an expected call of DeactivateByScenarioId.
+func (mr *MockIAccountScenarioRepositoryMockRecorder) DeactivateByScenarioId(ctx, scenarioId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateByScenarioId", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).DeactivateByScenarioId), ctx, scenarioId)
 }
 
 // GetActiveScenario mocks base method.

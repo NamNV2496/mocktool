@@ -12,6 +12,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
+type IBaseRepository interface {
+	Insert(ctx context.Context, doc interface{}) error
+	FindByID(ctx context.Context, id int64, out interface{}) error
+	FindMany(ctx context.Context, filter bson.M, out interface{}) error
+	FindManyWithPagination(ctx context.Context, filter bson.M, skip int64, limit int64, out interface{}) error
+	Count(ctx context.Context, filter bson.M) (int64, error)
+	UpdateByID(ctx context.Context, id int64, update bson.M) error
+	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateOne(ctx context.Context, filter bson.M, update bson.M) error
+	UpdateMany(ctx context.Context, filter bson.M, update bson.M) error
+	FindOne(ctx context.Context, filter bson.M, out interface{}) error
+	DeleteOne(ctx context.Context, id primitive.ObjectID) (*mongo.DeleteResult, error)
+	DeleteMany(ctx context.Context, filter bson.M) (*mongo.DeleteResult, error)
+	DeleteOneByFilter(ctx context.Context, filter bson.M) error
+}
 type BaseRepository struct {
 	col *mongo.Collection
 }
@@ -153,4 +168,28 @@ func (_self *BaseRepository) FindOne(
 	out interface{},
 ) error {
 	return _self.col.FindOne(ctx, filter).Decode(out)
+}
+
+func (_self *BaseRepository) DeleteOne(
+	ctx context.Context,
+	id primitive.ObjectID,
+) (*mongo.DeleteResult, error) {
+	return _self.col.DeleteOne(
+		ctx,
+		bson.M{"_id": id},
+	)
+}
+
+func (_self *BaseRepository) DeleteOneByFilter(
+	ctx context.Context,
+	filter bson.M,
+) error {
+	_, err := _self.col.DeleteOne(
+		ctx,
+		filter,
+	)
+	return err
+}
+func (_self *BaseRepository) DeleteMany(ctx context.Context, filter bson.M) (*mongo.DeleteResult, error) {
+	return _self.col.DeleteMany(ctx, filter)
 }

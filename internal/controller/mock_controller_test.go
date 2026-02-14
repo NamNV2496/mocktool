@@ -231,6 +231,9 @@ func TestMockController_CreateNewFeature(t *testing.T) {
 	featureRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any()).
 		Return(nil)
+	featureRepo.EXPECT().
+		FindByName(gomock.Any(), gomock.Any()).
+		Return(nil, nil)
 
 	e := echo.New()
 	e.Validator = customValidator.NewValidator()
@@ -334,6 +337,9 @@ func TestMockController_CreateNewScenarioByFeature(t *testing.T) {
 	scenarioRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any()).
 		Return(nil)
+	scenarioRepo.EXPECT().
+		FindByFeatureNameAndName(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil)
 
 	e := echo.New()
 	e.Validator = customValidator.NewValidator()
@@ -345,6 +351,7 @@ func TestMockController_CreateNewScenarioByFeature(t *testing.T) {
 	c := e.NewContext(req, rec)
 
 	err := controller.CreateNewScenariosByFeature(c)
+
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 }

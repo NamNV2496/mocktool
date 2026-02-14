@@ -16,21 +16,22 @@ type IAccountScenarioRepository interface {
 	GetActiveScenario(ctx context.Context, featureName string, accountId *string) (*domain.AccountScenario, error)
 	DeactivateByFeatureAndAccount(ctx context.Context, featureName string, accountId *string) error
 	DeactivateAllAccountSpecificMappings(ctx context.Context, featureName string) error
+	DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error
 }
 
 type AccountScenarioRepository struct {
-	*BaseRepository
+	repo IBaseRepository
 }
 
 func NewAccountScenarioRepository(db *mongo.Database) *AccountScenarioRepository {
 	return &AccountScenarioRepository{
-		BaseRepository: NewBaseRepository(db.Collection("account_scenarios")),
+		repo: NewBaseRepository(db.Collection("account_scenarios")),
 	}
 }
 
 func (r *AccountScenarioRepository) Create(ctx context.Context, as *domain.AccountScenario) error {
 	as.ID = primitive.NewObjectID()
-	return r.Insert(ctx, as)
+	return r.repo.Insert(ctx, as)
 }
 
 func (r *AccountScenarioRepository) UpdateByObjectID(
@@ -38,7 +39,7 @@ func (r *AccountScenarioRepository) UpdateByObjectID(
 	id primitive.ObjectID,
 	update bson.M,
 ) error {
-	return r.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
+	return r.repo.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
 }
 
 func (r *AccountScenarioRepository) GetByObjectID(
@@ -46,7 +47,7 @@ func (r *AccountScenarioRepository) GetByObjectID(
 	id primitive.ObjectID,
 ) (*domain.AccountScenario, error) {
 	var result domain.AccountScenario
-	err := r.FindOne(ctx, bson.M{"_id": id}, &result)
+	err := r.repo.FindOne(ctx, bson.M{"_id": id}, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func (r *AccountScenarioRepository) GetActiveScenario(
 
 	// If accountId is provided, try to find account-specific mapping
 	if accountId != nil {
-		err := r.FindOne(ctx, bson.M{
+		err := r.repo.FindOne(ctx, bson.M{
 			"feature_name": featureName,
 			"account_id":   *accountId,
 		}, &result)
@@ -76,7 +77,7 @@ func (r *AccountScenarioRepository) GetActiveScenario(
 	}
 
 	// Fallback to global mapping (account_id is null)
-	err := r.FindOne(ctx, bson.M{
+	err := r.repo.FindOne(ctx, bson.M{
 		"feature_name": featureName,
 		"account_id":   nil,
 	}, &result)
@@ -100,7 +101,7 @@ func (r *AccountScenarioRepository) DeactivateByFeatureAndAccount(
 		filter["account_id"] = nil
 	}
 
-	_, err := r.BaseRepository.col.DeleteMany(ctx, filter)
+	_, err := r.repo.DeleteMany(ctx, filter)
 	return err
 }
 
@@ -115,7 +116,7 @@ func (r *AccountScenarioRepository) DeactivateAllAccountSpecificMappings(
 		"account_id":   bson.M{"$ne": nil}, // Delete all where account_id is NOT nil
 	}
 
-	_, err := r.BaseRepository.col.DeleteMany(ctx, filter)
+	_, err := r.repo.DeleteMany(ctx, filter)
 	return err
 }
 
@@ -123,7 +124,7 @@ func (r *AccountScenarioRepository) Delete(
 	ctx context.Context,
 	id primitive.ObjectID,
 ) error {
-	_, err := r.BaseRepository.col.DeleteOne(ctx, bson.M{"_id": id})
+	_, err := r.repo.DeleteOne(ctx, id)
 	return err
 }
 
@@ -132,6 +133,13 @@ func (r *AccountScenarioRepository) ListByFeature(
 	featureName string,
 ) ([]domain.AccountScenario, error) {
 	var results []domain.AccountScenario
-	err := r.FindMany(ctx, bson.M{"feature_name": featureName}, &results)
+	err := r.repo.FindMany(ctx, bson.M{"feature_name": featureName}, &results)
 	return results, err
+}
+
+func (r *AccountScenarioRepository) DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
+	filter := bson.M{
+		"scenario_id": scenarioId,
+	}
+	return r.repo.DeleteOneByFilter(ctx, filter)
 }

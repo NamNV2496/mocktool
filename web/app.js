@@ -305,6 +305,35 @@ async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
     }
 }
 
+function renderMockAPIsTable() {
+    const tbody = document.getElementById('mockapis-table-body');
+
+    if (!mockAPIs || mockAPIs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="loading">No mock APIs found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = mockAPIs.map(api => `
+        <tr>
+            <td class="text-truncate" title="${api.feature_name || 'N/A'}">${api.feature_name || 'N/A'}</td>
+            <td class="text-truncate" title="${api.scenario_name || 'N/A'}">${api.scenario_name || 'N/A'}</td>
+            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong></td>
+            <td class="text-truncate" title="${api.description || '-'}">${api.description || '-'}</td>
+            <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
+            <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
+            <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
+                ${api.is_active ? 'Active' : 'Inactive'}
+            </span></td>
+            <td>${formatDate(api.created_at)}</td>
+            <td class="actions">
+                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>Edit</button>
+                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>Duplicate</button>
+                <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
 function renderScenariosTable() {
     const tbody = document.getElementById('scenarios-table-body');
 
@@ -717,12 +746,13 @@ async function saveFeature() {
         return;
     }
 
-    const data = {
-        name: name,
+    var data = {
         description: description,
         is_active: isActive
     };
-
+    if (id != null) {
+        data.name = name
+    }
     try {
         const url = id ? `${API_BASE_URL}/features/${id}` : `${API_BASE_URL}/features`;
         const method = id ? 'PUT' : 'POST';
@@ -823,13 +853,13 @@ async function saveScenario() {
         showFieldError('scenario-name', 'Scenario name is too long (max 100 characters)');
         return;
     }
-
     const data = {
         feature_name: featureName,
-        name: name,
         description: description
     };
-
+    if (id != null) {
+        data.name = name
+    }
     try {
         const url = id ? `${API_BASE_URL}/scenarios/${id}` : `${API_BASE_URL}/scenarios`;
         const method = id ? 'PUT' : 'POST';

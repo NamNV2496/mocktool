@@ -15,14 +15,17 @@ type IFeatureRepository interface {
 	SearchByName(ctx context.Context, query string, params domain.PaginationParams) ([]domain.Feature, int64, error)
 	Create(ctx context.Context, f *domain.Feature) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	DeactivateById(ctx context.Context, featureId primitive.ObjectID) error
+	FindById(ctx context.Context, featureId primitive.ObjectID) (*domain.Feature, error)
+	FindByName(ctx context.Context, name string) (*domain.Feature, error)
 }
 type FeatureRepository struct {
-	*BaseRepository
+	repo IBaseRepository
 }
 
 func NewFeatureRepository(db *mongo.Database) IFeatureRepository {
 	return &FeatureRepository{
-		BaseRepository: NewBaseRepository(db.Collection("features")),
+		repo: NewBaseRepository(db.Collection("features")),
 	}
 }
 
@@ -30,13 +33,13 @@ func NewFeatureRepository(db *mongo.Database) IFeatureRepository {
 func (_self *FeatureRepository) ListAllPaginated(ctx context.Context, params domain.PaginationParams) ([]domain.Feature, int64, error) {
 	filter := bson.M{}
 
-	total, err := _self.Count(ctx, filter)
+	total, err := _self.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.Feature
-	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = _self.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -53,13 +56,13 @@ func (_self *FeatureRepository) SearchByName(ctx context.Context, query string, 
 		},
 	}
 
-	total, err := _self.Count(ctx, filter)
+	total, err := _self.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.Feature
-	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = _self.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -69,13 +72,13 @@ func (_self *FeatureRepository) SearchByName(ctx context.Context, query string, 
 
 func (_self *FeatureRepository) ListActive(ctx context.Context) ([]domain.Feature, error) {
 	var result []domain.Feature
-	err := _self.FindMany(ctx, bson.M{"is_active": true}, &result)
+	err := _self.repo.FindMany(ctx, bson.M{"is_active": true}, &result)
 	return result, err
 }
 
 func (_self *FeatureRepository) Create(ctx context.Context, f *domain.Feature) error {
 	f.ID = primitive.NewObjectID()
-	return _self.Insert(ctx, f)
+	return _self.repo.Insert(ctx, f)
 }
 
 func (_self *FeatureRepository) Update(
@@ -83,5 +86,32 @@ func (_self *FeatureRepository) Update(
 	id int64,
 	update bson.M,
 ) error {
-	return _self.UpdateByID(ctx, id, update)
+	return _self.repo.UpdateByID(ctx, id, update)
+}
+
+func (_self *FeatureRepository) DeactivateById(ctx context.Context, featureId primitive.ObjectID) error {
+	_, err := _self.repo.DeleteOne(ctx, featureId)
+	return err
+}
+
+func (_self *FeatureRepository) FindById(ctx context.Context, featureId primitive.ObjectID) (*domain.Feature, error) {
+	var out domain.Feature
+	filter := bson.M{
+		"_id": featureId,
+	}
+	_self.repo.FindOne(ctx, filter, &out)
+	return &out, nil
+}
+
+func (_self *FeatureRepository) UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error {
+	return _self.repo.UpdateByObjectID(ctx, id, update)
+}
+
+func (_self *FeatureRepository) FindByName(ctx context.Context, name string) (*domain.Feature, error) {
+	var out domain.Feature
+	filter := bson.M{
+		"name": name,
+	}
+	_self.repo.FindOne(ctx, filter, &out)
+	return &out, nil
 }

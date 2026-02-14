@@ -471,8 +471,7 @@ func TestMockAPIRepository_UpdateByObjectID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the update
-	var updated domain.MockAPI
-	err = repo.BaseRepository.FindOne(ctx, bson.M{"_id": mockAPI.ID}, &updated)
+	updated, err := repo.FindByObjectID(ctx, mockAPI.ID)
 	require.NoError(t, err)
 
 	assert.Equal(t, "/api/v2/test", updated.Path)

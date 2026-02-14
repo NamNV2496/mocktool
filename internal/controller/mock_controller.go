@@ -91,8 +91,8 @@ func (_self *MockController) StartHttpServer() error {
 	c.Use(observability.TracingMiddleware()) // OpenTelemetry tracing
 	c.Use(observability.MetricsMiddleware()) // Prometheus metrics
 	c.Use(middleware.CORS())                 // enable CORS for web interface
-	c.Use(middleware.RequestLogger())        // use the default RequestLogger middleware with slog logger
-	c.Use(middleware.Recover())              // recover panics as errors for proper error handling
+	// c.Use(middleware.RequestLogger())        // use the default RequestLogger middleware with slog logger
+	// c.Use(middleware.Recover())              // recover panics as errors for proper error handling
 
 	// Health check endpoints
 	c.GET("/health", _self.HealthCheck)
@@ -101,10 +101,11 @@ func (_self *MockController) StartHttpServer() error {
 
 	// Routes
 	v1 := c.Group("/api/v1/mocktool")
-	v1.GET("/features", _self.GetFeatures)                 // list all features
-	v1.GET("/features/search", _self.SearchFeaturesByName) // list all features has name likely
-	v1.POST("/features", _self.CreateNewFeature)           // create new feature
-	v1.PUT("/features/:feature_id", _self.UpdateFeature)   // update or inactive
+	v1.GET("/features", _self.GetFeatures)                  // list all features
+	v1.GET("/features/search", _self.SearchFeaturesByName)  // list all features has name likely
+	v1.POST("/features", _self.CreateNewFeature)            // create new feature
+	v1.PUT("/features/:feature_id", _self.UpdateFeature)    // update or inactive
+	v1.DELETE("/features/:feature_id", _self.DeleteFeature) // update or inactive
 
 	v1.GET("/scenarios", _self.ListScenariosByFeature)                  // list all scenarios by feature
 	v1.GET("/scenarios/search", _self.SearchScenariosByFeatureAndName)  // list all scenarios by feature has name likely
@@ -112,12 +113,13 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/scenarios", _self.CreateNewScenariosByFeature)            // create new scenario
 	v1.PUT("/scenarios/:scenario_id", _self.UpdateScenarioByFeature)    // update scenario
 	v1.POST("/scenarios/:scenario_id/activate", _self.ActivateScenario) // activate scenario for account
-	// v1.DELETE("/scenarios/:scenario_id/deactivate", _self.DeactivateScenario) // deactivate scenario for account
+	v1.DELETE("/scenarios/:scenario_id", _self.DeleteScenario)          // Delete scenario
 
 	v1.GET("/mockapis", _self.ListMockAPIsByScenario)                       // list all APIs by scenario
 	v1.GET("/mockapis/search", _self.SearchMockAPIsByScenarioAndNameOrPath) // search APIs by scenario and name/path
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)                     // create new scenario
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario)              // update or inactive scenario
+	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)           // update or inactive scenario
 
 	// Load test scenarios - delegate to LoadTestController
 	_self.loadTestController.RegisterRoutes(v1)
@@ -212,7 +214,11 @@ func (_self *MockController) CreateNewFeature(c echo.Context) error {
 		return err
 	}
 
-	feature := &domain.Feature{
+	feature, _ := _self.FeatureRepo.FindByName(ctx, req.Name)
+	if feature != nil && feature.Name != "" {
+		return c.JSON(http.StatusBadRequest, "featureName is existed")
+	}
+	featureReq := &domain.Feature{
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    true,
@@ -220,14 +226,35 @@ func (_self *MockController) CreateNewFeature(c echo.Context) error {
 		UpdatedAt:   time.Now().UTC(),
 	}
 
-	if err := _self.FeatureRepo.Create(ctx, feature); err != nil {
+	if err := _self.FeatureRepo.Create(ctx, featureReq); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, feature)
+	return c.JSON(http.StatusCreated, featureReq)
 }
 
 /* ---------- PUT /features/:feature_id ---------- */
+
+func (_self *MockController) DeleteFeature(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("feature_id")
+	objectID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid feature_id")
+	}
+
+	_self.FeatureRepo.DeactivateById(ctx, objectID)
+
+	feature, err := _self.FeatureRepo.FindById(ctx, objectID)
+	if err != nil {
+		return c.NoContent(http.StatusOK)
+	}
+	// invalid cache by scenario
+	_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyFeatureTemplate, feature.Name))
+
+	return c.NoContent(http.StatusOK)
+}
 
 func (_self *MockController) UpdateFeature(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -360,7 +387,7 @@ func (_self *MockController) ListActiveScenariosByFeature(c echo.Context) error 
 	// Get active scenario mapping for this feature and account (or global if accountId is nil)
 	accountScenario, err := _self.AccountScenarioRepo.GetActiveScenario(ctx, featureName, accountId)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return c.NoContent(http.StatusOK)
 	}
 
 	// Get the actual scenario details
@@ -391,8 +418,12 @@ func (_self *MockController) CreateNewScenariosByFeature(c echo.Context) error {
 	if err := c.Validate(&req); err != nil {
 		return err
 	}
+	scenario, _ := _self.ScenarioRepo.FindByFeatureNameAndName(ctx, req.FeatureName, req.Name)
+	if scenario != nil && scenario.Name != "" {
+		return c.JSON(http.StatusBadRequest, "ScenarioName is existed")
+	}
 
-	scenario := &domain.Scenario{
+	scenarioReq := &domain.Scenario{
 		FeatureName: req.FeatureName,
 		Name:        req.Name,
 		Description: req.Description,
@@ -401,11 +432,11 @@ func (_self *MockController) CreateNewScenariosByFeature(c echo.Context) error {
 	}
 
 	// Just create the scenario - activation is handled separately via AccountScenario
-	if err := _self.ScenarioRepo.Create(ctx, scenario); err != nil {
+	if err := _self.ScenarioRepo.Create(ctx, scenarioReq); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	}
 
-	return c.JSON(http.StatusCreated, scenario)
+	return c.JSON(http.StatusCreated, scenarioReq)
 }
 
 /* ---------- PUT /scenarios/:scenario_id ---------- */
@@ -491,7 +522,7 @@ func (_self *MockController) ActivateScenario(c echo.Context) error {
 	}
 
 	// invalid cache by scenario
-	if reqBody.PrevScenarioId != "" {
+	if reqBody.PrevScenarioId != "" && reqBody.PrevScenarioId != "null" {
 		prevScenarioID, err := primitive.ObjectIDFromHex(reqBody.PrevScenarioId)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid scenario_id")
@@ -512,41 +543,30 @@ func (_self *MockController) ActivateScenario(c echo.Context) error {
 
 /* ---------- DELETE /scenarios/:scenario_id/deactivate ---------- */
 
-// func (_self *MockController) DeactivateScenario(c echo.Context) error {
-// 	ctx := c.Request().Context()
+func (_self *MockController) DeleteScenario(c echo.Context) error {
+	ctx := c.Request().Context()
 
-// 	idStr := c.Param("scenario_id")
-// 	scenarioID, err := primitive.ObjectIDFromHex(idStr)
-// 	if err != nil {
-// 		return echo.NewHTTPError(http.StatusBadRequest, "invalid scenario_id")
-// 	}
+	idStr := c.Param("scenario_id")
+	scenarioID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid scenario_id")
+	}
 
-// 	// Get the scenario to know its feature
-// 	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, scenarioID)
-// 	if err != nil {
-// 		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
-// 	}
+	// Get the scenario to know its feature
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, scenarioID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
+	}
+	_self.ScenarioRepo.DeleteByObjectID(ctx, scenarioID)
+	// Deactivate the scenario for this account
+	if err := _self.AccountScenarioRepo.DeactivateByScenarioId(ctx, scenarioID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
+	}
+	// invalid cache by scenario
+	_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, scenario.FeatureName, scenario.Name))
 
-// 	// Extract accountId from query or default to global
-// 	var accountId *string
-// 	accountIdParam := c.QueryParam("account_id")
-// 	if accountIdParam != "" {
-// 		accountId = &accountIdParam
-// 	}
-
-// 	// Deactivate the scenario for this account
-// 	if err := _self.AccountScenarioRepo.DeactivateByFeatureAndAccount(ctx, scenario.FeatureName, accountId); err != nil {
-// 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
-// 	}
-// 	// invalid cache by scenario
-// 	if accountId == nil {
-// 		_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, scenario.FeatureName, scenario.Name))
-// 	} else {
-// 		_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplateAccount, scenario.FeatureName, scenario.Name, *accountId))
-// 	}
-
-// 	return c.JSON(http.StatusOK, map[string]string{"message": "scenario deactivated successfully"})
-// }
+	return c.JSON(http.StatusOK, map[string]string{"message": "scenario deactivated successfully"})
+}
 
 /* ---------- GET /mockapis?scenario_name= ---------- */
 
@@ -732,6 +752,10 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		return err // Already formatted as HTTPError by CustomValidator
 	}
 
+	api, _ := _self.MockAPIRepo.FindByName(ctx, reqBody.Name)
+	if api != nil && api.Name != "" {
+		return c.JSON(http.StatusBadRequest, "API name is existed")
+	}
 	// Convert to domain.MockAPI
 	var req domain.MockAPI
 	req.FeatureName = reqBody.FeatureName
@@ -883,6 +907,26 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 }
 
 /* ---------- PUT /mockapis/:api_id ---------- */
+
+func (_self *MockController) DeleteMockAPIByScenario(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	objectID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+	mockAPI, err := _self.MockAPIRepo.FindByObjectID(ctx, objectID)
+	if err != nil {
+		return c.JSON(http.StatusOK, nil)
+	}
+	_self.MockAPIRepo.DeletByObjectID(ctx, objectID)
+	// invalid cache by scenario
+	if mockAPI != nil && mockAPI.Name != "" {
+		_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, mockAPI.FeatureName, mockAPI.ScenarioName))
+	}
+	return c.JSON(http.StatusOK, nil)
+}
 
 func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	ctx := c.Request().Context()

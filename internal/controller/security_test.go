@@ -66,6 +66,9 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 						// Headers should have Set-Cookie removed
 						return nil
 					})
+				mockAPIRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{
@@ -85,6 +88,9 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 				mockAPIRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				mockAPIRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{
@@ -104,6 +110,12 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 				mockAPIRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				mockAPIRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
+				mockAPIRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{

@@ -57,6 +57,20 @@ func (mr *MockIMockAPIRepositoryMockRecorder) Create(ctx, m any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockIMockAPIRepository)(nil).Create), ctx, m)
 }
 
+// DeletByObjectID mocks base method.
+func (m *MockIMockAPIRepository) DeletByObjectID(ctx context.Context, id primitive.ObjectID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletByObjectID", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeletByObjectID indicates an expected call of DeletByObjectID.
+func (mr *MockIMockAPIRepositoryMockRecorder) DeletByObjectID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletByObjectID", reflect.TypeOf((*MockIMockAPIRepository)(nil).DeletByObjectID), ctx, id)
+}
+
 // FindByFeatureScenarioPathMethodAndHash mocks base method.
 func (m *MockIMockAPIRepository) FindByFeatureScenarioPathMethodAndHash(ctx context.Context, featureName, scenarioName, path, method, hashInput string) (*domain.MockAPI, error) {
 	m.ctrl.T.Helper()
@@ -70,6 +84,66 @@ func (m *MockIMockAPIRepository) FindByFeatureScenarioPathMethodAndHash(ctx cont
 func (mr *MockIMockAPIRepositoryMockRecorder) FindByFeatureScenarioPathMethodAndHash(ctx, featureName, scenarioName, path, method, hashInput any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByFeatureScenarioPathMethodAndHash", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByFeatureScenarioPathMethodAndHash), ctx, featureName, scenarioName, path, method, hashInput)
+}
+
+// FindByName mocks base method.
+func (m *MockIMockAPIRepository) FindByName(ctx context.Context, name string) (*domain.MockAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByName", ctx, name)
+	ret0, _ := ret[0].(*domain.MockAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByName indicates an expected call of FindByName.
+func (mr *MockIMockAPIRepositoryMockRecorder) FindByName(ctx, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByName", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByName), ctx, name)
+}
+
+// FindByObjectID mocks base method.
+func (m *MockIMockAPIRepository) FindByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.MockAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByObjectID", ctx, id)
+	ret0, _ := ret[0].(*domain.MockAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByObjectID indicates an expected call of FindByObjectID.
+func (mr *MockIMockAPIRepositoryMockRecorder) FindByObjectID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByObjectID", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByObjectID), ctx, id)
+}
+
+// ListActiveAPIsByScenario mocks base method.
+func (m *MockIMockAPIRepository) ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListActiveAPIsByScenario", ctx, scenarios)
+	ret0, _ := ret[0].([]domain.MockAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListActiveAPIsByScenario indicates an expected call of ListActiveAPIsByScenario.
+func (mr *MockIMockAPIRepositoryMockRecorder) ListActiveAPIsByScenario(ctx, scenarios any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActiveAPIsByScenario", reflect.TypeOf((*MockIMockAPIRepository)(nil).ListActiveAPIsByScenario), ctx, scenarios)
+}
+
+// ListAllActiveAPIs mocks base method.
+func (m *MockIMockAPIRepository) ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAllActiveAPIs", ctx)
+	ret0, _ := ret[0].([]domain.MockAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAllActiveAPIs indicates an expected call of ListAllActiveAPIs.
+func (mr *MockIMockAPIRepositoryMockRecorder) ListAllActiveAPIs(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllActiveAPIs", reflect.TypeOf((*MockIMockAPIRepository)(nil).ListAllActiveAPIs), ctx)
 }
 
 // ListByScenarioNamePaginated mocks base method.

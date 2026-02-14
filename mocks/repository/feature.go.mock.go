@@ -57,6 +57,50 @@ func (mr *MockIFeatureRepositoryMockRecorder) Create(ctx, f any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockIFeatureRepository)(nil).Create), ctx, f)
 }
 
+// DeactivateById mocks base method.
+func (m *MockIFeatureRepository) DeactivateById(ctx context.Context, featureId primitive.ObjectID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeactivateById", ctx, featureId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeactivateById indicates an expected call of DeactivateById.
+func (mr *MockIFeatureRepositoryMockRecorder) DeactivateById(ctx, featureId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateById", reflect.TypeOf((*MockIFeatureRepository)(nil).DeactivateById), ctx, featureId)
+}
+
+// FindById mocks base method.
+func (m *MockIFeatureRepository) FindById(ctx context.Context, featureId primitive.ObjectID) (*domain.Feature, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindById", ctx, featureId)
+	ret0, _ := ret[0].(*domain.Feature)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindById indicates an expected call of FindById.
+func (mr *MockIFeatureRepositoryMockRecorder) FindById(ctx, featureId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindById", reflect.TypeOf((*MockIFeatureRepository)(nil).FindById), ctx, featureId)
+}
+
+// FindByName mocks base method.
+func (m *MockIFeatureRepository) FindByName(ctx context.Context, name string) (*domain.Feature, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByName", ctx, name)
+	ret0, _ := ret[0].(*domain.Feature)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByName indicates an expected call of FindByName.
+func (mr *MockIFeatureRepositoryMockRecorder) FindByName(ctx, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByName", reflect.TypeOf((*MockIFeatureRepository)(nil).FindByName), ctx, name)
+}
+
 // ListAllPaginated mocks base method.
 func (m *MockIFeatureRepository) ListAllPaginated(ctx context.Context, params domain.PaginationParams) ([]domain.Feature, int64, error) {
 	m.ctrl.T.Helper()

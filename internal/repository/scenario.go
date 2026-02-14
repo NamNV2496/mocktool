@@ -15,16 +15,18 @@ type IScenarioRepository interface {
 	Create(ctx context.Context, s *domain.Scenario) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error)
+	DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error
 	ListByFeatureNamePaginated(ctx context.Context, featureName string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
 	SearchByFeatureAndName(ctx context.Context, featureName, query string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
+	FindByFeatureNameAndName(ctx context.Context, featureName, name string) (*domain.Scenario, error)
 }
 type ScenarioRepository struct {
-	*BaseRepository
+	repo IBaseRepository
 }
 
 func NewScenarioRepository(db *mongo.Database) *ScenarioRepository {
 	return &ScenarioRepository{
-		BaseRepository: NewBaseRepository(db.Collection("scenarios")),
+		repo: NewBaseRepository(db.Collection("scenarios")),
 	}
 }
 
@@ -35,13 +37,13 @@ func (r *ScenarioRepository) ListByFeatureNamePaginated(
 ) ([]domain.Scenario, int64, error) {
 	filter := bson.M{"feature_name": featureName}
 
-	total, err := r.Count(ctx, filter)
+	total, err := r.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.Scenario
-	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = r.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -68,13 +70,13 @@ func (r *ScenarioRepository) SearchByFeatureAndName(
 		filter["feature_name"] = featureName
 	}
 
-	total, err := r.Count(ctx, filter)
+	total, err := r.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.Scenario
-	err = r.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = r.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -84,7 +86,7 @@ func (r *ScenarioRepository) SearchByFeatureAndName(
 
 func (r *ScenarioRepository) Create(ctx context.Context, s *domain.Scenario) error {
 	s.ID = primitive.NewObjectID()
-	return r.Insert(ctx, s)
+	return r.repo.Insert(ctx, s)
 }
 
 func (r *ScenarioRepository) UpdateByObjectID(
@@ -92,7 +94,7 @@ func (r *ScenarioRepository) UpdateByObjectID(
 	id primitive.ObjectID,
 	update bson.M,
 ) error {
-	return r.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
+	return r.repo.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": update})
 }
 
 func (r *ScenarioRepository) GetByObjectID(
@@ -100,7 +102,7 @@ func (r *ScenarioRepository) GetByObjectID(
 	id primitive.ObjectID,
 ) (*domain.Scenario, error) {
 	var result domain.Scenario
-	err := r.FindOne(ctx, bson.M{"_id": id}, &result)
+	err := r.repo.FindOne(ctx, bson.M{"_id": id}, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +115,7 @@ func (r *ScenarioRepository) GetByName(
 	scenarioName string,
 ) (*domain.Scenario, error) {
 	var result domain.Scenario
-	err := r.FindOne(ctx, bson.M{
+	err := r.repo.FindOne(ctx, bson.M{
 		"feature_name": featureName,
 		"name":         scenarioName,
 	}, &result)
@@ -127,6 +129,21 @@ func (r *ScenarioRepository) Delete(
 	ctx context.Context,
 	id primitive.ObjectID,
 ) error {
-	_, err := r.BaseRepository.col.DeleteOne(ctx, bson.M{"_id": id})
+	_, err := r.repo.DeleteOne(ctx, id)
 	return err
+}
+
+func (r *ScenarioRepository) DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error {
+	_, err := r.repo.DeleteOne(ctx, id)
+	return err
+}
+
+func (r *ScenarioRepository) FindByFeatureNameAndName(ctx context.Context, featureName, name string) (*domain.Scenario, error) {
+	var out domain.Scenario
+	filter := bson.M{
+		"feature_name": featureName,
+		"name":         name,
+	}
+	r.repo.FindOne(ctx, filter, &out)
+	return &out, nil
 }

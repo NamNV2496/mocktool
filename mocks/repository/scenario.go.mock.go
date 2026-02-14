@@ -57,6 +57,35 @@ func (mr *MockIScenarioRepositoryMockRecorder) Create(ctx, s any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockIScenarioRepository)(nil).Create), ctx, s)
 }
 
+// DeleteByObjectID mocks base method.
+func (m *MockIScenarioRepository) DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteByObjectID", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteByObjectID indicates an expected call of DeleteByObjectID.
+func (mr *MockIScenarioRepositoryMockRecorder) DeleteByObjectID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByObjectID", reflect.TypeOf((*MockIScenarioRepository)(nil).DeleteByObjectID), ctx, id)
+}
+
+// FindByFeatureNameAndName mocks base method.
+func (m *MockIScenarioRepository) FindByFeatureNameAndName(ctx context.Context, featureName, name string) (*domain.Scenario, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByFeatureNameAndName", ctx, featureName, name)
+	ret0, _ := ret[0].(*domain.Scenario)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByFeatureNameAndName indicates an expected call of FindByFeatureNameAndName.
+func (mr *MockIScenarioRepositoryMockRecorder) FindByFeatureNameAndName(ctx, featureName, name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByFeatureNameAndName", reflect.TypeOf((*MockIScenarioRepository)(nil).FindByFeatureNameAndName), ctx, featureName, name)
+}
+
 // GetByObjectID mocks base method.
 func (m *MockIScenarioRepository) GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error) {
 	m.ctrl.T.Helper()

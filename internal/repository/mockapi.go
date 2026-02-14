@@ -12,21 +12,24 @@ import (
 
 //go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type IMockAPIRepository interface {
-	// ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
-	// ListByScenarioName(ctx context.Context, scenarioName string) ([]domain.MockAPI, error)
+	ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error)
+	ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error)
 	ListByScenarioNamePaginated(ctx context.Context, scenarioName string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
 	SearchByScenarioAndNameOrPath(ctx context.Context, scenarioName, query string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
+	FindByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.MockAPI, error)
+	FindByName(ctx context.Context, name string) (*domain.MockAPI, error)
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	DeletByObjectID(ctx context.Context, id primitive.ObjectID) error
 	FindByFeatureScenarioPathMethodAndHash(ctx context.Context, featureName, scenarioName, path, method, hashInput string) (*domain.MockAPI, error)
 }
 type MockAPIRepository struct {
-	*BaseRepository
+	repo IBaseRepository
 }
 
-func NewMockAPIRepository(db *mongo.Database) *MockAPIRepository {
+func NewMockAPIRepository(db *mongo.Database) IMockAPIRepository {
 	return &MockAPIRepository{
-		BaseRepository: NewBaseRepository(db.Collection("mock_apis")),
+		repo: NewBaseRepository(db.Collection("mock_apis")),
 	}
 }
 
@@ -34,7 +37,7 @@ func NewMockAPIRepository(db *mongo.Database) *MockAPIRepository {
 
 func (_self *MockAPIRepository) ListActiveAPIsByScenario(ctx context.Context, scenarios []string) ([]domain.MockAPI, error) {
 	var result []domain.MockAPI
-	err := _self.FindMany(ctx, bson.M{
+	err := _self.repo.FindMany(ctx, bson.M{
 		"scenario_name": bson.M{"$in": scenarios},
 		"is_active":     true,
 	}, &result)
@@ -44,7 +47,7 @@ func (_self *MockAPIRepository) ListActiveAPIsByScenario(ctx context.Context, sc
 
 func (_self *MockAPIRepository) ListAllActiveAPIs(ctx context.Context) ([]domain.MockAPI, error) {
 	var result []domain.MockAPI
-	err := _self.FindMany(ctx, bson.M{
+	err := _self.repo.FindMany(ctx, bson.M{
 		"is_active": true,
 	}, &result)
 
@@ -57,7 +60,7 @@ func (_self *MockAPIRepository) ListByScenario(
 ) ([]domain.MockAPI, error) {
 
 	var result []domain.MockAPI
-	err := _self.FindMany(ctx, bson.M{
+	err := _self.repo.FindMany(ctx, bson.M{
 		"scenario_name": scenarioID,
 	}, &result)
 
@@ -70,7 +73,7 @@ func (_self *MockAPIRepository) ListByScenarioName(
 ) ([]domain.MockAPI, error) {
 
 	var result []domain.MockAPI
-	err := _self.FindMany(ctx, bson.M{
+	err := _self.repo.FindMany(ctx, bson.M{
 		"scenario_name": scenarioName,
 		// "is_active":     true,
 	}, &result)
@@ -88,13 +91,13 @@ func (_self *MockAPIRepository) ListByScenarioNamePaginated(
 		// "is_active":     true,
 	}
 
-	total, err := _self.Count(ctx, filter)
+	total, err := _self.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.MockAPI
-	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = _self.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -128,13 +131,13 @@ func (_self *MockAPIRepository) SearchByScenarioAndNameOrPath(
 		}
 	}
 
-	total, err := _self.Count(ctx, filter)
+	total, err := _self.repo.Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []domain.MockAPI
-	err = _self.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
+	err = _self.repo.FindManyWithPagination(ctx, filter, params.Skip(), params.Limit(), &result)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -146,7 +149,7 @@ func (_self *MockAPIRepository) SearchByScenarioAndNameOrPath(
 
 func (_self *MockAPIRepository) Create(ctx context.Context, m *domain.MockAPI) error {
 	m.ID = primitive.NewObjectID()
-	return _self.Insert(ctx, m)
+	return _self.repo.Insert(ctx, m)
 }
 
 /* ---------- update ---------- */
@@ -156,7 +159,7 @@ func (_self *MockAPIRepository) Update(
 	id int64,
 	update bson.M,
 ) error {
-	return _self.UpdateByID(ctx, id, update)
+	return _self.repo.UpdateByID(ctx, id, update)
 }
 
 /* ---------- execute ---------- */
@@ -168,11 +171,11 @@ func (_self *MockAPIRepository) FindByPathAndHash(
 ) (*domain.MockAPI, error) {
 
 	var result domain.MockAPI
-	err := _self.col.FindOne(ctx, bson.M{
+	err := _self.repo.FindOne(ctx, bson.M{
 		"path":      path,
 		"hashcode":  hash,
 		"is_active": true,
-	}).Decode(&result)
+	}, &result)
 
 	if err != nil {
 		return nil, err
@@ -196,10 +199,37 @@ func (_self *MockAPIRepository) FindByFeatureScenarioPathMethodAndHash(
 		"is_active":     true,
 	}
 
-	err := _self.col.FindOne(ctx, filter).Decode(&result)
+	err := _self.repo.FindOne(ctx, filter, &result)
 	if err != nil {
 		return nil, err
 	}
 
 	return &result, nil
+}
+
+func (_self *MockAPIRepository) DeletByObjectID(ctx context.Context, id primitive.ObjectID) error {
+	_, err := _self.repo.DeleteOne(ctx, id)
+	return err
+}
+
+func (_self *MockAPIRepository) FindByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.MockAPI, error) {
+	var output domain.MockAPI
+	filter := bson.M{
+		"_id": id,
+	}
+	_self.repo.FindOne(ctx, filter, &output)
+	return &output, nil
+}
+
+func (_self *MockAPIRepository) FindByName(ctx context.Context, name string) (*domain.MockAPI, error) {
+	var output domain.MockAPI
+	filter := bson.M{
+		"name": name,
+	}
+	_self.repo.FindOne(ctx, filter, &output)
+	return &output, nil
+}
+
+func (_self *MockAPIRepository) UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error {
+	return _self.repo.UpdateByObjectID(ctx, id, update)
 }

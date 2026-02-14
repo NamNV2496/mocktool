@@ -173,9 +173,7 @@ func TestFeatureRepository_UpdateByObjectID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the update
-	baseRepo := repo.(*FeatureRepository).BaseRepository
-	var updated domain.Feature
-	err = baseRepo.FindOne(ctx, bson.M{"_id": feature.ID}, &updated)
+	updated, err := repo.FindById(ctx, feature.ID)
 	require.NoError(t, err)
 
 	assert.Equal(t, "updated-name", updated.Name)

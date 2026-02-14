@@ -53,6 +53,9 @@ func TestValidation_CreateNewFeature(t *testing.T) {
 				featureRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				featureRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{
@@ -144,6 +147,9 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 				scenarioRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				scenarioRepo.EXPECT().
+					FindByFeatureNameAndName(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{
@@ -243,6 +249,9 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 				mockAPIRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				mockAPIRepo.EXPECT().
+					FindByName(gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 		{

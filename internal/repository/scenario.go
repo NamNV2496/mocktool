@@ -16,6 +16,7 @@ type IScenarioRepository interface {
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	GetByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.Scenario, error)
 	DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error
+	DeleteByFeatureName(ctx context.Context, featureName string) error
 	ListByFeatureNamePaginated(ctx context.Context, featureName string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
 	SearchByFeatureAndName(ctx context.Context, featureName, query string, params domain.PaginationParams) ([]domain.Scenario, int64, error)
 	FindByFeatureNameAndName(ctx context.Context, featureName, name string) (*domain.Scenario, error)
@@ -135,6 +136,14 @@ func (r *ScenarioRepository) Delete(
 
 func (r *ScenarioRepository) DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error {
 	_, err := r.repo.DeleteOne(ctx, id)
+	return err
+}
+
+func (r *ScenarioRepository) DeleteByFeatureName(ctx context.Context, featureName string) error {
+	filter := bson.M{
+		"feature_name": featureName,
+	}
+	_, err := r.repo.DeleteMany(ctx, filter)
 	return err
 }
 

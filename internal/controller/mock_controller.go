@@ -244,15 +244,21 @@ func (_self *MockController) DeleteFeature(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid feature_id")
 	}
 
-	_self.FeatureRepo.DeactivateById(ctx, objectID)
-
 	feature, err := _self.FeatureRepo.FindById(ctx, objectID)
 	if err != nil {
 		return c.NoContent(http.StatusOK)
 	}
+	_self.FeatureRepo.DeleteById(ctx, objectID)
+	_self.ScenarioRepo.DeleteByFeatureName(ctx, feature.Name)
+	_self.MockAPIRepo.DeleteByFeatureName(ctx, feature.Name)
+
 	// invalid cache by scenario
 	_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyFeatureTemplate, feature.Name))
-
+	// recheck
+	_, err = _self.FeatureRepo.FindById(ctx, objectID)
+	if err != nil {
+		return c.NoContent(http.StatusOK)
+	}
 	return c.NoContent(http.StatusOK)
 }
 
@@ -351,10 +357,7 @@ func (_self *MockController) ListScenariosByFeature(c echo.Context) error {
 			}
 		}
 	}
-	scenarios, total, err := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, pagination)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
+	scenarios, total, _ := _self.ScenarioRepo.ListByFeatureNamePaginated(ctx, featureName, pagination)
 	for _, scenario := range scenarios {
 		if scenario.ID == globalScenarioId {
 			continue
@@ -558,12 +561,14 @@ func (_self *MockController) DeleteScenario(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "scenario not found")
 	}
 	_self.ScenarioRepo.DeleteByObjectID(ctx, scenarioID)
-	// Deactivate the scenario for this account
-	if err := _self.AccountScenarioRepo.DeactivateByScenarioId(ctx, scenarioID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
-	}
+	_self.MockAPIRepo.DeleteByScenarioName(ctx, scenario.Name)
+
 	// invalid cache by scenario
 	_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, scenario.FeatureName, scenario.Name))
+	// Delete the scenario for this account
+	if err := _self.AccountScenarioRepo.DeleteByScenarioId(ctx, scenarioID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to deactivate scenario: "+err.Error())
+	}
 
 	return c.JSON(http.StatusOK, map[string]string{"message": "scenario deactivated successfully"})
 }

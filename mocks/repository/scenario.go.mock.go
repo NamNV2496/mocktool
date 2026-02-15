@@ -57,6 +57,20 @@ func (mr *MockIScenarioRepositoryMockRecorder) Create(ctx, s any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockIScenarioRepository)(nil).Create), ctx, s)
 }
 
+// DeleteByFeatureName mocks base method.
+func (m *MockIScenarioRepository) DeleteByFeatureName(ctx context.Context, featureName string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteByFeatureName", ctx, featureName)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteByFeatureName indicates an expected call of DeleteByFeatureName.
+func (mr *MockIScenarioRepositoryMockRecorder) DeleteByFeatureName(ctx, featureName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByFeatureName", reflect.TypeOf((*MockIScenarioRepository)(nil).DeleteByFeatureName), ctx, featureName)
+}
+
 // DeleteByObjectID mocks base method.
 func (m *MockIScenarioRepository) DeleteByObjectID(ctx context.Context, id primitive.ObjectID) error {
 	m.ctrl.T.Helper()

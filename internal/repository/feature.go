@@ -15,7 +15,7 @@ type IFeatureRepository interface {
 	SearchByName(ctx context.Context, query string, params domain.PaginationParams) ([]domain.Feature, int64, error)
 	Create(ctx context.Context, f *domain.Feature) error
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
-	DeactivateById(ctx context.Context, featureId primitive.ObjectID) error
+	DeleteById(ctx context.Context, featureId primitive.ObjectID) error
 	FindById(ctx context.Context, featureId primitive.ObjectID) (*domain.Feature, error)
 	FindByName(ctx context.Context, name string) (*domain.Feature, error)
 }
@@ -89,7 +89,7 @@ func (_self *FeatureRepository) Update(
 	return _self.repo.UpdateByID(ctx, id, update)
 }
 
-func (_self *FeatureRepository) DeactivateById(ctx context.Context, featureId primitive.ObjectID) error {
+func (_self *FeatureRepository) DeleteById(ctx context.Context, featureId primitive.ObjectID) error {
 	_, err := _self.repo.DeleteOne(ctx, featureId)
 	return err
 }

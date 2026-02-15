@@ -57,18 +57,18 @@ func (mr *MockIFeatureRepositoryMockRecorder) Create(ctx, f any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockIFeatureRepository)(nil).Create), ctx, f)
 }
 
-// DeactivateById mocks base method.
-func (m *MockIFeatureRepository) DeactivateById(ctx context.Context, featureId primitive.ObjectID) error {
+// DeleteById mocks base method.
+func (m *MockIFeatureRepository) DeleteById(ctx context.Context, featureId primitive.ObjectID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeactivateById", ctx, featureId)
+	ret := m.ctrl.Call(m, "DeleteById", ctx, featureId)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeactivateById indicates an expected call of DeactivateById.
-func (mr *MockIFeatureRepositoryMockRecorder) DeactivateById(ctx, featureId any) *gomock.Call {
+// DeleteById indicates an expected call of DeleteById.
+func (mr *MockIFeatureRepositoryMockRecorder) DeleteById(ctx, featureId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateById", reflect.TypeOf((*MockIFeatureRepository)(nil).DeactivateById), ctx, featureId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteById", reflect.TypeOf((*MockIFeatureRepository)(nil).DeleteById), ctx, featureId)
 }
 
 // FindById mocks base method.

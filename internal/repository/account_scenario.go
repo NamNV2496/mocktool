@@ -16,7 +16,7 @@ type IAccountScenarioRepository interface {
 	GetActiveScenario(ctx context.Context, featureName string, accountId *string) (*domain.AccountScenario, error)
 	DeactivateByFeatureAndAccount(ctx context.Context, featureName string, accountId *string) error
 	DeactivateAllAccountSpecificMappings(ctx context.Context, featureName string) error
-	DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error
+	DeleteByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error
 }
 
 type AccountScenarioRepository struct {
@@ -137,7 +137,7 @@ func (r *AccountScenarioRepository) ListByFeature(
 	return results, err
 }
 
-func (r *AccountScenarioRepository) DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
+func (r *AccountScenarioRepository) DeleteByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
 	filter := bson.M{
 		"scenario_id": scenarioId,
 	}

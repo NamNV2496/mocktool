@@ -84,18 +84,18 @@ func (mr *MockIAccountScenarioRepositoryMockRecorder) DeactivateByFeatureAndAcco
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateByFeatureAndAccount", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).DeactivateByFeatureAndAccount), ctx, featureName, accountId)
 }
 
-// DeactivateByScenarioId mocks base method.
-func (m *MockIAccountScenarioRepository) DeactivateByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
+// DeleteByScenarioId mocks base method.
+func (m *MockIAccountScenarioRepository) DeleteByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeactivateByScenarioId", ctx, scenarioId)
+	ret := m.ctrl.Call(m, "DeleteByScenarioId", ctx, scenarioId)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeactivateByScenarioId indicates an expected call of DeactivateByScenarioId.
-func (mr *MockIAccountScenarioRepositoryMockRecorder) DeactivateByScenarioId(ctx, scenarioId any) *gomock.Call {
+// DeleteByScenarioId indicates an expected call of DeleteByScenarioId.
+func (mr *MockIAccountScenarioRepositoryMockRecorder) DeleteByScenarioId(ctx, scenarioId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeactivateByScenarioId", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).DeactivateByScenarioId), ctx, scenarioId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByScenarioId", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).DeleteByScenarioId), ctx, scenarioId)
 }
 
 // GetActiveScenario mocks base method.

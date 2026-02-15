@@ -188,8 +188,9 @@ docker compose up -d
 # Start server
 go run main.go service
 
-# start UI
-open web/index.html
+# start UI with browser
+http://localhost:8081/
+# use command run: open web/index.html
 
 # start your service client
 # example http server

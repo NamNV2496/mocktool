@@ -67,6 +67,7 @@ func NewMockController(
 
 func (_self *MockController) StartHttpServer() error {
 	c := echo.New()
+	c.Static("/", "web")
 	c.Validator = customValidator.NewValidator()
 
 	cleanup, err := observability.InitTracing("mocktool", "1.0.0")

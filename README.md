@@ -188,6 +188,9 @@ end
 
 ## Design Tradeoffs Explanation
 
+<summary>
+<details>
+
 ### Redis vs Direct Database Access
 ```
 Choice: Use Redis cache layer
@@ -252,6 +255,8 @@ Tradeoff:
 Decision:
 gRPC added to support high-performance internal communication.
 ```
+</details>
+</summary>
 
 ## Performance benchmark
 

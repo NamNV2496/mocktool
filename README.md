@@ -306,10 +306,10 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 
 ## 2. Only 1 active scenario for each feature for each accountId
 
-- If I add new scenario of a feature, that new scenario will active and deactive others.
-- If I active a existed scenario of a feature. others scenarios will deactive
+- If I active a another scenario of a feature, the actived scenarios will deactive
 - Reusable because all scenario is shared
 - Setup globally scenario => All accountIds will have the same result
+- If I don't want use global scenario. I can active another, other account will still keep thier active scenario
 
 ![doc/2.png](doc/2.png)
 
@@ -328,8 +328,7 @@ Cache in Redis with template: `mocktool:<feature>:<scenario>:<account_id>:<path>
 
 ## 3. Multiple APIs for each scenario 
 
-An API path with different request body will have different response by hashing requestBody
-
+The key point is combination of: Path + Method + requestBody
 
 ![doc/7.png](doc/7.png)
 ![doc/5.png](doc/5.png)

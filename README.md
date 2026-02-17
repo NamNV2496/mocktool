@@ -2,6 +2,19 @@
 
 Mocktool is a simple tool written in the Go language. It supports controlling API responses based on feature scenarios.
 
+## Technologies
+
+```bash
+- mongoDB: "go.mongodb.org/mongo-driver/mongo"
+- echo: "github.com/labstack/echo/v4"
+- Hash: "crypto/sha256"
+- Monitoring: "github.com/prometheus/client_golang/prometheus"
+- Redis: "github.com/go-redis/redis/v8"
+- grpc: "google.golang.org/grpc"
+- validator: "github.com/go-playground/validator/v10"
+- Unittest: "go.uber.org/mock/gomock" - coverage: 87.5% of statements
+```
+
 ## Problem Statement
 
 During software development, you may encounter bottlenecks where:
@@ -10,16 +23,88 @@ During software development, you may encounter bottlenecks where:
 - Mocking solutions are limited to hardcoding responses by URL path, without request body filtering.
 - Multiple stakeholders cannot work in parallel (for example: FE completes development but lacks test data, or QA cannot set up edge cases for testing).
 
-That is exactly pain point in development. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
+=> That is exactly pain point in development. However, the tools currently available on the market only allow hardcoding responses based on URL paths, and do not allow filtering by requestBody. This tool allows FE and testers to control the process without needing support from the BE.
 
-## Key Features
+## Pros and cons
 
-This tool provides the following capabilities:
+### Pros
+- FE no need modify code when call API. BE can controll
+- Multiple stackholder can work paralell
+- Multiple active scenarios base on account_id
+- Dynamic API response base on path + method + hash of request body
 
-- Multiple active features
-- Multiple scenarios of a features
-- Only 1 active scenario for each feature for each accountId
-- Multiple APIs for each scenario (same API path with different request bodies distinguished by hash)
+### Cons
+- Need define correct API contract at the first time
+
+# Architecture
+
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+    Admin[Admin portal]
+    Client[Client / Frontend / Test Tool]
+    Service
+    subgraph Mocktool System
+        API1[HTTP API Server: 8081]
+        subgraph cluster
+            LB[Load balancer]
+            API2[HTTP/gRPC API Server: 8082]
+            API3[HTTP/gRPC API Server: 8082]
+        end
+        Cache[(Redis Cache)]
+        DB[(MongoDB)]
+        Metrics[Prometheus Metrics]
+    end
+    
+    Admin --> API1
+    API1 --> DB
+    DB --> API1
+    API1 --> Admin
+
+    Client --> Service
+    Service --forward--> cluster 
+    LB --> API2
+    LB --> API3
+    cluster --> Cache
+    Cache --> cluster
+    
+    cluster --> DB
+    DB --> cluster
+    cluster --> Metrics
+```
+
+## Architecture Explanation
+
+### Write
+```
+Request
+  ↓
+Update / remove
+  ↓
+Cache invalid
+  ↓
+Store result in MongoDB
+  ↓
+Return response
+```
+### Read
+
+```
+Request
+  ↓
+Check Redis cache
+  ↓
+Cache hit → return immediately
+  ↓
+Cache miss → query MongoDB
+  ↓
+Store result in Redis
+  ↓
+Return response
+```
+
+## Usecases
 
 ```mermaid
 flowchart TB
@@ -63,6 +148,8 @@ flowchart TB
 </details>
 </summary>
 
+## Sequence diagram
+
 ![doc/sequence_diagram.png](doc/sequence_diagram.png)
 
 <summary>
@@ -90,30 +177,115 @@ end
 </details>
 </summary>
 
-# Technologies
+## Design Tradeoffs Explanation
 
-```bash
-- mongoDB: "go.mongodb.org/mongo-driver/mongo"
-- echo: "github.com/labstack/echo/v4"
-- Hash: "crypto/sha256"
-- Monitoring: "github.com/prometheus/client_golang/prometheus"
-- Redis: "github.com/go-redis/redis/v8"
-- grpc: "google.golang.org/grpc"
-- validator: "github.com/go-playground/validator/v10"
-- Unittest: "go.uber.org/mock/gomock" - coverage: 87.5% of statements
+### Redis vs Direct Database Access
+```
+Choice: Use Redis cache layer
+Benefits:
+- reduces database load
+- improves response latency
+- improves scalability
+
+Tradeoff:
+- cache invalidation complexity
+- additional infrastructure
+
+Decision:
+Redis chosen to improve performance and scalability.
+```
+---
+
+### Cache-aside vs Write-through
+```
+Choice: Cache-aside pattern
+
+Benefits:
+- simple implementation
+- flexible caching
+
+Tradeoff:
+- first request slightly slower (cache miss)
+
+Decision:
+Cache-aside chosen for simplicity and flexibility.
+```
+---
+
+### MongoDB vs SQL
+```
+Choice: MongoDB
+
+Benefits:
+- flexible schema
+- easier iteration
+- fast reads
+
+Tradeoff:
+- weaker relational guarantees
+
+Decision:
+MongoDB suitable for flexible mock configuration storage.
+```
+---
+
+### HTTP + gRPC Support
+```
+Choice: support both protocols
+
+Benefits:
+- flexibility
+- supports modern backend architectures
+
+Tradeoff:
+- increased code complexity
+
+Decision:
+gRPC added to support high-performance internal communication.
 ```
 
-# Pros and cons
+## Performance benchmark
 
-## Pros
-- FE no need modify code when call API. Only need to modify on BE
-- Dynamic scenarios
+```
+hey -n 10000 -c 100 http://localhost:8082/mock/test
 
-## Cons
-- Need define correct API contract at the first time
-- Need define all usecase
+Summary:
+  Total:        0.2252 secs
+  Slowest:      0.0188 secs
+  Fastest:      0.0001 secs
+  Average:      0.0022 secs
+  Requests/sec: 44398.8287
+  
+  Total data:   240000 bytes
+  Size/request: 24 bytes
 
-# Multiple active feature at the same time
+Response time histogram:
+  0.000 [1]     |
+  0.002 [6532]  |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  0.004 [2220]  |■■■■■■■■■■■■■■
+  0.006 [674]   |■■■■
+  0.008 [231]   |■
+  0.009 [112]   |■
+  0.011 [70]    |
+  0.013 [34]    |
+  0.015 [27]    |
+  0.017 [68]    |
+  0.019 [31]    |
+
+
+Latency distribution:
+  10%% in 0.0005 secs
+  25%% in 0.0009 secs
+  50%% in 0.0014 secs
+  75%% in 0.0026 secs
+  90%% in 0.0043 secs
+  95%% in 0.0062 secs
+  99%% in 0.0150 secs
+```
+
+# Features
+
+## 1. Multiple active feature at the same time
 
 The feature_name is control by `api-service`. Which support multiple services work at the same time.
 ```go
@@ -132,7 +304,7 @@ forwardReq.Header.Set("X-Account-Id", accountId)
 
 ![doc/1.png](doc/1.png)
 
-# Only 1 active scenario for each feature for each accountId
+## 2. Only 1 active scenario for each feature for each accountId
 
 - If I add new scenario of a feature, that new scenario will active and deactive others.
 - If I active a existed scenario of a feature. others scenarios will deactive
@@ -154,7 +326,7 @@ Cache in Redis with template: `mocktool:<feature>:<scenario>:<account_id>:<path>
 
 => Multiple platform can develop parrallelly. 1 account for IOS with scenario1, 1 account for ANDROID with scenario2, 1 account for QC to write automation testing.
 
-# Multiple APIs for each scenario 
+## 3. Multiple APIs for each scenario 
 
 An API path with different request body will have different response by hashing requestBody
 
@@ -166,7 +338,7 @@ An API path with different request body will have different response by hashing 
 DB 
 ![doc/8.png](doc/8.png)
 
-## result
+### result
 
 ![doc/9.png](doc/9.png)
 ![doc/10.png](doc/10.png)
@@ -177,6 +349,19 @@ response with headers
 ![doc/12.png](doc/12.png)
 ![doc/13.png](doc/13.png)
 
+## 4. Load test feature (Bonus)
+
+![doc/17.png](doc/17.png)
+
+You can run test scenario
+
+![doc/18.png](doc/18.png)
+
+example at `/doc/mocktool.loadtest_scenarios.json`
+
+result
+
+![doc/19.png](doc/19.png)
 
 # How to start
 
@@ -233,16 +418,3 @@ return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s"
 }
 ```
 
-# Load test feature
-
-![doc/17.png](doc/17.png)
-
-You can run test scenario
-
-![doc/18.png](doc/18.png)
-
-example at `/doc/mocktool.loadtest_scenarios.json`
-
-result
-
-![doc/19.png](doc/19.png)

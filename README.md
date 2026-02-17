@@ -52,15 +52,16 @@ flowchart LR
             API2[HTTP/gRPC API Server: 8082]
             API3[HTTP/gRPC API Server: 8082]
         end
+        Metrics[Prometheus Metrics]
         Cache[(Redis Cache)]
         DB[(MongoDB)]
-        Metrics[Prometheus Metrics]
     end
     
     Admin --> API1
     API1 --> DB
     DB --> API1
     API1 --> Admin
+    API1 --> Cache
 
     Client --> Service
     Service --forward--> cluster 
@@ -73,6 +74,14 @@ flowchart LR
     DB --> cluster
     cluster --> Metrics
 ```
+
+<summary>
+<details>
+
+![architecture](doc/architecture.png)
+
+</details>
+</summary>
 
 ## Architecture Explanation
 

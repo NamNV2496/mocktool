@@ -39,7 +39,6 @@ func NewFowardController(
 	forwardUc usecase.IForwardUC,
 	flags entity.ServiceFlags,
 ) IForwardController {
-
 	return &ForwardController{
 		config:    config,
 		forwardUc: forwardUc,
@@ -54,6 +53,16 @@ func (_self *ForwardController) StartMockServer() error {
 	c.Use(middleware.CORS()) // enable CORS for web interface
 	// c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
 	// c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+
+	// load shedding by concurrency
+	loadShedding := custommiddleware.NewLoadShedding(
+		conf.LoadSheddingCfg.MaxConcurrency,
+		conf.LoadSheddingCfg.WarningLatency,
+		conf.LoadSheddingCfg.MaxLatency,
+	)
+	// health.StartCPUMonitor(90.0)
+	c.Use(loadShedding.IsOverload())
+
 	// rate limit
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: conf.RateLimiterCfg.Host,

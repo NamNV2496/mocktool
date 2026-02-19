@@ -13,6 +13,8 @@ Mocktool is a simple tool written in the Go language. It supports controlling AP
 - grpc: "google.golang.org/grpc"
 - validator: "github.com/go-playground/validator/v10"
 - Unittest: "go.uber.org/mock/gomock" - coverage: 87.5% of statements
+- ratelimit
+- load shedding
 ```
 
 ## Problem Statement
@@ -259,7 +261,7 @@ gRPC added to support high-performance internal communication.
 
 ### Rate limit: Slide window vs Leaky Bucket
 ```
-Choice: support both protocols
+Choice: Slide window
 
 Benefits:
 - simpler implementation
@@ -267,6 +269,23 @@ Benefits:
 - sufficient accuracy for API limiting
 
 Sliding window chosen for better fairness.
+```
+
+### Load Shedding Strategy
+
+```
+1️⃣ Concurrency-based load shedding
+2️⃣ Latency-based adaptive shedding
+
+When concurrent requests exceed a configured threshold or latency > threadhold the system immediately returns HTTP 503.
+When the latency > warning threadhold the system delay response
+
+
+Benefits:
+- protects Redis and MongoDB
+- prevents cascading failures
+- maintains low latency under load
+- improves system resilience
 ```
 
 </details>

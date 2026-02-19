@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/namnv2496/mocktool/internal/configs"
+	"github.com/namnv2496/mocktool/internal/repository/health"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -51,6 +52,8 @@ func NewMongoConnect(conf *configs.Config) (*mongo.Client, *mongo.Database, erro
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
 		return nil, nil, err
 	}
+
+	health.StartMongoMonitor(client, time.Second)
 
 	db := client.Database(conf.MongoDB.Database)
 	return client, db, nil

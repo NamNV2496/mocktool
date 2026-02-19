@@ -54,6 +54,24 @@ var (
 		},
 		[]string{"method", "endpoint", "error_type"},
 	)
+	LoadSheddingCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "mocktool_load_shedding_total",
+			Help: "Total number of requests rejected due to load shedding",
+		},
+	)
+	LoadSheddingLatencyCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "mocktool_load_shedding_latency_total",
+			Help: "Total number of requests rejected due to high latency",
+		},
+	)
+	LoadSheddingDelayLatencyCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "mocktool_load_shedding_delay_latency_total",
+			Help: "Total number of requests delayed due to high latency",
+		},
+	)
 )
 
 // Cache metrics

@@ -27,16 +27,23 @@ type RedisConf struct {
 type RateLimiterCfg struct {
 	Host        string        `env:"RATELIMITER_HOST" envDefault:"localhost:6379"`
 	DB          int           `env:"RATELIMITER_DB" envDefault:"7"`
-	Limit       int           `env:"RATELIMITER_LIMIT" envDefault:"300"`
+	Limit       int           `env:"RATELIMITER_LIMIT" envDefault:"500"`
 	LimitOption string        `env:"RATELIMITER_LIMIT_OPTION" envDefault:"account_id"`
 	Window      time.Duration `env:"RATELIMITER_WINDOW" envDefault:"60s"`
 }
 
+type LoadSheddingCfg struct {
+	MaxConcurrency int64 `env:"LOAD_SHEDDING_MAX_CONCURRENCY" envDefault:"500"`
+	WarningLatency int64 `env:"LOAD_SHEDDING_WARNING_LATENCY" envDefault:"1000"` // 1 second
+	MaxLatency     int64 `env:"LOAD_SHEDDING_MAX_LATENCY" envDefault:"2000"`     // 2 seconds
+}
+
 type Config struct {
-	AppConfig      AppConfig
-	MongoDB        MongoDB
-	RedisConf      RedisConf
-	RateLimiterCfg RateLimiterCfg
+	AppConfig       AppConfig
+	MongoDB         MongoDB
+	RedisConf       RedisConf
+	RateLimiterCfg  RateLimiterCfg
+	LoadSheddingCfg LoadSheddingCfg
 }
 
 func LoadConfig() *Config {

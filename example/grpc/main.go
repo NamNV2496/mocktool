@@ -74,7 +74,7 @@ func (_self *TestController) TestAPI(ctx context.Context, req *testgrpc.TestRequ
 	// =================================================WAY 1===================================================
 	return callHttp(ctx, req)
 	// =================================================WAY 2===================================================
-	return callGrpc(ctx, req)
+	// return callGrpc(ctx, req)
 }
 
 func callHttp(ctx context.Context, req *testgrpc.TestRequest) (*testgrpc.TestResponse, error) {

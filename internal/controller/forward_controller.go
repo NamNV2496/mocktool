@@ -16,9 +16,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/namnv2496/mocktool/internal/configs"
+	custommiddleware "github.com/namnv2496/mocktool/internal/controller/middleware"
 	"github.com/namnv2496/mocktool/internal/entity"
+	"github.com/namnv2496/mocktool/internal/repository/ratelimiter"
 	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
+	"github.com/redis/go-redis/v9"
 )
 
 type IForwardController interface {
@@ -45,11 +48,24 @@ func NewFowardController(
 }
 
 func (_self *ForwardController) StartMockServer() error {
+	conf := configs.LoadConfig()
 	c := echo.New()
 	// Middleware
-	c.Use(middleware.CORS())          // enable CORS for web interface
-	c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
-	c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+	c.Use(middleware.CORS()) // enable CORS for web interface
+	// c.Use(middleware.RequestLogger()) // use the default RequestLogger middleware with slog logger
+	// c.Use(middleware.Recover())       // recover panics as errors for proper error handling
+	// rate limit
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: conf.RateLimiterCfg.Host,
+		DB:   conf.RateLimiterCfg.DB,
+	})
+
+	limiter := ratelimiter.NewLimiter(
+		redisClient,
+		conf.RateLimiterCfg.Limit,
+		conf.RateLimiterCfg.Window,
+	)
+	c.Use(custommiddleware.RateLimitMiddleware(limiter, conf.RateLimiterCfg.LimitOption))
 
 	c.GET("/forward/*", _self.responseMockData)
 	c.POST("/forward/*", _self.responseMockData)

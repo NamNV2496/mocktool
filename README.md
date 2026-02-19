@@ -210,7 +210,7 @@ Redis chosen to improve performance and scalability.
 
 ### Cache-aside vs Write-through
 ```
-Choice: Cache-aside pattern
+Choice: Cache-aside combine Write-through pattern
 
 Benefits:
 - simple implementation
@@ -221,6 +221,7 @@ Tradeoff:
 
 Decision:
 Cache-aside chosen for simplicity and flexibility.
+Write-through chosen for invalide cache when have any updating
 ```
 ---
 
@@ -255,6 +256,19 @@ Tradeoff:
 Decision:
 gRPC added to support high-performance internal communication.
 ```
+
+### Rate limit: Slide window vs Leaky Bucket
+```
+Choice: support both protocols
+
+Benefits:
+- simpler implementation
+- good fairness
+- sufficient accuracy for API limiting
+
+Sliding window chosen for better fairness.
+```
+
 </details>
 </summary>
 

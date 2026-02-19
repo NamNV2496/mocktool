@@ -9,6 +9,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/controller"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/internal/repository/ratelimiter"
 	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -60,6 +61,8 @@ func InvokeServer(invokers ...any) *fx.App {
 			fx.Annotate(controller.NewLoadTestController, fx.As(new(controller.ILoadTestController))),
 			fx.Annotate(repository.NewLoadTestScenarioRepository, fx.As(new(repository.ILoadTestScenarioRepository))),
 			fx.Annotate(repository.NewCache, fx.As(new(repository.ICache))),
+
+			fx.Annotate(ratelimiter.NewLimiter, fx.As(new(ratelimiter.ILimiter))),
 
 			repository.NewMongoConnect,
 		),

@@ -1,6 +1,8 @@
 package configs
 
 import (
+	"time"
+
 	"github.com/caarlos0/env/v6"
 )
 
@@ -21,10 +23,20 @@ type RedisConf struct {
 	Password string `env:"REDIS_PASSWORD" envDefault:""`
 	Database int64  `env:"REDIS_DATABASE" envDefault:"0"`
 }
+
+type RateLimiterCfg struct {
+	Host        string        `env:"RATELIMITER_HOST" envDefault:"localhost:6379"`
+	DB          int           `env:"RATELIMITER_DB" envDefault:"7"`
+	Limit       int           `env:"RATELIMITER_LIMIT" envDefault:"300"`
+	LimitOption string        `env:"RATELIMITER_LIMIT_OPTION" envDefault:"account_id"`
+	Window      time.Duration `env:"RATELIMITER_WINDOW" envDefault:"60s"`
+}
+
 type Config struct {
-	AppConfig AppConfig
-	MongoDB   MongoDB
-	RedisConf RedisConf
+	AppConfig      AppConfig
+	MongoDB        MongoDB
+	RedisConf      RedisConf
+	RateLimiterCfg RateLimiterCfg
 }
 
 func LoadConfig() *Config {

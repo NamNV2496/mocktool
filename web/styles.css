@@ -26,6 +26,39 @@ header {
     color: white;
     padding: 40px;
     text-align: center;
+    position: relative;
+}
+
+.lang-switcher {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    display: flex;
+    gap: 4px;
+}
+
+.lang-btn {
+    padding: 5px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+}
+
+.lang-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.lang-btn.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    border-color: transparent;
 }
 
 header h1 {

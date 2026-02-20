@@ -130,7 +130,7 @@ async function loadFeatures(page = 1, searchQuery = '') {
         renderPagination('features', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading features:', error);
-        showError('Failed to load features');
+        showError(t('feature.error.load'));
     }
 }
 
@@ -138,7 +138,7 @@ function renderFeaturesTable() {
     const tbody = document.getElementById('features-table-body');
 
     if (!features || features.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">No features found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">${t('feature.noResults')}</td></tr>`;
         return;
     }
 
@@ -147,12 +147,12 @@ function renderFeaturesTable() {
             <td class="text-truncate" title="${feature.name || 'N/A'}"><strong>${feature.name || 'N/A'}</strong></td>
             <td class="text-truncate" title="${feature.description || '-'}">${feature.description || '-'}</td>
             <td><span class="status-badge ${feature.is_active ? 'status-active' : 'status-inactive'}">
-                ${feature.is_active ? 'Active' : 'Inactive'}
+                ${feature.is_active ? t('common.active') : t('common.inactive')}
             </span></td>
             <td>${formatDate(feature.created_at)}</td>
             <td class="actions">
-                <button class="btn btn-edit" onclick='editFeature(${JSON.stringify(feature).replace(/'/g, "&#39;")})'>Edit</button>
-                <button class="btn btn-delete" onclick="deleteFeature('${feature.id}')">Delete</button>
+                <button class="btn btn-edit" onclick='editFeature(${JSON.stringify(feature).replace(/'/g, "&#39;")})'>${t('common.edit')}</button>
+                <button class="btn btn-delete" onclick="deleteFeature('${feature.id}')">${t('common.delete')}</button>
             </td>
         </tr>
     `).join('');
@@ -161,7 +161,7 @@ function renderFeaturesTable() {
 async function loadScenarios(featureName, page = 1) {
     if (!featureName) {
         document.getElementById('scenarios-table-body').innerHTML =
-            '<tr><td colspan="6" class="loading">Select a feature to view scenarios</td></tr>';
+            `<tr><td colspan="6" class="loading">${t('scenario.loading')}</td></tr>`;
         document.getElementById('scenarios-pagination').innerHTML = '';
         activeScenarioId = null;
         globalActiveScenarioId = null;
@@ -191,7 +191,7 @@ async function loadScenarios(featureName, page = 1) {
         renderPagination('scenarios', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading scenarios:', error);
-        showError('Failed to load scenarios');
+        showError(t('scenario.error.load'));
     }
 }
 
@@ -238,7 +238,7 @@ function renderScenariosTable() {
     const tbody = document.getElementById('scenarios-table-body');
 
     if (!scenarios || scenarios.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">No scenarios found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="loading">${t('scenario.noResults')}</td></tr>`;
         return;
     }
 
@@ -258,15 +258,15 @@ function renderScenariosTable() {
                 <td class="text-truncate" title="${scenario.feature_name || 'N/A'}">${scenario.feature_name || 'N/A'}</td>
                 <td class="text-truncate" title="${scenario.name || 'N/A'}">
                     <strong style="cursor: pointer; color: #3b82f6; text-decoration: underline;" onclick="navigateToMockAPIs('${scenario.feature_name}', '${scenario.name}')">${scenario.name || 'N/A'}</strong>
-                    ${isActive ? '<span class="status-badge status-active" style="margin-left: 8px;">ACTIVE</span>' : ''}
-                    ${isGlobalActive ? '<span class="status-badge" style="margin-left: 8px; background-color: #9f7aea; color: white;">ACTIVE GLOBAL</span>' : ''}
+                    ${isActive ? `<span class="status-badge status-active" style="margin-left: 8px;">${t('scenario.badge.active')}</span>` : ''}
+                    ${isGlobalActive ? `<span class="status-badge" style="margin-left: 8px; background-color: #9f7aea; color: white;">${t('scenario.badge.activeGlobal')}</span>` : ''}
                 </td>
                 <td class="text-truncate" title="${scenario.description || '-'}">${scenario.description || '-'}</td>
                 <td>${formatDate(scenario.created_at)}</td>
                 <td class="actions">
-                    <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'>Edit</button>
-                    <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">Delete</button>
-                    ${!isActive && !isGlobalActive ? (filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}', '${activeScenarioId}')">Activate for ACCOUNT_ID ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}', '${globalActiveScenarioId}')">Activate Globally</button>`) : ''}
+                    <button class="btn btn-edit" onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'>${t('common.edit')}</button>
+                    <button class="btn btn-delete" onclick="deleteScenario('${scenario.id}')">${t('common.delete')}</button>
+                    ${!isActive && !isGlobalActive ? (filterAccountId ? `<button class="btn btn-primary" onclick="activateScenario('${scenario.id}', '${filterAccountId}', '${activeScenarioId}')">${t('scenario.btn.activateForAccount')} ${filterAccountId}</button>` : `<button class="btn btn-primary" onclick="activateScenarioGlobal('${scenario.id}', '${globalActiveScenarioId}')">${t('scenario.btn.activateGlobally')}</button>`) : ''}
                 </td>
             </tr>
         `;
@@ -276,7 +276,7 @@ function renderScenariosTable() {
 async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
     if (!scenarioName) {
         document.getElementById('mockapis-table-body').innerHTML =
-            '<tr><td colspan="8" class="loading">Select a scenario to view mock APIs</td></tr>';
+            `<tr><td colspan="8" class="loading">${t('mockapi.loading')}</td></tr>`;
         document.getElementById('mockapis-pagination').innerHTML = '';
         return;
     }
@@ -301,7 +301,7 @@ async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
         renderPagination('mockapis', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading mock APIs:', error);
-        showError('Failed to load mock APIs');
+        showError(t('mockapi.error.load'));
     }
 }
 
@@ -309,7 +309,7 @@ function renderMockAPIsTable() {
     const tbody = document.getElementById('mockapis-table-body');
 
     if (!mockAPIs || mockAPIs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">No mock APIs found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="9" class="loading">${t('mockapi.noResults')}</td></tr>`;
         return;
     }
 
@@ -322,13 +322,13 @@ function renderMockAPIsTable() {
             <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
             <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
             <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
-                ${api.is_active ? 'Active' : 'Inactive'}
+                ${api.is_active ? t('common.active') : t('common.inactive')}
             </span></td>
             <td>${formatDate(api.created_at)}</td>
             <td class="actions">
-                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>Edit</button>
-                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>Duplicate</button>
-                <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">Delete</button>
+                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>${t('common.edit')}</button>
+                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>${t('common.duplicate')}</button>
+                <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">${t('common.delete')}</button>
             </td>
         </tr>
     `).join('');
@@ -338,7 +338,7 @@ function renderScenariosTable() {
     const tbody = document.getElementById('scenarios-table-body');
 
     if (!scenarios || scenarios.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">No scenarios found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" class="loading">${t('scenario.noResults')}</td></tr>`;
         return;
     }
 
@@ -393,12 +393,12 @@ function renderScenariosTable() {
                     </strong>
 
                     ${isActive
-                        ? '<span class="status-badge status-active" style="margin-left:8px;">ACTIVE</span>'
+                        ? `<span class="status-badge status-active" style="margin-left:8px;">${t('scenario.badge.active')}</span>`
                         : ''
                     }
 
                     ${isGlobalActive
-                        ? '<span class="status-badge" style="margin-left:8px;background-color:#9f7aea;color:white;">ACTIVE GLOBAL</span>'
+                        ? `<span class="status-badge" style="margin-left:8px;background-color:#9f7aea;color:white;">${t('scenario.badge.activeGlobal')}</span>`
                         : ''
                     }
 
@@ -418,14 +418,14 @@ function renderScenariosTable() {
                         class="btn btn-edit"
                         onclick='editScenario(${JSON.stringify(scenario).replace(/'/g, "&#39;")})'
                     >
-                        Edit
+                        ${t('common.edit')}
                     </button>
 
                     <button
                         class="btn btn-delete"
                         onclick="deleteScenario('${scenario.id}')"
                     >
-                        Delete
+                        ${t('common.delete')}
                     </button>
 
                     ${
@@ -434,14 +434,14 @@ function renderScenariosTable() {
                                 class="btn btn-primary"
                                 onclick="activateScenario('${scenario.id}', '${filterAccountId}', '${activeScenarioId}')"
                            >
-                                ACTIVE FOR ACCOUNT_ID ${filterAccountId}
+                                ${t('scenario.btn.activateForAccount')} ${filterAccountId}
                            </button>`
                         : (!filterAccountId && !isGlobalActive
                             ? `<button
                                     class="btn btn-primary"
                                     onclick="activateScenarioGlobal('${scenario.id}', '${globalActiveScenarioId}')"
                                >
-                                    Activate Globally
+                                    ${t('scenario.btn.activateGlobally')}
                                </button>`
                             : ''
                         )
@@ -490,7 +490,7 @@ function renderPagination(entity, currentPage, totalPages) {
     let html = '<div class="pagination">';
 
     // Previous button
-    html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage - 1})">Prev</button>`;
+    html += `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage - 1})">${t('pagination.prev')}</button>`;
 
     // Page number range
     const range = 2;
@@ -512,7 +512,7 @@ function renderPagination(entity, currentPage, totalPages) {
     }
 
     // Next button
-    html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage + 1})">Next</button>`;
+    html += `<button class="page-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="loadPage('${entity}', ${currentPage + 1})">${t('pagination.next')}</button>`;
 
     html += '</div>';
     container.innerHTML = html;
@@ -590,7 +590,7 @@ async function populateMockAPIFilters() {
 
                 // Clear mock APIs
                 document.getElementById('mockapis-table-body').innerHTML =
-                    '<tr><td colspan="8" class="loading">Select a scenario to view mock APIs</td></tr>';
+                    `<tr><td colspan="8" class="loading">${t('mockapi.loading')}</td></tr>`;
             }
         });
     }
@@ -629,12 +629,12 @@ function searchMockAPIs() {
     const query = searchInput.value.trim();
 
     if (!scenarioName) {
-        showError('Please select a scenario first');
+        showError(t('search.error.noScenario'));
         return;
     }
 
     if (!query) {
-        showError('Please enter a search term');
+        showError(t('search.error.noTerm'));
         return;
     }
 
@@ -662,7 +662,7 @@ function searchLoadTestScenarios() {
     const query = searchInput.value.trim();
 
     if (!query) {
-        showError('Please enter a search term');
+        showError(t('search.error.noTerm'));
         return;
     }
 
@@ -686,7 +686,7 @@ function searchFeatures() {
     const query = searchInput.value.trim();
 
     if (!query) {
-        showError('Please enter a search term');
+        showError(t('search.error.noTerm'));
         return;
     }
 
@@ -705,7 +705,7 @@ function clearFeatureSearch() {
 }
 
 function showCreateFeatureModal() {
-    document.getElementById('feature-modal-title').textContent = 'Create Feature';
+    document.getElementById('feature-modal-title').textContent = t('feature.modal.create');
     document.getElementById('feature-id').value = '';
     document.getElementById('feature-name').value = '';
     document.getElementById('feature-description').value = '';
@@ -714,7 +714,7 @@ function showCreateFeatureModal() {
 }
 
 function editFeature(feature) {
-    document.getElementById('feature-modal-title').textContent = 'Edit Feature';
+    document.getElementById('feature-modal-title').textContent = t('feature.modal.edit');
     document.getElementById('feature-id').value = feature.id;
     document.getElementById('feature-name').value = feature.name;
     document.getElementById('feature-description').value = feature.description || '';
@@ -732,17 +732,17 @@ async function saveFeature() {
     clearFieldError('feature-name');
 
     if (!name) {
-        showFieldError('feature-name', 'Feature name is required');
+        showFieldError('feature-name', t('feature.error.nameRequired'));
         return;
     }
 
     if (name.includes(' ')) {
-        showFieldError('feature-name', 'Feature name cannot contain spaces');
+        showFieldError('feature-name', t('feature.error.nameHasSpaces'));
         return;
     }
 
     if (name.length > 100) {
-        showFieldError('feature-name', 'Feature name is too long (max 100 characters)');
+        showFieldError('feature-name', t('feature.error.nameTooLong'));
         return;
     }
 
@@ -766,16 +766,16 @@ async function saveFeature() {
         if (!response.ok) throw new Error('Failed to save feature');
 
         closeModal('feature-modal');
-        showSuccess(id ? 'Feature updated successfully' : 'Feature created successfully');
+        showSuccess(id ? t('feature.success.updated') : t('feature.success.created'));
         loadFeatures();
     } catch (error) {
         console.error('Error saving feature:', error);
-        showError('Failed to save feature');
+        showError(t('feature.error.save'));
     }
 }
 
 async function showCreateScenarioModal() {
-    document.getElementById('scenario-modal-title').textContent = 'Create Scenario';
+    document.getElementById('scenario-modal-title').textContent = t('scenario.modal.create');
     document.getElementById('scenario-id').value = '';
     document.getElementById('scenario-name').value = '';
     document.getElementById('scenario-description').value = '';
@@ -799,7 +799,7 @@ async function showCreateScenarioModal() {
 }
 
 async function editScenario(scenario) {
-    document.getElementById('scenario-modal-title').textContent = 'Edit Scenario';
+    document.getElementById('scenario-modal-title').textContent = t('scenario.modal.edit');
     document.getElementById('scenario-id').value = scenario.id;
     document.getElementById('scenario-name').value = scenario.name;
     document.getElementById('scenario-description').value = scenario.description || '';
@@ -835,22 +835,22 @@ async function saveScenario() {
     clearFieldError('scenario-name');
 
     if (!featureName) {
-        showFieldError('scenario-feature', 'Feature is required');
+        showFieldError('scenario-feature', t('scenario.error.featureRequired'));
         return;
     }
 
     if (!name) {
-        showFieldError('scenario-name', 'Scenario name is required');
+        showFieldError('scenario-name', t('scenario.error.nameRequired'));
         return;
     }
 
     if (name.includes(' ')) {
-        showFieldError('scenario-name', 'Scenario name cannot contain spaces');
+        showFieldError('scenario-name', t('scenario.error.nameHasSpaces'));
         return;
     }
 
     if (name.length > 100) {
-        showFieldError('scenario-name', 'Scenario name is too long (max 100 characters)');
+        showFieldError('scenario-name', t('scenario.error.nameTooLong'));
         return;
     }
     const data = {
@@ -873,7 +873,7 @@ async function saveScenario() {
         if (!response.ok) throw new Error('Failed to save scenario');
 
         closeModal('scenario-modal');
-        showSuccess(id ? 'Scenario updated successfully' : 'Scenario created successfully');
+        showSuccess(id ? t('scenario.success.updated') : t('scenario.success.created'));
 
         const featureInput = document.getElementById('scenario-feature-filter');
         const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
@@ -882,7 +882,7 @@ async function saveScenario() {
         }
     } catch (error) {
         console.error('Error saving scenario:', error);
-        showError('Failed to save scenario');
+        showError(t('scenario.error.save'));
     }
 }
 
@@ -900,7 +900,7 @@ async function activateScenario(scenarioId, accountId, prevScenarioId) {
 
         if (!response.ok) throw new Error('Failed to activate scenario');
 
-        showSuccess(`Scenario activated for account ${accountId}`);
+        showSuccess(t('scenario.success.activated', accountId));
 
         // Update active scenario ID and reload
         activeScenarioId = scenarioId;
@@ -911,7 +911,7 @@ async function activateScenario(scenarioId, accountId, prevScenarioId) {
         }
     } catch (error) {
         console.error('Error activating scenario:', error);
-        showError('Failed to activate scenario');
+        showError(t('scenario.error.activate'));
     }
 }
 
@@ -929,7 +929,7 @@ async function activateScenarioGlobal(scenarioId, prevScenarioId) {
 
         if (!response.ok) throw new Error('Failed to activate scenario');
 
-        showSuccess('Scenario activated globally');
+        showSuccess(t('scenario.success.activatedGlobal'));
 
         // Clear active scenario ID since this is a global activation
         activeScenarioId = null;
@@ -940,12 +940,12 @@ async function activateScenarioGlobal(scenarioId, prevScenarioId) {
         }
     } catch (error) {
         console.error('Error activating scenario:', error);
-        showError('Failed to activate scenario');
+        showError(t('scenario.error.activate'));
     }
 }
 
 async function showCreateMockAPIModal() {
-    document.getElementById('mockapi-modal-title').textContent = 'Create Mock API';
+    document.getElementById('mockapi-modal-title').textContent = t('mockapi.modal.create');
     document.getElementById('mockapi-id').value = '';
     document.getElementById('mockapi-name').value = '';
     document.getElementById('mockapi-description').value = '';
@@ -997,7 +997,7 @@ async function showCreateMockAPIModal() {
 }
 
 async function editMockAPI(api) {
-    document.getElementById('mockapi-modal-title').textContent = 'Edit Mock API';
+    document.getElementById('mockapi-modal-title').textContent = t('mockapi.modal.edit');
     document.getElementById('mockapi-id').value = api.id;
     document.getElementById('mockapi-name').value = api.name;
     document.getElementById('mockapi-description').value = api.description || '';
@@ -1084,7 +1084,7 @@ async function editMockAPI(api) {
 }
 
 async function duplicateMockAPI(api) {
-    document.getElementById('mockapi-modal-title').textContent = 'Duplicate Mock API';
+    document.getElementById('mockapi-modal-title').textContent = t('mockapi.modal.duplicate');
 
     // Clear ID so it creates a new record
     document.getElementById('mockapi-id').value = '';
@@ -1211,37 +1211,37 @@ async function saveMockAPI() {
     clearFieldError('mockapi-output');
 
     if (!featureName) {
-        showFieldError('mockapi-feature', 'Feature is required');
+        showFieldError('mockapi-feature', t('mockapi.error.featureRequired'));
         return;
     }
 
     if (!scenarioName) {
-        showFieldError('mockapi-scenario', 'Scenario is required');
+        showFieldError('mockapi-scenario', t('mockapi.error.scenarioRequired'));
         return;
     }
 
     if (!name) {
-        showFieldError('mockapi-name', 'Mock API name is required');
+        showFieldError('mockapi-name', t('mockapi.error.nameRequired'));
         return;
     }
 
     if (name.includes(' ')) {
-        showFieldError('mockapi-name', 'Mock API name cannot contain spaces');
+        showFieldError('mockapi-name', t('mockapi.error.nameHasSpaces'));
         return;
     }
 
     if (name.length > 100) {
-        showFieldError('mockapi-name', 'Mock API name is too long (max 100 characters)');
+        showFieldError('mockapi-name', t('mockapi.error.nameTooLong'));
         return;
     }
 
     if (!path) {
-        showFieldError('mockapi-path', 'Path is required');
+        showFieldError('mockapi-path', t('mockapi.error.pathRequired'));
         return;
     }
 
     if (!method || !outputStr) {
-        showError('Method and output are required');
+        showError(t('mockapi.error.methodOutputRequired'));
         return;
     }
 
@@ -1250,7 +1250,7 @@ async function saveMockAPI() {
     try {
         output = JSON.parse(outputStr);
     } catch (e) {
-        showError('Invalid JSON in output field');
+        showError(t('mockapi.error.invalidOutput'));
         return;
     }
 
@@ -1260,7 +1260,7 @@ async function saveMockAPI() {
         try {
             input = JSON.parse(hashInputStr);
         } catch (e) {
-            showError('Invalid JSON in input field');
+            showError(t('mockapi.error.invalidInput'));
             return;
         }
     }
@@ -1292,7 +1292,7 @@ async function saveMockAPI() {
         if (!response.ok) throw new Error('Failed to save mock API');
 
         closeModal('mockapi-modal');
-        showSuccess(id ? 'Mock API updated successfully' : 'Mock API created successfully');
+        showSuccess(id ? t('mockapi.success.updated') : t('mockapi.success.created'));
 
         const scenarioInput = document.getElementById('mockapi-scenario-filter');
         const currentScenario = scenarioInput.dataset.selectedValue || scenarioInput.value;
@@ -1301,7 +1301,7 @@ async function saveMockAPI() {
         }
     } catch (error) {
         console.error('Error saving mock API:', error);
-        showError('Failed to save mock API');
+        showError(t('mockapi.error.save'));
     }
 }
 
@@ -1320,11 +1320,11 @@ function formatDate(dateString) {
 }
 
 function showError(message) {
-    alert('Error: ' + message);
+    alert(message);
 }
 
 function showSuccess(message) {
-    alert('Success: ' + message);
+    alert(message);
 }
 
 function showFieldError(fieldId, message) {
@@ -1396,7 +1396,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function deleteFeature(id) {
-    if (!confirm('Are you sure you want to delete this feature?')) return;
+    if (!confirm(t('feature.confirm.delete'))) return;
 
     try {
         const response = await fetch(`${API_BASE_URL}/features/${id}`, {
@@ -1405,16 +1405,16 @@ async function deleteFeature(id) {
 
         if (!response.ok) throw new Error('Failed to delete feature');
 
-        showSuccess('Feature deleted successfully');
+        showSuccess(t('feature.success.deleted'));
         loadFeatures();
     } catch (error) {
         console.error('Error deleting feature:', error);
-        showError('Failed to delete feature');
+        showError(t('feature.error.delete'));
     }
 }
 
 async function deleteScenario(id) {
-    if (!confirm('Are you sure you want to delete this scenario?')) return;
+    if (!confirm(t('scenario.confirm.delete'))) return;
 
     try {
         const response = await fetch(`${API_BASE_URL}/scenarios/${id}`, {
@@ -1423,7 +1423,7 @@ async function deleteScenario(id) {
 
         if (!response.ok) throw new Error('Failed to delete scenario');
 
-        showSuccess('Scenario deleted successfully');
+        showSuccess(t('scenario.success.deleted'));
         const featureInput = document.getElementById('scenario-feature-filter');
         const currentFeature = featureInput.dataset.selectedValue || featureInput.value;
         if (currentFeature) {
@@ -1431,12 +1431,12 @@ async function deleteScenario(id) {
         }
     } catch (error) {
         console.error('Error deleting scenario:', error);
-        showError('Failed to delete scenario');
+        showError(t('scenario.error.delete'));
     }
 }
 
 async function deleteMockAPI(id) {
-    if (!confirm('Are you sure you want to delete this mock API?')) return;
+    if (!confirm(t('mockapi.confirm.delete'))) return;
 
     try {
         const response = await fetch(`${API_BASE_URL}/mockapis/${id}`, {
@@ -1445,7 +1445,7 @@ async function deleteMockAPI(id) {
 
         if (!response.ok) throw new Error('Failed to delete mock API');
 
-        showSuccess('Mock API deleted successfully');
+        showSuccess(t('mockapi.success.deleted'));
         const scenarioInput = document.getElementById('mockapi-scenario-filter');
         const currentScenario = scenarioInput.dataset.selectedValue || scenarioInput.value;
         if (currentScenario) {
@@ -1453,7 +1453,7 @@ async function deleteMockAPI(id) {
         }
     } catch (error) {
         console.error('Error deleting mock API:', error);
-        showError('Failed to delete mock API');
+        showError(t('mockapi.error.delete'));
     }
 }
 
@@ -1484,7 +1484,7 @@ function showProtoParserModal() {
 function parseProtoInput() {
     const text = document.getElementById('proto-text-input').value.trim();
     if (!text) {
-        showError('Please enter or upload a .proto file');
+        showError(t('proto.error.empty'));
         return;
     }
 
@@ -1651,7 +1651,7 @@ function renderProtoResults() {
     const names = Object.keys(parsedMessages);
 
     if (names.length === 0) {
-        container.innerHTML = '<p style="color: #718096; font-style: italic;">No messages found in the .proto file.</p>';
+        container.innerHTML = `<p style="color: #718096; font-style: italic;">${t('proto.noMessages')}</p>`;
         container.style.display = 'block';
         return;
     }
@@ -1668,14 +1668,14 @@ function renderProtoResults() {
                 <div class="proto-result-name">${escapeHtml(item.name)}</div>
                 <pre class="proto-result-json">${escapeHtml(item.json)}</pre>
                 <div class="proto-result-actions">
-                    <button class="btn btn-proto-input btn-proto-select" onclick="selectProtoTemplate(${index}, 'input')">Use as Input</button>
-                    <button class="btn btn-proto-output btn-proto-select" onclick="selectProtoTemplate(${index}, 'output')">Use as Output</button>
+                    <button class="btn btn-proto-input btn-proto-select" onclick="selectProtoTemplate(${index}, 'input')">${t('proto.btn.useAsInput')}</button>
+                    <button class="btn btn-proto-output btn-proto-select" onclick="selectProtoTemplate(${index}, 'output')">${t('proto.btn.useAsOutput')}</button>
                 </div>
             </div>`;
     });
     html += '</div>';
     html += '<div class="proto-apply-row">';
-    html += '<button class="btn btn-primary" id="proto-apply-btn" style="display: none;" onclick="applyProtoTemplates()">Create Mock API</button>';
+    html += `<button class="btn btn-primary" id="proto-apply-btn" style="display: none;" onclick="applyProtoTemplates()">${t('proto.btn.createMockAPI')}</button>`;
     html += '</div>';
 
     container.innerHTML = html;
@@ -2090,7 +2090,7 @@ function formatJson(fieldId) {
     const rawValue = textarea.value.trim();
 
     if (!rawValue) {
-        showError('No JSON to format');
+        showError(t('json.format.error.empty'));
         return;
     }
 
@@ -2107,21 +2107,21 @@ function formatJson(fieldId) {
         // Update the textarea
         textarea.value = formatted;
 
-        showSuccess('JSON formatted and sorted successfully!');
+        showSuccess(t('json.format.success'));
     } catch (e) {
         // Provide more helpful error message
-        let errorMsg = 'Invalid JSON';
+        let errorMsg = t('json.format.error.invalid');
         if (e.message) {
             errorMsg += ':\n' + e.message;
         }
 
         // Try to identify common issues
         if (rawValue.includes('}{')) {
-            errorMsg += '\n\nTip: You may have extra braces. Check for duplicate { or } characters.';
+            errorMsg += t('json.format.error.tip.braces');
         } else if (rawValue.match(/,\s*[}\]]/)) {
-            errorMsg += '\n\nTip: Remove trailing commas before } or ].';
+            errorMsg += t('json.format.error.tip.trailing');
         } else if (!rawValue.startsWith('{') && !rawValue.startsWith('[')) {
-            errorMsg += '\n\nTip: JSON must start with { or [.';
+            errorMsg += t('json.format.error.tip.start');
         }
 
         showError(errorMsg);
@@ -2253,7 +2253,7 @@ async function searchOptions(inputId, query, options) {
         renderDropdownOptions(inputId, items, options);
     } catch (error) {
         console.error('Error searching:', error);
-        dropdown.innerHTML = '<div class="searchable-select-option disabled">Error searching...</div>';
+        dropdown.innerHTML = `<div class="searchable-select-option disabled">${t('dropdown.error')}</div>`;
     }
 }
 
@@ -2262,7 +2262,7 @@ function renderDropdownOptions(inputId, items, options) {
     const dropdown = document.getElementById(inputId + '-dropdown');
 
     if (!items || items.length === 0) {
-        dropdown.innerHTML = '<div class="searchable-select-option disabled">No results found</div>';
+        dropdown.innerHTML = `<div class="searchable-select-option disabled">${t('dropdown.noResults')}</div>`;
         return;
     }
 
@@ -2322,7 +2322,7 @@ async function loadLoadTestScenarios(page = 1, searchQuery = '') {
         renderPagination('loadtest', result.page, result.total_pages);
     } catch (error) {
         console.error('Error loading load test scenarios:', error);
-        showError('Failed to load load test scenarios');
+        showError(t('loadtest.error.load'));
     }
 }
 
@@ -2330,7 +2330,7 @@ async function renderLoadTestTable() {
     const tbody = document.getElementById('loadtest-table-body');
 
     if (!loadTestScenarios || loadTestScenarios.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">No load test scenarios found</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="7" class="loading">${t('loadtest.noResults')}</td></tr>`;
         return;
     }
 
@@ -2349,25 +2349,25 @@ async function renderLoadTestTable() {
         <tr>
             <td><strong>${scenario.name || 'N/A'}</strong></td>
             <td>${scenario.description || '-'}</td>
-            <td>${scenario.steps ? scenario.steps.length : 0} steps</td>
-            <td>${accountCounts[scenario.id] || 0} accounts</td>
+            <td>${t('loadtest.table.stepsCount', scenario.steps ? scenario.steps.length : 0)}</td>
+            <td>${t('loadtest.table.accountsCount', accountCounts[scenario.id] || 0)}</td>
             <td><span class="status-badge ${scenario.is_active ? 'status-active' : 'status-inactive'}">
-                ${scenario.is_active ? 'Active' : 'Inactive'}
+                ${scenario.is_active ? t('common.active') : t('common.inactive')}
             </span></td>
             <td>${formatDate(scenario.created_at)}</td>
             <td class="actions">
-                <button class="btn btn-primary" onclick='runLoadTestScenario("${scenario.id}")' style="background: #10b981;">▶ Run</button>
-                <button class="btn btn-edit" onclick='editLoadTestScenario("${scenario.id}")'>Edit</button>
-                <button class="btn btn-duplicate" onclick='duplicateLoadTestScenario("${scenario.id}")'>Duplicate</button>
-                <button class="btn btn-outline" onclick='exportScenarioToJSON("${scenario.id}")'>📥 Export</button>
-                <button class="btn btn-delete" onclick="deleteLoadTestScenario('${scenario.id}')">Delete</button>
+                <button class="btn btn-primary" onclick='runLoadTestScenario("${scenario.id}")' style="background: #10b981;">${t('loadtest.btn.run')}</button>
+                <button class="btn btn-edit" onclick='editLoadTestScenario("${scenario.id}")'>${t('common.edit')}</button>
+                <button class="btn btn-duplicate" onclick='duplicateLoadTestScenario("${scenario.id}")'>${t('common.duplicate')}</button>
+                <button class="btn btn-outline" onclick='exportScenarioToJSON("${scenario.id}")'>${t('loadtest.btn.export')}</button>
+                <button class="btn btn-delete" onclick="deleteLoadTestScenario('${scenario.id}')">${t('common.delete')}</button>
             </td>
         </tr>
     `).join('');
 }
 
 function showCreateLoadTestModal() {
-    document.getElementById('loadtest-modal-title').textContent = 'Create Load Test Scenario';
+    document.getElementById('loadtest-modal-title').textContent = t('loadtest.modal.create');
     document.getElementById('loadtest-id').value = '';
     document.getElementById('loadtest-name').value = '';
     document.getElementById('loadtest-description').value = '';
@@ -2395,6 +2395,9 @@ function addLoadTestStep() {
     // Update step number
     const stepNumber = container.children.length + 1;
     clone.querySelector('.step-number').textContent = stepNumber;
+
+    // Apply i18n translations to cloned template content
+    applyTranslations(clone);
 
     container.appendChild(clone);
 }
@@ -2430,6 +2433,7 @@ function addStepVariable(button) {
     const container = button.previousElementSibling;
     const template = document.getElementById('variable-row-template');
     const clone = template.content.cloneNode(true);
+    applyTranslations(clone);
     container.appendChild(clone);
 }
 
@@ -2445,6 +2449,7 @@ function populateVariablesInStep(stepDiv, variables) {
     for (const [varName, jsonPath] of Object.entries(variables)) {
         const template = document.getElementById('variable-row-template');
         const clone = template.content.cloneNode(true);
+        applyTranslations(clone);
 
         clone.querySelector('.var-name').value = varName || '';
         clone.querySelector('.var-jsonpath').value = jsonPath || '';
@@ -2583,7 +2588,7 @@ function populateStepsInForm(steps) {
 }
 
 async function runLoadTestScenario(id) {
-    if (!confirm('Are you sure you want to run this load test?')) return;
+    if (!confirm(t('loadtest.confirm.run'))) return;
 
     try {
         // showSuccess('Running load test... This may take a while.');
@@ -2604,24 +2609,24 @@ async function runLoadTestScenario(id) {
         // showSuccess('Load test completed successfully!');
     } catch (error) {
         console.error('Error running load test:', error);
-        showError('Failed to run load test: ' + error.message);
+        showError(t('loadtest.error.run') + ': ' + error.message);
     }
 }
 
 function displayLoadTestResults(result) {
     const summary = `
-Load Test Results
+${t('loadtest.results.title')}
 ================
-Scenario: ${result.ScenarioName || 'N/A'}
-Total Accounts: ${result.TotalAccounts || 0}
-Success: ${result.SuccessCount || 0}
-Failure: ${result.FailureCount || 0}
-Total Duration: ${result.TotalDuration || 0}ms
-Average Duration: ${result.AvgDuration || 0}ms
+${t('loadtest.results.scenario')}: ${result.ScenarioName || 'N/A'}
+${t('loadtest.results.totalAccounts')}: ${result.TotalAccounts || 0}
+${t('loadtest.results.success')}: ${result.SuccessCount || 0}
+${t('loadtest.results.failure')}: ${result.FailureCount || 0}
+${t('loadtest.results.totalDuration')}: ${result.TotalDuration || 0}ms
+${t('loadtest.results.avgDuration')}: ${result.AvgDuration || 0}ms
 
-${result.AccountResults && result.AccountResults.length > 0 ? 
-    'Account Results:\n' + result.AccountResults.map(acc => 
-        `- ${acc.Username}: ${acc.Success ? '✓ Success' : '✗ Failed'} (${acc.TotalTime}ms)${acc.FailedStep ? ' - Failed at: ' + acc.FailedStep : ''}`
+${result.AccountResults && result.AccountResults.length > 0 ?
+    t('loadtest.results.accountResults') + ':\n' + result.AccountResults.map(acc =>
+        `- ${acc.Username}: ${acc.Success ? t('loadtest.results.successMark') : t('loadtest.results.failMark')} (${acc.TotalTime}ms)${acc.FailedStep ? ' - ' + t('loadtest.results.failedAt') + ': ' + acc.FailedStep : ''}`
     ).join('\n') : ''}`;
 
     alert(summary);
@@ -2669,7 +2674,7 @@ ${stepsHtml}
         alert(details);
     } catch (error) {
         console.error('Error loading scenario:', error);
-        showError('Failed to load scenario details');
+        showError(t('loadtest.error.load'));
     }
 }
 
@@ -2680,7 +2685,7 @@ async function editLoadTestScenario(id) {
 
         const scenario = await response.json();
 
-        document.getElementById('loadtest-modal-title').textContent = 'Edit Load Test Scenario';
+        document.getElementById('loadtest-modal-title').textContent = t('loadtest.modal.edit');
         document.getElementById('loadtest-id').value = scenario.id;
         document.getElementById('loadtest-name').value = scenario.name || '';
         document.getElementById('loadtest-description').value = scenario.description || '';
@@ -2695,7 +2700,7 @@ async function editLoadTestScenario(id) {
         showModal('loadtest-modal');
     } catch (error) {
         console.error('Error loading scenario:', error);
-        showError('Failed to load scenario for editing');
+        showError(t('loadtest.error.load'));
     }
 }
 
@@ -2706,7 +2711,7 @@ async function duplicateLoadTestScenario(id) {
 
         const scenario = await response.json();
 
-        document.getElementById('loadtest-modal-title').textContent = 'Duplicate Load Test Scenario';
+        document.getElementById('loadtest-modal-title').textContent = t('loadtest.modal.duplicate');
 
         // Clear ID so it creates a new record
         document.getElementById('loadtest-id').value = '';
@@ -2738,7 +2743,7 @@ async function duplicateLoadTestScenario(id) {
         showModal('loadtest-modal');
     } catch (error) {
         console.error('Error loading scenario:', error);
-        showError('Failed to load scenario for duplicating');
+        showError(t('loadtest.error.load'));
     }
 }
 
@@ -2755,22 +2760,22 @@ async function saveLoadTestScenario() {
     clearFieldError('loadtest-name');
 
     if (!name) {
-        showFieldError('loadtest-name', 'Scenario name is required');
+        showFieldError('loadtest-name', t('loadtest.error.nameRequired'));
         return;
     }
 
     if (name.includes(' ')) {
-        showFieldError('loadtest-name', 'Load test scenario name cannot contain spaces');
+        showFieldError('loadtest-name', t('loadtest.error.nameHasSpaces'));
         return;
     }
 
     if (name.length > 100) {
-        showFieldError('loadtest-name', 'Load test scenario name is too long (max 100 characters)');
+        showFieldError('loadtest-name', t('loadtest.error.nameTooLong'));
         return;
     }
 
     if (steps.length === 0) {
-        showError('At least one step is required');
+        showError(t('loadtest.error.stepsRequired'));
         return;
     }
 
@@ -2796,16 +2801,16 @@ async function saveLoadTestScenario() {
         if (!response.ok) throw new Error('Failed to save load test scenario');
 
         closeModal('loadtest-modal');
-        showSuccess(id ? 'Load test scenario updated successfully' : 'Load test scenario created successfully');
+        showSuccess(id ? t('loadtest.success.updated') : t('loadtest.success.created'));
         loadLoadTestScenarios();
     } catch (error) {
         console.error('Error saving load test scenario:', error);
-        showError('Failed to save load test scenario');
+        showError(t('loadtest.error.save'));
     }
 }
 
 async function deleteLoadTestScenario(id) {
-    if (!confirm('Are you sure you want to delete this load test scenario?')) return;
+    if (!confirm(t('loadtest.confirm.delete'))) return;
 
     try {
         const response = await fetch(`${API_BASE_URL}/loadtest/scenarios/${id}`, {
@@ -2814,11 +2819,11 @@ async function deleteLoadTestScenario(id) {
 
         if (!response.ok) throw new Error('Failed to delete load test scenario');
 
-        showSuccess('Load test scenario deleted successfully');
+        showSuccess(t('loadtest.success.deleted'));
         loadLoadTestScenarios();
     } catch (error) {
         console.error('Error deleting load test scenario:', error);
-        showError('Failed to delete load test scenario');
+        showError(t('loadtest.error.delete'));
     }
 }
 
@@ -2951,10 +2956,10 @@ async function handleJSONImport(event) {
 
             // Validate required fields
             if (!scenario.name) {
-                throw new Error('Scenario name is required');
+                throw new Error(t('import.error.noName'));
             }
             if (!scenario.steps || scenario.steps.length === 0) {
-                throw new Error('At least one step is required');
+                throw new Error(t('import.error.noSteps'));
             }
 
             // Check if scenario with same name already exists
@@ -2963,14 +2968,10 @@ async function handleJSONImport(event) {
             );
 
             if (existingScenario) {
-                const confirmImport = confirm(
-                    `A scenario with the name "${scenario.name}" already exists.\n\n` +
-                    'Do you want to import anyway? This will create a duplicate.\n\n' +
-                    'Click OK to import as duplicate, or Cancel to abort.'
-                );
+                const confirmImport = confirm(t('import.duplicateName', scenario.name));
 
                 if (!confirmImport) {
-                    showError('Import cancelled - scenario name already exists');
+                    showError(t('import.cancelled'));
                     event.target.value = '';
                     return;
                 }
@@ -3002,14 +3003,14 @@ async function handleJSONImport(event) {
                 throw new Error(error.message || 'Failed to import scenario');
             }
 
-            showSuccess(`Scenario "${scenario.name}" imported successfully!`);
+            showSuccess(t('import.success', scenario.name));
             loadLoadTestScenarios();
 
             // Reset file input
             event.target.value = '';
         } catch (error) {
             console.error('Error importing JSON:', error);
-            showError('Failed to import JSON: ' + error.message);
+            showError(t('import.error') + ': ' + error.message);
             event.target.value = '';
         }
     };
@@ -3020,7 +3021,7 @@ async function exportScenarioToJSON(scenarioId) {
     try {
         const scenario = loadTestScenarios.find(s => s.id === scenarioId);
         if (!scenario) {
-            showError('Scenario not found');
+            showError(t('loadtest.noResults'));
             return;
         }
 
@@ -3049,9 +3050,9 @@ async function exportScenarioToJSON(scenarioId) {
         link.click();
         document.body.removeChild(link);
 
-        showSuccess('Scenario exported successfully!');
+        showSuccess(t('loadtest.success.exported'));
     } catch (error) {
         console.error('Error exporting scenario:', error);
-        showError('Failed to export scenario');
+        showError(t('loadtest.error.run'));
     }
 }

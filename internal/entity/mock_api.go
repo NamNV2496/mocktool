@@ -2,7 +2,7 @@ package entity
 
 import "encoding/json"
 
-type ReqMockAPIBody struct {
+type MockAPIRequest struct {
 	FeatureName  string          `json:"feature_name" validate:"required,no_spaces"`
 	ScenarioName string          `json:"scenario_name" validate:"required,no_spaces"`
 	Name         string          `json:"name" validate:"required,no_spaces"`
@@ -12,8 +12,10 @@ type ReqMockAPIBody struct {
 	Input        json.RawMessage `json:"input"`
 	Headers      json.RawMessage `json:"headers"`
 	Output       json.RawMessage `json:"output"`
+	IsActive     bool            `json:"is_active"`
+	Latency      int64           `json:"latency"`
 }
 
-type ActiceScenario struct {
+type ActiceScenarioRequest struct {
 	PrevScenarioId string `json:"prev_scenario_id"`
 }

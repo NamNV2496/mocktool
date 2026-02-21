@@ -114,19 +114,19 @@ func (mr *MockIMockAPIRepositoryMockRecorder) FindByFeatureScenarioPathMethodAnd
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByFeatureScenarioPathMethodAndHash", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByFeatureScenarioPathMethodAndHash), ctx, featureName, scenarioName, path, method, hashInput)
 }
 
-// FindByName mocks base method.
-func (m *MockIMockAPIRepository) FindByName(ctx context.Context, name string) (*domain.MockAPI, error) {
+// FindByNameAndFeatureAndScenario mocks base method.
+func (m *MockIMockAPIRepository) FindByNameAndFeatureAndScenario(ctx context.Context, mockName, featureName, sceanrioName string) (*domain.MockAPI, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByName", ctx, name)
+	ret := m.ctrl.Call(m, "FindByNameAndFeatureAndScenario", ctx, mockName, featureName, sceanrioName)
 	ret0, _ := ret[0].(*domain.MockAPI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// FindByName indicates an expected call of FindByName.
-func (mr *MockIMockAPIRepositoryMockRecorder) FindByName(ctx, name any) *gomock.Call {
+// FindByNameAndFeatureAndScenario indicates an expected call of FindByNameAndFeatureAndScenario.
+func (mr *MockIMockAPIRepositoryMockRecorder) FindByNameAndFeatureAndScenario(ctx, mockName, featureName, sceanrioName any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByName", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByName), ctx, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByNameAndFeatureAndScenario", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByNameAndFeatureAndScenario), ctx, mockName, featureName, sceanrioName)
 }
 
 // FindByObjectID mocks base method.

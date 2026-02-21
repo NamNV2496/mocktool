@@ -20,6 +20,7 @@ type MockAPI struct {
 	HashInput    string             `bson:"hash_input" json:"hash_input"`
 	Headers      bson.Raw           `bson:"headers,omitempty" json:"headers"`
 	Output       bson.Raw           `bson:"output,omitempty" json:"output"`
+	Latency      int64              `bson:"latency" json:"latency"`
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time          `bson:"updated_at" json:"updated_at"`
 }

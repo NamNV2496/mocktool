@@ -250,7 +250,10 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
 				mockAPIRepo.EXPECT().
-					FindByName(gomock.Any(), gomock.Any()).
+					FindByNameAndFeatureAndScenario(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
+				mockAPIRepo.EXPECT().
+					FindByFeatureScenarioPathMethodAndHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
 			},
 		},

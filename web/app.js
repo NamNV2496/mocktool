@@ -954,6 +954,7 @@ async function showCreateMockAPIModal() {
     document.getElementById('mockapi-regex-path').value = '';
     document.getElementById('mockapi-hash-input').value = '';
     document.getElementById('mockapi-output').value = '';
+    document.getElementById('mockapi-latency').value = '0';
     document.getElementById('mockapi-active').checked = true;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1039,6 +1040,7 @@ async function editMockAPI(api) {
         document.getElementById('mockapi-output-header').value = '';
     }
 
+    document.getElementById('mockapi-latency').value = api.latency || 0;
     document.getElementById('mockapi-active').checked = api.is_active;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1143,6 +1145,7 @@ async function duplicateMockAPI(api) {
         document.getElementById('mockapi-output-header').value = '';
     }
 
+    document.getElementById('mockapi-latency').value = api.latency || 0;
     document.getElementById('mockapi-active').checked = api.is_active;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1201,6 +1204,7 @@ async function saveMockAPI() {
     const hashInputStr = getJsonFieldValue('mockapi-hash-input');
     const outputStr = getJsonFieldValue('mockapi-output');
     const outputHeaders = document.getElementById('mockapi-output-header').value.trim();
+    const latency = parseInt(document.getElementById('mockapi-latency').value, 10) || 0;
     const isActive = document.getElementById('mockapi-active').checked;
 
     // Clear previous errors
@@ -1276,6 +1280,7 @@ async function saveMockAPI() {
         input: input,
         output: output,
         headers: outputHeaders,
+        latency: latency,
         is_active: isActive
     };
 

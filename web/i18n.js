@@ -144,6 +144,8 @@ const translations = {
         'mockapi.form.output.hint': 'JSON response to return when this mock API is matched',
         'mockapi.form.outputHeader.label': 'Response Output header',
         'mockapi.form.outputHeader.hint': 'Response header',
+        'mockapi.form.latency.label': 'Latency (seconds)',
+        'mockapi.form.latency.hint': 'Delay response by this many seconds. 0 = no delay.',
 
         // Mock API validation
         'mockapi.error.featureRequired': 'Feature is required',
@@ -444,6 +446,8 @@ const translations = {
         'mockapi.form.output.hint': 'Phản hồi JSON trả về khi Mock API này được khớp',
         'mockapi.form.outputHeader.label': 'Header phản hồi',
         'mockapi.form.outputHeader.hint': 'Header phản hồi',
+        'mockapi.form.latency.label': 'Độ trễ (giây)',
+        'mockapi.form.latency.hint': 'Trì hoãn phản hồi bấy nhiêu giây. 0 = không trì hoãn.',
 
         // Mock API validation
         'mockapi.error.featureRequired': 'Tính năng là bắt buộc',

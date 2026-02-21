@@ -67,7 +67,10 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 						return nil
 					})
 				mockAPIRepo.EXPECT().
-					FindByName(gomock.Any(), gomock.Any()).
+					FindByNameAndFeatureAndScenario(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
+				mockAPIRepo.EXPECT().
+					FindByFeatureScenarioPathMethodAndHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
 			},
 		},
@@ -89,7 +92,10 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
 				mockAPIRepo.EXPECT().
-					FindByName(gomock.Any(), gomock.Any()).
+					FindByNameAndFeatureAndScenario(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
+				mockAPIRepo.EXPECT().
+					FindByFeatureScenarioPathMethodAndHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
 			},
 		},
@@ -111,11 +117,12 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
 				mockAPIRepo.EXPECT().
-					FindByName(gomock.Any(), gomock.Any()).
+					FindByNameAndFeatureAndScenario(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
 				mockAPIRepo.EXPECT().
-					FindByName(gomock.Any(), gomock.Any()).
+					FindByFeatureScenarioPathMethodAndHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
+
 			},
 		},
 		{
@@ -135,6 +142,12 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 				mockAPIRepo.EXPECT().
 					Create(gomock.Any(), gomock.Any()).
 					Return(nil)
+				mockAPIRepo.EXPECT().
+					FindByNameAndFeatureAndScenario(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
+				mockAPIRepo.EXPECT().
+					FindByFeatureScenarioPathMethodAndHash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, nil)
 			},
 		},
 	}

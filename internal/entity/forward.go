@@ -24,3 +24,8 @@ type ServiceFlags struct {
 	TestWay    int
 	EnableHTTP bool
 }
+
+type CachedEntry struct {
+	Output  string `json:"output"`
+	Latency int64  `json:"latency"`
+}

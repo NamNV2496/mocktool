@@ -325,6 +325,7 @@ func (_self *MockController) SearchScenariosByFeatureAndName(c echo.Context) err
 	response := domain.NewPaginatedResponse(scenarios, total, params)
 	return c.JSON(http.StatusOK, response)
 }
+
 func (_self *MockController) ListScenariosByFeature(c echo.Context) error {
 	ctx := c.Request().Context()
 
@@ -476,7 +477,7 @@ func (_self *MockController) ActivateScenario(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	idStr := c.Param("scenario_id")
-	var reqBody entity.ActiceScenario
+	var reqBody entity.ActiceScenarioRequest
 	if err := c.Bind(&reqBody); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -631,6 +632,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"path":          api.Path,
 			"method":        api.Method,
 			"input":         inputJSON,
+			"latency":       api.Latency,
 			// "hash_input":    api.HashInput,
 			"output":     outputJSON,
 			"headers":    headers,
@@ -721,6 +723,7 @@ func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Contex
 			"headers":       headers,
 			"output":        outputJSON,
 			"is_active":     api.IsActive,
+			"latency":       api.Latency,
 			"created_at":    api.CreatedAt,
 		})
 	}
@@ -748,7 +751,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	// Use a temporary struct for binding with json.RawMessage
-	var reqBody entity.ReqMockAPIBody
+	var reqBody entity.MockAPIRequest
 	if err := c.Bind(&reqBody); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -757,24 +760,22 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 	if err := c.Validate(&reqBody); err != nil {
 		return err // Already formatted as HTTPError by CustomValidator
 	}
-
-	api, _ := _self.MockAPIRepo.FindByName(ctx, reqBody.Name)
+	// Check duplicate by name
+	api, _ := _self.MockAPIRepo.FindByNameAndFeatureAndScenario(ctx, reqBody.Name, reqBody.FeatureName, reqBody.ScenarioName)
 	if api != nil && api.Name != "" {
 		return c.JSON(http.StatusBadRequest, "API name is existed")
 	}
 	// Convert to domain.MockAPI
-	var req domain.MockAPI
-	req.FeatureName = reqBody.FeatureName
-	req.ScenarioName = reqBody.ScenarioName
-	req.Name = reqBody.Name
-	req.Description = reqBody.Description
-	req.Path = reqBody.Path
-	req.Method = reqBody.Method
-
-	now := time.Now().UTC()
-	req.CreatedAt = now
-	req.UpdatedAt = now
-	req.IsActive = true
+	req := domain.MockAPI{
+		FeatureName:  reqBody.FeatureName,
+		ScenarioName: reqBody.ScenarioName,
+		Name:         reqBody.Name,
+		Description:  reqBody.Description,
+		Path:         reqBody.Path,
+		Method:       reqBody.Method,
+		Latency:      reqBody.Latency,
+		IsActive:     true,
+	}
 
 	// Process input - store original JSON and compute hash
 	if len(reqBody.Input) > 0 && string(reqBody.Input) != "null" {
@@ -801,6 +802,11 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 
 		// Generate hash from sorted input
 		req.HashInput = utils.GenerateHashFromInput(inputBsonData)
+	}
+	// Check duplicate by path + hash input
+	api, _ = _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(ctx, req.FeatureName, req.ScenarioName, req.Path, req.Method, req.HashInput)
+	if api != nil && api.Name != "" {
+		return c.JSON(http.StatusBadRequest, "API is duplicated")
 	}
 
 	// Process output - required field
@@ -902,6 +908,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"path":          req.Path,
 		"method":        req.Method,
 		"input":         inputJSON,
+		"latency":       req.Latency,
 		// "hash_input":    req.HashInput,
 		"output":     outputJSON,
 		"headers":    req.Headers,
@@ -942,27 +949,12 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
 	}
-
-	// Use a temporary struct for binding with json.RawMessage
-	var reqBody struct {
-		FeatureName  string          `json:"feature_name"`
-		ScenarioName string          `json:"scenario_name"`
-		Name         string          `json:"name"`
-		Description  string          `json:"description"`
-		Path         string          `json:"path"`
-		Method       string          `json:"method"`
-		Input        json.RawMessage `json:"input"`
-		Headers      json.RawMessage `json:"headers"`
-		Output       json.RawMessage `json:"output"`
-		IsActive     bool            `json:"is_active"`
-	}
-
+	var reqBody entity.MockAPIRequest
 	if err := c.Bind(&reqBody); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	update := bson.M{}
-
 	if reqBody.Name != "" {
 		update["name"] = reqBody.Name
 	}
@@ -980,6 +972,9 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	}
 	if reqBody.ScenarioName != "" {
 		update["scenario_name"] = reqBody.ScenarioName
+	}
+	if reqBody.Latency != 0 {
+		update["latency"] = reqBody.Latency
 	}
 
 	// Process input if provided

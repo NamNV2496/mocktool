@@ -18,7 +18,7 @@ type IMockAPIRepository interface {
 	SearchByScenarioAndNameOrPath(ctx context.Context, scenarioName, query string, params domain.PaginationParams) ([]domain.MockAPI, int64, error)
 	Create(ctx context.Context, m *domain.MockAPI) error
 	FindByObjectID(ctx context.Context, id primitive.ObjectID) (*domain.MockAPI, error)
-	FindByName(ctx context.Context, name string) (*domain.MockAPI, error)
+	FindByNameAndFeatureAndScenario(ctx context.Context, mockName, featureName, sceanrioName string) (*domain.MockAPI, error)
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	DeletByObjectID(ctx context.Context, id primitive.ObjectID) error
 	FindByFeatureScenarioPathMethodAndHash(ctx context.Context, featureName, scenarioName, path, method, hashInput string) (*domain.MockAPI, error)
@@ -223,10 +223,12 @@ func (_self *MockAPIRepository) FindByObjectID(ctx context.Context, id primitive
 	return &output, nil
 }
 
-func (_self *MockAPIRepository) FindByName(ctx context.Context, name string) (*domain.MockAPI, error) {
+func (_self *MockAPIRepository) FindByNameAndFeatureAndScenario(ctx context.Context, mockName, featureName, sceanrioName string) (*domain.MockAPI, error) {
 	var output domain.MockAPI
 	filter := bson.M{
-		"name": name,
+		"name":          mockName,
+		"feature_name":  featureName,
+		"scenario_name": sceanrioName,
 	}
 	_self.repo.FindOne(ctx, filter, &output)
 	return &output, nil

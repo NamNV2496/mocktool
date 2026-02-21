@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"github.com/namnv2496/mocktool/pkg/observability"
@@ -91,17 +92,11 @@ func (_self *ForwardUC) forward(
 	// 1. Read body
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		return echo.NewHTTPError(
-			http.StatusBadRequest,
-			"failed to read request body",
-		)
+		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
 	}
 
 	// 2. Build path
-	path := strings.TrimPrefix(
-		c.Request().URL.Path,
-		trimPrefix,
-	)
+	path := strings.TrimPrefix(c.Request().URL.Path, trimPrefix)
 	if rawQuery := c.Request().URL.RawQuery; rawQuery != "" {
 		values, err := url.ParseQuery(rawQuery)
 		if err == nil && len(values) > 0 {
@@ -119,10 +114,7 @@ func (_self *ForwardUC) forward(
 	if err != nil {
 		return err
 	}
-	scenario, err := _self.ScenarioRepo.GetByObjectID(
-		ctx,
-		accountScenario.ScenarioID,
-	)
+	scenario, err := _self.ScenarioRepo.GetByObjectID(ctx, accountScenario.ScenarioID)
 	if err != nil {
 		return err
 	}
@@ -133,14 +125,9 @@ func (_self *ForwardUC) forward(
 	if len(bodyBytes) > 0 {
 		var tmp map[string]any
 		if err := json.Unmarshal(bodyBytes, &tmp); err != nil {
-			return echo.NewHTTPError(
-				http.StatusBadRequest,
-				"invalid JSON body",
-			)
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid JSON body")
 		}
-		hash = utils.GenerateHashFromInput(
-			bson.Raw(bodyBytes),
-		)
+		hash = utils.GenerateHashFromInput(bson.Raw(bodyBytes))
 	}
 
 	// 5. Build cache key
@@ -162,16 +149,17 @@ func (_self *ForwardUC) forward(
 	// 6. Try cache first
 	cached, err := _self.cacheRepo.Get(ctx, cacheKey)
 	if err == nil {
-		observability.MockAPICacheHits.WithLabelValues("hit").Inc()
-		observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
-		c.Response().Header().Set(
-			echo.HeaderContentType,
-			echo.MIMEApplicationJSON,
-		)
-		_, err := c.Response().Write(
-			[]byte(cached.(string)),
-		)
-		return err
+		var entry entity.CachedEntry
+		if err := json.Unmarshal([]byte(cached.(string)), &entry); err == nil {
+			if entry.Latency > 0 {
+				time.Sleep(time.Duration(entry.Latency) * time.Second)
+			}
+			observability.MockAPICacheHits.WithLabelValues("hit").Inc()
+			observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
+			c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			_, err := c.Response().Write([]byte(entry.Output))
+			return err
+		}
 	}
 
 	// 7. Query DB
@@ -197,47 +185,34 @@ func (_self *ForwardUC) forward(
 			)
 		}
 
-		return echo.NewHTTPError(
-			http.StatusInternalServerError,
-			err.Error(),
-		)
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// 8. Convert output
+	// 8. Apply latency if configured
+	if mockAPI.Latency > 0 {
+		time.Sleep(time.Duration(mockAPI.Latency) * time.Second)
+	}
+
+	// 9. Convert output
 	var outputMap map[string]any
 
 	if err := bson.Unmarshal(mockAPI.Output, &outputMap); err != nil {
-		if err := json.Unmarshal(
-			mockAPI.Output,
-			&outputMap,
-		); err != nil {
-			return echo.NewHTTPError(
-				http.StatusInternalServerError,
-				"failed to parse output",
-			)
+		if err := json.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
 		}
 	}
 
 	outputBytes, err := json.Marshal(outputMap)
 	if err != nil {
-		return echo.NewHTTPError(
-			http.StatusInternalServerError,
-			"failed to marshal output",
-		)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output")
 	}
 
-	// 9. Set headers
-	c.Response().Header().Set(
-		echo.HeaderContentType,
-		echo.MIMEApplicationJSON,
-	)
+	// 10. Set headers
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	if len(mockAPI.Headers) > 0 {
 		var headers map[string]string
-		if err := bson.Unmarshal(
-			mockAPI.Headers,
-			&headers,
-		); err == nil {
+		if err := bson.Unmarshal(mockAPI.Headers, &headers); err == nil {
 			sanitized, _ := security.ValidateAndSanitizeHeaders(headers)
 
 			for k, v := range sanitized {
@@ -246,19 +221,20 @@ func (_self *ForwardUC) forward(
 		}
 	}
 
-	// 10. Write response
+	// 11. Write response
 	_, err = c.Response().Write(outputBytes)
 	if err != nil {
 		return err
 	}
 	observability.MockAPICacheHits.WithLabelValues("miss").Inc()
 	observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
-	// 11. Save cache
-	_self.cacheRepo.Set(
-		ctx,
-		cacheKey,
-		string(outputBytes),
-	)
+	// 12. Save cache
+	if entryBytes, err := json.Marshal(entity.CachedEntry{
+		Output:  string(outputBytes),
+		Latency: mockAPI.Latency,
+	}); err == nil {
+		_self.cacheRepo.Set(ctx, cacheKey, string(entryBytes))
+	}
 
 	return nil
 }

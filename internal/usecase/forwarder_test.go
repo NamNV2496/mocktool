@@ -81,13 +81,6 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 					GetByObjectID(gomock.Any(), scenarioID).
 					Return(scenario, nil)
 
-				cacheRepo.EXPECT().
-					Get(gomock.Any(), gomock.Any()).
-					Return(nil, fmt.Errorf("not found"))
-
-				cacheRepo.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil)
 				mockAPIRepo.EXPECT().
 					FindByFeatureScenarioPathMethodAndHash(
 						gomock.Any(),
@@ -99,6 +92,13 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 					).
 					Return(mockAPI, nil)
 
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
+
+				cacheRepo.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 			},
 			expectedStatus: http.StatusOK,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
@@ -182,13 +182,6 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(nil, mongo.ErrNoDocuments)
-				cacheRepo.EXPECT().
-					Get(gomock.Any(), gomock.Any()).
-					Return(nil, fmt.Errorf("not found"))
-
-				cacheRepo.EXPECT().
-					Set(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil)
 			},
 			expectedStatus: http.StatusInternalServerError,
 			wantErr:        true,
@@ -236,9 +229,14 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						"", // Empty hash for empty body
 					).
 					Return(mockAPI, nil)
+
 				cacheRepo.EXPECT().
 					Get(gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("not found"))
+
+				cacheRepo.EXPECT().
+					Set(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 			},
 			expectedStatus: http.StatusOK,
 			wantErr:        false,
@@ -336,6 +334,7 @@ func TestForwardUC_ResponsePublicMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(mockAPI, nil)
+
 				cacheRepo.EXPECT().
 					Get(gomock.Any(), gomock.Any()).
 					Return(nil, fmt.Errorf("not found"))
@@ -437,6 +436,7 @@ func TestForwardUC_WithQueryParameters(t *testing.T) {
 				gomock.Any(),
 			).
 			Return(mockAPI, nil)
+
 		cacheRepo.EXPECT().
 			Get(gomock.Any(), gomock.Any()).
 			Return(nil, fmt.Errorf("not found"))
@@ -444,6 +444,7 @@ func TestForwardUC_WithQueryParameters(t *testing.T) {
 		cacheRepo.EXPECT().
 			Set(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil)
+
 		err := uc.ResponseMockData(c)
 		assert.NoError(t, err)
 	})
@@ -514,6 +515,7 @@ func TestForwardUC_WithCustomHeaders(t *testing.T) {
 				gomock.Any(),
 			).
 			Return(mockAPI, nil)
+
 		cacheRepo.EXPECT().
 			Get(gomock.Any(), gomock.Any()).
 			Return(nil, fmt.Errorf("not found"))
@@ -521,6 +523,7 @@ func TestForwardUC_WithCustomHeaders(t *testing.T) {
 		cacheRepo.EXPECT().
 			Set(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil)
+
 		err := uc.ResponseMockData(c)
 		assert.NoError(t, err)
 
@@ -647,6 +650,7 @@ func TestForwardUC_HeaderSanitization(t *testing.T) {
 					gomock.Any(),
 				).
 				Return(mockAPI, nil)
+
 			cacheRepo.EXPECT().
 				Get(gomock.Any(), gomock.Any()).
 				Return(nil, fmt.Errorf("not found"))

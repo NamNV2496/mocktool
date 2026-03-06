@@ -1,6 +1,8 @@
 module github.com/namnv2496/mocktool
 
-go 1.25
+go 1.24.0
+
+toolchain go1.24.13
 
 require (
 	github.com/caarlos0/env/v6 v6.10.1

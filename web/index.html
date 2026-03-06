@@ -287,30 +287,54 @@
                     <div id="mockapi-hash-input-tree" class="json-tree" style="display: none;"></div>
                     <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.hashInput.hint">JSON object to generate unique hash for request matching. Keys are automatically sorted for consistent hashing.</small>
                 </div>
-                <div class="form-group">
-                    <div class="json-field-header">
-                        <label for="mockapi-output" data-i18n="mockapi.form.output.label">Response Output - JSON (Required)</label>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <button class="btn-format" onclick="formatJson('mockapi-output')" data-i18n-title="json.format.btn" title="Format JSON"><span data-i18n="json.format.btn">⚡ Format</span></button>
-                            <div class="json-mode-toggle">
-                                <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-output', 'raw')" data-i18n="json.mode.raw">Raw</button>
-                                <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-output', 'tree')" data-i18n="json.mode.tree">Tree</button>
+                <!-- Response Mode Toggle -->
+                <div class="response-mode-toggle">
+                    <button class="response-mode-btn active" data-mode="default" onclick="switchResponseMode('default')">
+                        <span class="response-mode-icon">📄</span> Default Response
+                    </button>
+                    <button class="response-mode-btn" data-mode="sequence" onclick="switchResponseMode('sequence')">
+                        <span class="response-mode-icon">🔄</span> Sequence Responses
+                    </button>
+                </div>
+
+                <!-- Default Response Panel -->
+                <div id="response-panel-default" class="response-panel active">
+                    <div class="form-group">
+                        <div class="json-field-header">
+                            <label for="mockapi-output" data-i18n="mockapi.form.output.label">Response Output - JSON (Required)</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button class="btn-format" onclick="formatJson('mockapi-output')" data-i18n-title="json.format.btn" title="Format JSON"><span data-i18n="json.format.btn">⚡ Format</span></button>
+                                <div class="json-mode-toggle">
+                                    <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('mockapi-output', 'raw')" data-i18n="json.mode.raw">Raw</button>
+                                    <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('mockapi-output', 'tree')" data-i18n="json.mode.tree">Tree</button>
+                                </div>
                             </div>
                         </div>
+                        <textarea id="mockapi-output" placeholder='{"message": "success", "data": {...}}' rows="8" required></textarea>
+                        <div id="mockapi-output-tree" class="json-tree" style="display: none;"></div>
+                        <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.output.hint">JSON response to return when this mock API is matched</small>
                     </div>
-                    <textarea id="mockapi-output" placeholder='{"message": "success", "data": {...}}' rows="8" required></textarea>
-                    <div id="mockapi-output-tree" class="json-tree" style="display: none;"></div>
-                    <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.output.hint">JSON response to return when this mock API is matched</small>
+                    <div class="form-group">
+                        <label for="mockapi-output-header" data-i18n="mockapi.form.outputHeader.label">Response Output header</label>
+                        <textarea id="mockapi-output-header" placeholder='"x-corr-id":"jfd4-dsf3-3dde"' rows="4"></textarea>
+                        <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.outputHeader.hint">Response header</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="mockapi-latency" data-i18n="mockapi.form.latency.label">Latency (seconds)</label>
+                        <input type="number" id="mockapi-latency" min="0" value="0" placeholder="0">
+                        <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.latency.hint">Delay response by this many seconds. 0 = no delay.</small>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="mockapi-output-header" data-i18n="mockapi.form.outputHeader.label">Response Output header</label>
-                    <textarea id="mockapi-output-header" placeholder='"x-corr-id":"jfd4-dsf3-3dde"' rows="8"></textarea>
-                    <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.outputHeader.hint">Response header</small>
-                </div>
-                <div class="form-group">
-                    <label for="mockapi-latency" data-i18n="mockapi.form.latency.label">Latency (seconds)</label>
-                    <input type="number" id="mockapi-latency" min="0" value="0" placeholder="0">
-                    <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.latency.hint">Delay response by this many seconds. 0 = no delay.</small>
+
+                <!-- Sequence Response Panel -->
+                <div id="response-panel-sequence" class="response-panel">
+                    <div id="sequence-responses-container"></div>
+                    <div class="sequence-panel-footer">
+                        <small style="color: #718096; font-size: 0.85rem;">
+                            Define multiple responses based on call count. Each response has its own output, headers, and latency.
+                        </small>
+                        <button class="btn btn-sm btn-primary" type="button" onclick="addSequenceResponse(); setTimeout(() => document.getElementById('sequence-responses-container').lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)">+ ADD RESPONSE</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">

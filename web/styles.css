@@ -958,3 +958,212 @@ select.tree-value-input {
         padding: 10px;
     }
 }
+
+/* Response Mode Toggle */
+.response-mode-toggle {
+    display: flex;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 4px;
+}
+
+.response-mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.response-mode-btn:hover {
+    background: rgba(255, 255, 255, 0.6);
+    color: #475569;
+}
+
+.response-mode-btn.active {
+    background: white;
+    color: #667eea;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.response-mode-btn .response-mode-icon {
+    font-size: 1.1rem;
+}
+
+.response-panel {
+    display: none;
+}
+
+.response-panel.active {
+    display: block;
+    animation: fadeInPanel 0.25s ease;
+}
+
+@keyframes fadeInPanel {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.sequence-panel-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px dashed #cbd5e1;
+}
+
+/* Sequence Responses */
+.sequence-response-item {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: white;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.sequence-response-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.sequence-response-item .seq-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.sequence-response-item .seq-header strong {
+    color: #4a5568;
+    font-size: 0.9rem;
+}
+
+.sequence-response-item .seq-body {
+    padding: 12px 14px;
+}
+
+.sequence-response-item .seq-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.sequence-response-item .seq-row label {
+    font-size: 0.8rem;
+    color: #718096;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.sequence-response-item .seq-row input[type="number"] {
+    width: 80px;
+    padding: 8px 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.sequence-response-item .seq-row input[type="number"]:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.sequence-response-item textarea {
+    width: 100%;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fafbfc;
+    color: #2d3748;
+    line-height: 1.6;
+    resize: vertical;
+    transition: all 0.2s ease;
+}
+
+.sequence-response-item textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.sequence-response-item textarea::placeholder {
+    color: #a0aec0;
+    font-style: italic;
+}
+
+.sequence-response-item .seq-body label {
+    font-size: 0.8rem;
+    color: #667eea;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+}
+
+.btn-remove-seq {
+    background: #fc8181;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.btn-remove-seq:hover {
+    background: #f56565;
+}
+
+.btn-reset-counter {
+    background: #ed8936;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.btn-reset-counter:hover {
+    background: #dd6b20;
+}
+
+.seq-badge {
+    background: #9f7aea;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}

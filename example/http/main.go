@@ -77,7 +77,7 @@ func forwardRequest(c echo.Context) error {
 	accountId := "1"
 	// add accountId to header
 	req.Header["X-Account-Id"] = []string{accountId}
-	req.Header["X-Feature-Name"] = []string{"test_feature"}
+	req.Header["X-Feature-Name"] = []string{"iav3_job"}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

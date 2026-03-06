@@ -40,6 +40,20 @@ func (m *MockICache) EXPECT() *MockICacheMockRecorder {
 	return m.recorder
 }
 
+// Del mocks base method.
+func (m *MockICache) Del(ctx context.Context, key string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Del", ctx, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Del indicates an expected call of Del.
+func (mr *MockICacheMockRecorder) Del(ctx, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Del", reflect.TypeOf((*MockICache)(nil).Del), ctx, key)
+}
+
 // Get mocks base method.
 func (m *MockICache) Get(ctx context.Context, key string) (any, error) {
 	m.ctrl.T.Helper()
@@ -53,6 +67,21 @@ func (m *MockICache) Get(ctx context.Context, key string) (any, error) {
 func (mr *MockICacheMockRecorder) Get(ctx, key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockICache)(nil).Get), ctx, key)
+}
+
+// Incr mocks base method.
+func (m *MockICache) Incr(ctx context.Context, key string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Incr", ctx, key)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Incr indicates an expected call of Incr.
+func (mr *MockICacheMockRecorder) Incr(ctx, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Incr", reflect.TypeOf((*MockICache)(nil).Incr), ctx, key)
 }
 
 // InvalidAllKey mocks base method.

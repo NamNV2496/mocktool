@@ -11,6 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"log"
+
+	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/pkg/errorcustome"
@@ -146,23 +149,7 @@ func (_self *ForwardUC) forward(
 		hash,
 	)
 
-	// 6. Try cache first
-	cached, err := _self.cacheRepo.Get(ctx, cacheKey)
-	if err == nil {
-		var entry entity.CachedEntry
-		if err := json.Unmarshal([]byte(cached.(string)), &entry); err == nil {
-			if entry.Latency > 0 {
-				time.Sleep(time.Duration(entry.Latency) * time.Second)
-			}
-			observability.MockAPICacheHits.WithLabelValues("hit").Inc()
-			observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
-			c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			_, err := c.Response().Write([]byte(entry.Output))
-			return err
-		}
-	}
-
-	// 7. Query DB
+	// 6. Query DB first to check if this is a sequence-based API
 	mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
 		ctx,
 		featureName,
@@ -188,16 +175,76 @@ func (_self *ForwardUC) forward(
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// 8. Apply latency if configured
-	if mockAPI.Latency > 0 {
-		time.Sleep(time.Duration(mockAPI.Latency) * time.Second)
+	hasSequence := len(mockAPI.Responses) > 0
+
+	// 7. For non-sequence APIs, try cache first
+	if !hasSequence {
+		cached, err := _self.cacheRepo.Get(ctx, cacheKey)
+		if err == nil {
+			var entry entity.CachedEntry
+			if err := json.Unmarshal([]byte(cached.(string)), &entry); err == nil {
+				if entry.Latency > 0 {
+					time.Sleep(time.Duration(entry.Latency) * time.Second)
+				}
+				observability.MockAPICacheHits.WithLabelValues("hit").Inc()
+				observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
+				c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				_, err := c.Response().Write([]byte(entry.Output))
+				return err
+			}
+		}
 	}
 
-	// 9. Convert output
+	// 8. Determine output, headers, and latency
+	var outputRaw bson.Raw
+	var headersRaw bson.Raw
+	var latency int64
+
+	if hasSequence {
+		// Increment sequence counter
+		seqKey := fmt.Sprintf(
+			repository.KeySequenceTemplate,
+			featureName,
+			scenarioName,
+			acc,
+			path,
+			method,
+			hash,
+		)
+		count, err := _self.cacheRepo.Incr(ctx, seqKey)
+		if err != nil {
+			log.Println("failed to increment sequence counter:", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to increment sequence counter")
+		}
+
+		// Find matching sequence response
+		matched := findMatchingResponse(mockAPI.Responses, int(count))
+		if matched != nil {
+			outputRaw = matched.Output
+			headersRaw = matched.Headers
+			latency = matched.Latency
+		} else {
+			// Fallback to default output if no sequence matches
+			outputRaw = mockAPI.Output
+			headersRaw = mockAPI.Headers
+			latency = mockAPI.Latency
+		}
+	} else {
+		outputRaw = mockAPI.Output
+		headersRaw = mockAPI.Headers
+		latency = mockAPI.Latency
+	}
+
+	// 9. Apply latency if configured
+	if latency > 0 {
+		time.Sleep(time.Duration(latency) * time.Second)
+	}
+
+	// 10. Convert output
 	var outputMap map[string]any
 
-	if err := bson.Unmarshal(mockAPI.Output, &outputMap); err != nil {
-		if err := json.Unmarshal(mockAPI.Output, &outputMap); err != nil {
+	if err := bson.Unmarshal(outputRaw, &outputMap); err != nil {
+		if err := json.Unmarshal(outputRaw, &outputMap); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
 		}
 	}
@@ -207,12 +254,12 @@ func (_self *ForwardUC) forward(
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output")
 	}
 
-	// 10. Set headers
+	// 11. Set headers
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	if len(mockAPI.Headers) > 0 {
+	if len(headersRaw) > 0 {
 		var headers map[string]string
-		if err := bson.Unmarshal(mockAPI.Headers, &headers); err == nil {
+		if err := bson.Unmarshal(headersRaw, &headers); err == nil {
 			sanitized, _ := security.ValidateAndSanitizeHeaders(headers)
 
 			for k, v := range sanitized {
@@ -221,20 +268,33 @@ func (_self *ForwardUC) forward(
 		}
 	}
 
-	// 11. Write response
+	// 12. Write response
 	_, err = c.Response().Write(outputBytes)
 	if err != nil {
 		return err
 	}
 	observability.MockAPICacheHits.WithLabelValues("miss").Inc()
 	observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
-	// 12. Save cache
-	if entryBytes, err := json.Marshal(entity.CachedEntry{
-		Output:  string(outputBytes),
-		Latency: mockAPI.Latency,
-	}); err == nil {
-		_self.cacheRepo.Set(ctx, cacheKey, string(entryBytes))
+
+	// 13. Save cache (skip for sequence-based APIs)
+	if !hasSequence {
+		if entryBytes, err := json.Marshal(entity.CachedEntry{
+			Output:  string(outputBytes),
+			Latency: latency,
+		}); err == nil {
+			_self.cacheRepo.Set(ctx, cacheKey, string(entryBytes))
+		}
 	}
 
+	return nil
+}
+
+func findMatchingResponse(responses []domain.SequenceResponse, count int) *domain.SequenceResponse {
+	for i := range responses {
+		r := &responses[i]
+		if count >= r.From && (r.To == 0 || count <= r.To) {
+			return r
+		}
+	}
 	return nil
 }

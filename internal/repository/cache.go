@@ -20,12 +20,16 @@ const (
 	KeyScnarioTemplate = "mocktool:%s:%s:*"
 	// mocktool:<feature>
 	KeyFeatureTemplate = "mocktool:%s:*"
+	// mocktool:seq:<feature>:<scenario>:<account_id>:<path>:<method>:<hash_input>
+	KeySequenceTemplate = "mocktool:seq:%s:%s:%s:%s:%s:%s"
 )
 
 //go:generate mockgen -source=$GOFILE -destination=../../mocks/repository/$GOFILE.mock.go -package=$GOPACKAGE
 type ICache interface {
 	Set(ctx context.Context, key string, value any) error
 	Get(ctx context.Context, key string) (any, error)
+	Incr(ctx context.Context, key string) (int64, error)
+	Del(ctx context.Context, key string) error
 	InvalidAllKey(ctx context.Context, key string) error
 }
 
@@ -36,18 +40,21 @@ type Cache struct {
 
 func NewCache(
 	conf *configs.Config,
-) ICache {
+) (ICache, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     conf.RedisConf.Host,
 		Username: conf.RedisConf.Username,
 		Password: conf.RedisConf.Password,
 		DB:       int(conf.RedisConf.Database),
 	})
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		return nil, err
+	}
 	// invalid all keys
 	invalidateAllKeys(context.Background(), client)
 	return &Cache{
 		redisClient: client,
-	}
+	}, nil
 }
 
 func (_self Cache) Set(ctx context.Context, key string, value any) error {
@@ -81,6 +88,14 @@ func invalidateAllKeys(ctx context.Context, redisClient *redis.Client) error {
 		}
 	}
 	return nil
+}
+
+func (_self Cache) Incr(ctx context.Context, key string) (int64, error) {
+	return _self.redisClient.Incr(ctx, key).Result()
+}
+
+func (_self Cache) Del(ctx context.Context, key string) error {
+	return _self.redisClient.Del(ctx, key).Err()
 }
 
 func (_self Cache) InvalidAllKey(ctx context.Context, key string) error {

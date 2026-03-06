@@ -120,7 +120,8 @@ func (_self *MockController) StartHttpServer() error {
 	v1.GET("/mockapis/search", _self.SearchMockAPIsByScenarioAndNameOrPath) // search APIs by scenario and name/path
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)                     // create new scenario
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario)              // update or inactive scenario
-	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)           // update or inactive scenario
+	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)                    // update or inactive scenario
+	v1.POST("/mockapis/:api_id/reset-counter", _self.ResetSequenceCounter)           // reset sequence counter
 
 	// Load test scenarios - delegate to LoadTestController
 	_self.loadTestController.RegisterRoutes(v1)
@@ -622,7 +623,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			}
 		}
 
-		data = append(data, map[string]any{
+		entry := map[string]any{
 			"id":            api.ID.Hex(),
 			"feature_name":  api.FeatureName,
 			"scenario_name": api.ScenarioName,
@@ -638,7 +639,13 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"headers":    headers,
 			"created_at": api.CreatedAt.Format(time.RFC3339),
 			"updated_at": api.UpdatedAt.Format(time.RFC3339),
-		})
+		}
+
+		if len(api.Responses) > 0 {
+			entry["responses"] = convertSequenceResponsesToJSON(api.Responses)
+		}
+
+		data = append(data, entry)
 	}
 
 	// Calculate total pages
@@ -710,7 +717,7 @@ func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Contex
 			}
 		}
 
-		data = append(data, map[string]any{
+		entry := map[string]any{
 			"id":            api.ID.Hex(),
 			"feature_name":  api.FeatureName,
 			"scenario_name": api.ScenarioName,
@@ -725,7 +732,13 @@ func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Contex
 			"is_active":     api.IsActive,
 			"latency":       api.Latency,
 			"created_at":    api.CreatedAt,
-		})
+		}
+
+		if len(api.Responses) > 0 {
+			entry["responses"] = convertSequenceResponsesToJSON(api.Responses)
+		}
+
+		data = append(data, entry)
 	}
 
 	// Calculate total pages
@@ -879,6 +892,57 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		req.Headers = bson.Raw(headerData)
 	}
 
+	// Process sequence responses
+	if len(reqBody.Responses) > 0 {
+		for _, seqReq := range reqBody.Responses {
+			seqResp := domain.SequenceResponse{
+				From:    seqReq.From,
+				To:      seqReq.To,
+				Latency: seqReq.Latency,
+			}
+
+			// Convert output
+			if len(seqReq.Output) > 0 && string(seqReq.Output) != "null" {
+				var seqOutputData any
+				if err := json.Unmarshal(seqReq.Output, &seqOutputData); err != nil {
+					return echo.NewHTTPError(http.StatusBadRequest, "invalid sequence response output JSON: "+err.Error())
+				}
+				if outputStr, ok := seqOutputData.(string); ok {
+					var parsed any
+					if err := json.Unmarshal([]byte(outputStr), &parsed); err != nil {
+						return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in sequence output: "+err.Error())
+					}
+					seqOutputData = parsed
+				}
+				seqBsonData, err := bson.Marshal(seqOutputData)
+				if err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert sequence output to BSON: "+err.Error())
+				}
+				seqResp.Output = seqBsonData
+			}
+
+			// Convert headers
+			if len(seqReq.Headers) > 0 && string(seqReq.Headers) != "null" {
+				var seqHeadersStr string
+				if err := json.Unmarshal(seqReq.Headers, &seqHeadersStr); err == nil {
+					seqHeadersStr = strings.TrimSpace(seqHeadersStr)
+					if !strings.HasPrefix(seqHeadersStr, "{") {
+						seqHeadersStr = "{" + seqHeadersStr + "}"
+					}
+					var headersMap map[string]string
+					if err := json.Unmarshal([]byte(seqHeadersStr), &headersMap); err == nil {
+						sanitized, _ := security.ValidateAndSanitizeHeaders(headersMap)
+						if headerData, err := bson.Marshal(sanitized); err == nil {
+							seqResp.Headers = bson.Raw(headerData)
+						}
+					}
+				}
+			}
+
+			req.Responses = append(req.Responses, seqResp)
+		}
+	}
+
 	// create
 	if err := _self.MockAPIRepo.Create(ctx, &req); err != nil {
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
@@ -914,6 +978,10 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"headers":    req.Headers,
 		"created_at": req.CreatedAt.Format(time.RFC3339),
 		"updated_at": req.UpdatedAt.Format(time.RFC3339),
+	}
+
+	if len(req.Responses) > 0 {
+		response["responses"] = convertSequenceResponsesToJSON(req.Responses)
 	}
 
 	return c.JSON(http.StatusCreated, response)
@@ -1081,6 +1149,61 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 
 		update["headers"] = bson.Raw(headerData)
 	}
+
+	// Process sequence responses
+	if len(reqBody.Responses) > 0 {
+		var seqResponses []domain.SequenceResponse
+		for _, seqReq := range reqBody.Responses {
+			seqResp := domain.SequenceResponse{
+				From:    seqReq.From,
+				To:      seqReq.To,
+				Latency: seqReq.Latency,
+			}
+
+			if len(seqReq.Output) > 0 && string(seqReq.Output) != "null" {
+				var seqOutputData any
+				if err := json.Unmarshal(seqReq.Output, &seqOutputData); err != nil {
+					return echo.NewHTTPError(http.StatusBadRequest, "invalid sequence response output JSON: "+err.Error())
+				}
+				if outputStr, ok := seqOutputData.(string); ok {
+					var parsed any
+					if err := json.Unmarshal([]byte(outputStr), &parsed); err != nil {
+						return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in sequence output: "+err.Error())
+					}
+					seqOutputData = parsed
+				}
+				seqBsonData, err := bson.Marshal(seqOutputData)
+				if err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert sequence output to BSON: "+err.Error())
+				}
+				seqResp.Output = seqBsonData
+			}
+
+			if len(seqReq.Headers) > 0 && string(seqReq.Headers) != "null" {
+				var seqHeadersStr string
+				if err := json.Unmarshal(seqReq.Headers, &seqHeadersStr); err == nil {
+					seqHeadersStr = strings.TrimSpace(seqHeadersStr)
+					if !strings.HasPrefix(seqHeadersStr, "{") {
+						seqHeadersStr = "{" + seqHeadersStr + "}"
+					}
+					var headersMap map[string]string
+					if err := json.Unmarshal([]byte(seqHeadersStr), &headersMap); err == nil {
+						sanitized, _ := security.ValidateAndSanitizeHeaders(headersMap)
+						if headerData, err := bson.Marshal(sanitized); err == nil {
+							seqResp.Headers = bson.Raw(headerData)
+						}
+					}
+				}
+			}
+
+			seqResponses = append(seqResponses, seqResp)
+		}
+		update["responses"] = seqResponses
+	} else {
+		// Explicitly clear responses if empty array sent
+		update["responses"] = nil
+	}
+
 	update["is_active"] = reqBody.IsActive
 	update["updated_at"] = time.Now().UTC()
 
@@ -1091,6 +1214,62 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	// invalid cache by scenario
 	_self.cacheRepo.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, reqBody.FeatureName, reqBody.ScenarioName))
 	return c.NoContent(http.StatusOK)
+}
+
+/* ---------- POST /mockapis/:api_id/reset-counter ---------- */
+
+func (_self *MockController) ResetSequenceCounter(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	objectID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+
+	mockAPI, err := _self.MockAPIRepo.FindByObjectID(ctx, objectID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "mock API not found")
+	}
+
+	// Delete all sequence counter keys matching this API pattern
+	pattern := fmt.Sprintf("mocktool:seq:%s:%s:*:%s:%s:*",
+		mockAPI.FeatureName,
+		mockAPI.ScenarioName,
+		mockAPI.Path,
+		mockAPI.Method,
+	)
+	_self.cacheRepo.InvalidAllKey(ctx, pattern)
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "counter reset successfully"})
+}
+
+func convertSequenceResponsesToJSON(responses []domain.SequenceResponse) []map[string]any {
+	var result []map[string]any
+	for _, r := range responses {
+		entry := map[string]any{
+			"from":    r.From,
+			"to":      r.To,
+			"latency": r.Latency,
+		}
+
+		if len(r.Output) > 0 {
+			var outputMap bson.M
+			if err := bson.Unmarshal(r.Output, &outputMap); err == nil {
+				entry["output"] = outputMap
+			}
+		}
+
+		if len(r.Headers) > 0 {
+			var headersMap bson.M
+			if err := bson.Unmarshal(r.Headers, &headersMap); err == nil {
+				entry["headers"] = headersMap
+			}
+		}
+
+		result = append(result, entry)
+	}
+	return result
 }
 
 /* ---------- Health Check Endpoints ---------- */

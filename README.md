@@ -405,6 +405,15 @@ You can run test scenario
 
 example at `/doc/mocktool.loadtest_scenarios.json`
 
+Can setup `sequence response`
+
+Example:
+- times: 0-1 response 1
+- times: 2-3 response 2
+- others
+
+![doc/20.png](doc/20.png)
+
 result
 
 ![doc/19.png](doc/19.png)

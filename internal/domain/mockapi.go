@@ -7,6 +7,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type SequenceResponse struct {
+	From    int      `bson:"from" json:"from"`
+	To      int      `bson:"to" json:"to"`
+	Output  bson.Raw `bson:"output,omitempty" json:"output"`
+	Headers bson.Raw `bson:"headers,omitempty" json:"headers"`
+	Latency int64    `bson:"latency" json:"latency"`
+}
+
 type MockAPI struct {
 	ID           primitive.ObjectID `bson:"_id" json:"id"`
 	FeatureName  string             `bson:"feature_name" json:"feature_name" validate:"required,no_spaces"`
@@ -21,6 +29,7 @@ type MockAPI struct {
 	Headers      bson.Raw           `bson:"headers,omitempty" json:"headers"`
 	Output       bson.Raw           `bson:"output,omitempty" json:"output"`
 	Latency      int64              `bson:"latency" json:"latency"`
+	Responses    []SequenceResponse `bson:"responses,omitempty" json:"responses"`
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt    time.Time          `bson:"updated_at" json:"updated_at"`
 }

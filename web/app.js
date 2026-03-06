@@ -317,7 +317,7 @@ function renderMockAPIsTable() {
         <tr>
             <td class="text-truncate" title="${api.feature_name || 'N/A'}">${api.feature_name || 'N/A'}</td>
             <td class="text-truncate" title="${api.scenario_name || 'N/A'}">${api.scenario_name || 'N/A'}</td>
-            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong></td>
+            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong>${api.responses && api.responses.length > 0 ? '<span class="seq-badge">SEQ</span>' : ''}</td>
             <td class="text-truncate" title="${api.description || '-'}">${api.description || '-'}</td>
             <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
             <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
@@ -328,6 +328,7 @@ function renderMockAPIsTable() {
             <td class="actions">
                 <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>${t('common.edit')}</button>
                 <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>${t('common.duplicate')}</button>
+                ${api.responses && api.responses.length > 0 ? `<button class="btn-reset-counter" onclick="resetSequenceCounter('${api.id}')">Reset Counter</button>` : ''}
                 <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">${t('common.delete')}</button>
             </td>
         </tr>
@@ -992,6 +993,8 @@ async function showCreateMockAPIModal() {
         scenarioSelect.dataset.featureName = '';
     }
 
+    clearSequenceResponses();
+    switchResponseMode('default');
     resetJsonTreeMode('mockapi-hash-input');
     resetJsonTreeMode('mockapi-output');
     showModal('mockapi-modal');
@@ -1079,6 +1082,15 @@ async function editMockAPI(api) {
     scenarioSelect.value = api.scenario_name;
     scenarioSelect.dataset.selectedValue = api.scenario_name;
     scenarioSelect.dataset.selectedText = api.scenario_name;
+
+    // Populate sequence responses
+    clearSequenceResponses();
+    if (api.responses && Array.isArray(api.responses) && api.responses.length > 0) {
+        api.responses.forEach(r => addSequenceResponse(r));
+        switchResponseMode('sequence');
+    } else {
+        switchResponseMode('default');
+    }
 
     resetJsonTreeMode('mockapi-hash-input');
     resetJsonTreeMode('mockapi-output');
@@ -1269,6 +1281,10 @@ async function saveMockAPI() {
         }
     }
 
+    // Collect sequence responses
+    const responses = getSequenceResponsesFromForm();
+    if (responses === null) return; // validation error
+
     const data = {
         feature_name: featureName,
         scenario_name: scenarioName,
@@ -1281,7 +1297,8 @@ async function saveMockAPI() {
         output: output,
         headers: outputHeaders,
         latency: latency,
-        is_active: isActive
+        is_active: isActive,
+        responses: responses.length > 0 ? responses : undefined
     };
 
     try {
@@ -1307,6 +1324,141 @@ async function saveMockAPI() {
     } catch (error) {
         console.error('Error saving mock API:', error);
         showError(t('mockapi.error.save'));
+    }
+}
+
+// ---- Response Mode Toggle ----
+
+function switchResponseMode(mode) {
+    document.querySelectorAll('.response-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    document.querySelectorAll('.response-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.getElementById(`response-panel-${mode}`).classList.add('active');
+}
+
+// ---- Sequence Responses ----
+
+let sequenceResponses = [];
+let seqOutputIdCounter = 0;   // unique id generator for sequence outputs
+
+function addSequenceResponse(data = null) {
+    const container = document.getElementById('sequence-responses-container');
+    const idx = container.children.length;
+    const from = data ? data.from : (idx === 0 ? 1 : '');
+    const to = data ? data.to : 0;
+    const output = data && data.output
+        ? (typeof data.output === 'string' ? data.output : JSON.stringify(data.output, null, 2))
+        : '';
+    const headers = data && data.headers
+        ? (typeof data.headers === 'string' ? data.headers : JSON.stringify(data.headers, null, 2))
+        : '';
+    const latency = data ? (data.latency || 0) : 0;
+
+    // create a unique id for this output field
+    const outputFieldId = `seq-output-${seqOutputIdCounter++}`;
+
+    const div = document.createElement('div');
+    div.className = 'sequence-response-item';
+    div.innerHTML = `
+        <div class="seq-header">
+            <strong>Response #${idx + 1}</strong>
+            <button class="btn-remove-seq" type="button" onclick="removeSequenceResponse(this)">Remove</button>
+        </div>
+        <div class="seq-body">
+            <div class="seq-row">
+                <div>
+                    <label>From (>= 1)</label>
+                    <input type="number" class="seq-from" min="1" value="${from}" placeholder="1">
+                </div>
+                <div>
+                    <label>To (<= call, 0=unlimited)</label>
+                    <input type="number" class="seq-to" min="0" value="${to}" placeholder="0">
+                </div>
+                <div>
+                    <label>Latency (seconds)</label>
+                    <input type="number" class="seq-latency" min="0" value="${latency}" placeholder="0">
+                </div>
+            </div>
+            <div style="margin-bottom: 6px;">
+                <label style="font-size: 0.8rem; color: #718096;">Output JSON</label>
+                <button class="btn-format" style="margin-left: 8px; font-size: 0.8rem;"
+                        onclick="formatJson('${outputFieldId}')"
+                        title="Format JSON">⚡ Format</button>
+                <textarea id="${outputFieldId}" class="seq-output" rows="3"
+                          placeholder='{"message": "response"}'>${output}</textarea>
+            </div>
+            <div>
+                <label style="font-size: 0.8rem; color: #718096;">Headers (Optional)</label>
+                <textarea class="seq-headers" rows="2"
+                          placeholder='"x-custom": "value"'>${headers}</textarea>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+}
+
+function removeSequenceResponse(btn) {
+    btn.closest('.sequence-response-item').remove();
+    // Re-number
+    const container = document.getElementById('sequence-responses-container');
+    container.querySelectorAll('.sequence-response-item').forEach((item, i) => {
+        item.querySelector('strong').textContent = `Response #${i + 1}`;
+    });
+}
+
+function clearSequenceResponses() {
+    document.getElementById('sequence-responses-container').innerHTML = '';
+    seqOutputIdCounter = 0; // reset counter when clearing responses
+}
+
+function getSequenceResponsesFromForm() {
+    const container = document.getElementById('sequence-responses-container');
+    const items = container.querySelectorAll('.sequence-response-item');
+    if (items.length === 0) return [];
+
+    const responses = [];
+    for (const item of items) {
+        const from = parseInt(item.querySelector('.seq-from').value, 10) || 1;
+        const to = parseInt(item.querySelector('.seq-to').value, 10) || 0;
+        const latency = parseInt(item.querySelector('.seq-latency').value, 10) || 0;
+        const outputStr = item.querySelector('.seq-output').value.trim();
+        const headersStr = item.querySelector('.seq-headers').value.trim();
+
+        let output = null;
+        if (outputStr) {
+            try {
+                output = JSON.parse(outputStr);
+            } catch (e) {
+                showError(`Invalid JSON in sequence response output: ${e.message}`);
+                return null;
+            }
+        }
+
+        responses.push({
+            from: from,
+            to: to,
+            output: output,
+            headers: headersStr || null,
+            latency: latency
+        });
+    }
+    return responses;
+}
+
+async function resetSequenceCounter(apiId) {
+    if (!confirm('Reset the call counter for this API? The sequence will start from call #1 again.')) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/mockapis/${apiId}/reset-counter`, {
+            method: 'POST'
+        });
+        if (!response.ok) throw new Error('Failed to reset counter');
+        showSuccess('Counter reset successfully');
+    } catch (error) {
+        console.error('Error resetting counter:', error);
+        showError('Failed to reset counter');
     }
 }
 

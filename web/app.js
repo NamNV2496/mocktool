@@ -1382,16 +1382,27 @@ function addSequenceResponse(data = null) {
                     <input type="number" class="seq-latency" min="0" value="${latency}" placeholder="0">
                 </div>
             </div>
-            <div style="margin-bottom: 6px;">
-                <label style="font-size: 0.8rem; color: #718096;">Output JSON</label>
-                <button class="btn-format" style="margin-left: 8px; font-size: 0.8rem;"
-                        onclick="formatJson('${outputFieldId}')"
-                        title="Format JSON">⚡ Format</button>
-                <textarea id="${outputFieldId}" class="seq-output" rows="3"
+            <div class="form-group">
+                <div class="json-field-header">
+                    <label>Output JSON</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn-format" 
+                                onclick="formatJson('${outputFieldId}')"
+                                title="Format JSON">⚡ Format</button>
+                        <div class="json-mode-toggle">
+                            <button class="mode-btn active" data-mode="raw"
+                                    onclick="switchJsonMode('${outputFieldId}', 'raw')">Raw</button>
+                            <button class="mode-btn" data-mode="tree"
+                                    onclick="switchJsonMode('${outputFieldId}', 'tree')">Tree</button>
+                        </div>
+                    </div>
+                </div>
+                <textarea id="${outputFieldId}" class="seq-output" rows="4"
                           placeholder='{"message": "response"}'>${output}</textarea>
+                <div id="${outputFieldId}-tree" class="json-tree" style="display: none;"></div>
             </div>
-            <div>
-                <label style="font-size: 0.8rem; color: #718096;">Headers (Optional)</label>
+            <div class="form-group">
+                <label>Headers (Optional)</label>
                 <textarea class="seq-headers" rows="2"
                           placeholder='"x-custom": "value"'>${headers}</textarea>
             </div>

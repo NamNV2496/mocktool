@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"log"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"log"
 
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
@@ -80,7 +81,7 @@ func (_self *ForwardUC) ResponsePublicMockData(c echo.Context) error {
 		c,
 		nil,
 		featureName,
-		"/forward/public",
+		"/forward",
 	)
 }
 

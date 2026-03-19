@@ -76,16 +76,26 @@ func (_self *ForwardController) StartMockServer() error {
 	)
 	c.Use(custommiddleware.RateLimitMiddleware(limiter, conf.RateLimiterCfg.LimitOption))
 
-	c.GET("/forward/*", _self.responseMockData)
-	c.POST("/forward/*", _self.responseMockData)
-	c.PUT("/forward/*", _self.responseMockData)
-	c.DELETE("/forward/*", _self.responseMockData)
+	// Middleware to detect public API by checking authorization header
+	c.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			authHeader := c.Request().Header.Get("Authorization")
+			if authHeader == "" {
+				c.Set("isPublic", true)
+			} else {
+				c.Set("isPublic", false)
+			}
+			return next(c)
+		}
+	})
 
-	// Public API endpoints - no X-Account-Id required, uses global scenario
-	c.GET("/forward/public/*", _self.responsePublicMockData)
-	c.POST("/forward/public/*", _self.responsePublicMockData)
-	c.PUT("/forward/public/*", _self.responsePublicMockData)
-	c.DELETE("/forward/public/*", _self.responsePublicMockData)
+	// Single handler for all forward endpoints
+	c.Match([]string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete}, "/forward/*", func(c echo.Context) error {
+		if isPublic, ok := c.Get("isPublic").(bool); ok && isPublic {
+			return _self.responsePublicMockData(c)
+		}
+		return _self.responseMockData(c)
+	})
 
 	if err := c.Start(_self.config.AppConfig.FowardHTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)

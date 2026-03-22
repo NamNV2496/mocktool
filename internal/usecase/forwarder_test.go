@@ -172,6 +172,10 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 					GetByObjectID(gomock.Any(), scenarioID).
 					Return(scenario, nil)
 
+				cacheRepo.EXPECT().
+					Get(gomock.Any(), gomock.Any()).
+					Return(nil, fmt.Errorf("not found"))
+
 				mockAPIRepo.EXPECT().
 					FindByFeatureScenarioPathMethodAndHash(
 						gomock.Any(),
@@ -182,6 +186,10 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(nil, mongo.ErrNoDocuments)
+
+				cacheRepo.EXPECT().
+					SetWithTTL(gomock.Any(), gomock.Any(), notFoundSentinel, notFoundCacheTTL).
+					Return(nil)
 			},
 			expectedStatus: http.StatusInternalServerError,
 			wantErr:        true,

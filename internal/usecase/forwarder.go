@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
@@ -26,6 +28,12 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+const (
+	sequenceCounterTTL  = 24 * time.Hour
+	notFoundSentinel    = "__not_found__"
+	notFoundCacheTTL    = 30 * time.Second
+)
+
 //go:generate mockgen -source=$GOFILE -destination=../../mocks/usecase/$GOFILE.mock.go -package=$GOPACKAGE
 type IForwardUC interface {
 	ResponseMockData(c echo.Context) error
@@ -36,6 +44,7 @@ type ForwardUC struct {
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
 	cacheRepo           repository.ICache
+	sfGroup             singleflight.Group
 }
 
 func NewForwardUC(
@@ -85,6 +94,14 @@ func (_self *ForwardUC) ResponsePublicMockData(c echo.Context) error {
 	)
 }
 
+type sfResolved struct {
+	outputBytes []byte
+	headersRaw  bson.Raw
+	latency     int64
+	mockAPI     *domain.MockAPI
+	isSequence  bool
+}
+
 func (_self *ForwardUC) forward(
 	c echo.Context,
 	accountId *string,
@@ -93,6 +110,7 @@ func (_self *ForwardUC) forward(
 ) error {
 	ctx := c.Request().Context()
 	start := time.Now()
+
 	// 1. Read body
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
@@ -150,59 +168,85 @@ func (_self *ForwardUC) forward(
 		hash,
 	)
 
-	// 6. Query DB first to check if this is a sequence-based API
-	mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
-		ctx,
-		featureName,
-		scenarioName,
-		path,
-		method,
-		hash,
-	)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			metadata := map[string]string{
-				"x-trace-id": uuid.NewString(),
-			}
-			return errorcustome.NewError(
-				codes.Internal,
-				"ERR.001",
-				"Mock API not found: %s",
-				metadata,
-				"not found",
-			)
+	if cached, err := _self.cacheRepo.Get(ctx, cacheKey); err == nil {
+		observability.MockAPICacheHits.WithLabelValues("hit").Inc()
+		observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
+		if cached.(string) == notFoundSentinel {
+			return echo.NewHTTPError(http.StatusNotFound, "mock API not found")
 		}
-
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		var entry entity.CachedEntry
+		if err := json.Unmarshal([]byte(cached.(string)), &entry); err == nil {
+			if entry.Latency > 0 {
+				time.Sleep(time.Duration(entry.Latency) * time.Second)
+			}
+			c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			_, err := c.Response().Write([]byte(entry.Output))
+			return err
+		}
 	}
 
-	hasSequence := len(mockAPI.Responses) > 0
-
-	// 7. For non-sequence APIs, try cache first
-	if !hasSequence {
-		cached, err := _self.cacheRepo.Get(ctx, cacheKey)
-		if err == nil {
-			var entry entity.CachedEntry
-			if err := json.Unmarshal([]byte(cached.(string)), &entry); err == nil {
-				if entry.Latency > 0 {
-					time.Sleep(time.Duration(entry.Latency) * time.Second)
+	// Cache miss: use singleflight to prevent thundering herd.
+	// Use a detached context for the fetch so a cancelled caller does not abort
+	// the shared in-flight request and invalidate results for other waiters.
+	fetchCtx := context.WithoutCancel(ctx)
+	v, err, _ := _self.sfGroup.Do(cacheKey, func() (any, error) {
+		mockAPI, err := _self.MockAPIRepo.FindByFeatureScenarioPathMethodAndHash(
+			fetchCtx,
+			featureName,
+			scenarioName,
+			path,
+			method,
+			hash,
+		)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				// Negative cache: store sentinel so subsequent waves skip the DB.
+				_self.cacheRepo.SetWithTTL(fetchCtx, cacheKey, notFoundSentinel, notFoundCacheTTL)
+				metadata := map[string]string{
+					"x-trace-id": uuid.NewString(),
 				}
-				observability.MockAPICacheHits.WithLabelValues("hit").Inc()
-				observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
-				c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-				_, err := c.Response().Write([]byte(entry.Output))
-				return err
+				return nil, errorcustome.NewError(
+					codes.Internal,
+					"ERR.001",
+					"Mock API not found: %s",
+					metadata,
+					"not found",
+				)
 			}
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
+
+		if len(mockAPI.Responses) > 0 {
+			return &sfResolved{mockAPI: mockAPI, isSequence: true}, nil
+		}
+		outputBytes, err := rawToJSON(mockAPI.Output)
+		if err != nil {
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
+		}
+		if entryBytes, err := json.Marshal(entity.CachedEntry{
+			Output:  string(outputBytes),
+			Latency: mockAPI.Latency,
+		}); err == nil {
+			_self.cacheRepo.Set(fetchCtx, cacheKey, string(entryBytes))
+		}
+		return &sfResolved{
+			outputBytes: outputBytes,
+			headersRaw:  mockAPI.Headers,
+			latency:     mockAPI.Latency,
+			isSequence:  false,
+		}, nil
+	})
+	if err != nil {
+		return err
 	}
 
-	// 8. Determine output, headers, and latency
-	var outputRaw bson.Raw
+	r := v.(*sfResolved)
+
+	var outputBytes []byte
 	var headersRaw bson.Raw
 	var latency int64
 
-	if hasSequence {
-		// Increment sequence counter
+	if r.isSequence {
 		seqKey := fmt.Sprintf(
 			repository.KeySequenceTemplate,
 			featureName,
@@ -212,64 +256,51 @@ func (_self *ForwardUC) forward(
 			method,
 			hash,
 		)
-		count, err := _self.cacheRepo.Incr(ctx, seqKey)
+		count, err := _self.cacheRepo.IncrWithTTL(ctx, seqKey, sequenceCounterTTL)
 		if err != nil {
 			log.Println("failed to increment sequence counter:", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to increment sequence counter")
 		}
 
-		// Find matching sequence response
-		matched := findMatchingResponse(mockAPI.Responses, int(count))
+		matched := findMatchingResponse(r.mockAPI.Responses, int(count))
 		if matched != nil {
-			outputRaw = matched.Output
+			outputBytes, err = rawToJSON(matched.Output)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse sequence output")
+			}
 			headersRaw = matched.Headers
 			latency = matched.Latency
 		} else {
-			// Fallback to default output if no sequence matches
-			outputRaw = mockAPI.Output
-			headersRaw = mockAPI.Headers
-			latency = mockAPI.Latency
+			outputBytes, err = rawToJSON(r.mockAPI.Output)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
+			}
+			headersRaw = r.mockAPI.Headers
+			latency = r.mockAPI.Latency
 		}
 	} else {
-		outputRaw = mockAPI.Output
-		headersRaw = mockAPI.Headers
-		latency = mockAPI.Latency
+		outputBytes = r.outputBytes
+		headersRaw = r.headersRaw
+		latency = r.latency
 	}
-
-	// 9. Apply latency if configured
 	if latency > 0 {
 		time.Sleep(time.Duration(latency) * time.Second)
 	}
 
-	// 10. Convert output
-	var outputMap map[string]any
-
-	if err := bson.Unmarshal(outputRaw, &outputMap); err != nil {
-		if err := json.Unmarshal(outputRaw, &outputMap); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
-		}
-	}
-
-	outputBytes, err := json.Marshal(outputMap)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to marshal output")
-	}
-
-	// 11. Set headers
+	// 10. Set headers
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	if len(headersRaw) > 0 {
 		var headers map[string]string
 		if err := bson.Unmarshal(headersRaw, &headers); err == nil {
 			sanitized, _ := security.ValidateAndSanitizeHeaders(headers)
-
 			for k, v := range sanitized {
 				c.Response().Header().Set(k, v)
 			}
 		}
 	}
 
-	// 12. Write response
+	// 11. Write response
 	_, err = c.Response().Write(outputBytes)
 	if err != nil {
 		return err
@@ -277,17 +308,16 @@ func (_self *ForwardUC) forward(
 	observability.MockAPICacheHits.WithLabelValues("miss").Inc()
 	observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
 
-	// 13. Save cache (skip for sequence-based APIs)
-	if !hasSequence {
-		if entryBytes, err := json.Marshal(entity.CachedEntry{
-			Output:  string(outputBytes),
-			Latency: latency,
-		}); err == nil {
-			_self.cacheRepo.Set(ctx, cacheKey, string(entryBytes))
+	return nil
+}
+func rawToJSON(raw bson.Raw) ([]byte, error) {
+	var m map[string]any
+	if err := bson.Unmarshal(raw, &m); err != nil {
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return nil, err
 		}
 	}
-
-	return nil
+	return json.Marshal(m)
 }
 
 func findMatchingResponse(responses []domain.SequenceResponse, count int) *domain.SequenceResponse {

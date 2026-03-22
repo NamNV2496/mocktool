@@ -15,6 +15,7 @@ Mocktool is a simple tool written in the Go language. It supports controlling AP
 - Unittest: "go.uber.org/mock/gomock" - coverage: 87.5% of statements
 - ratelimit
 - load shedding
+- singleflight - "golang.org/x/sync/singleflight"
 ```
 
 ## Problem Statement
@@ -473,3 +474,22 @@ return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s"
 }
 ```
 
+<summary>
+<details>
+
+```txt       
+t=0ms ~~  Request A vào → fn() bắt đầu chạy                 
+t=50ms  Request B vào → chờ, KHÔNG chạy fn() mới
+t=100ms Request C vào chờ
+t=200ms fn() xong → A, B, C đều nhận kết quả        
+t=201ms Request D vào → fn() bắt đầu chạy lại (group đã giải tán)
+Với nhiều pod — singleflight KHÔNG hoạt động cross-pod     
+Đây là điểm quan trọng nhất:
+Pod 1: Request A ──► sfGroup.Do() ──► DB query  ✓ gộp được trong pod
+Pod 2: Request B ──► sfGroup.Do() ──► DB query  ✗ pod 2 không biết pod 1 đang query
+Pod 3: Request C ──► sfGroup.Do() ──► DB query  ✗ tương tự       
+singleflight chỉ là in-memory, không share state giữa các pod. 3 pod = 3 DB queries dù cùng key. 
+```
+
+</details>
+</summary>

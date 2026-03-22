@@ -12,6 +12,7 @@ package repository
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -84,6 +85,21 @@ func (mr *MockICacheMockRecorder) Incr(ctx, key any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Incr", reflect.TypeOf((*MockICache)(nil).Incr), ctx, key)
 }
 
+// IncrWithTTL mocks base method.
+func (m *MockICache) IncrWithTTL(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrWithTTL", ctx, key, ttl)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IncrWithTTL indicates an expected call of IncrWithTTL.
+func (mr *MockICacheMockRecorder) IncrWithTTL(ctx, key, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrWithTTL", reflect.TypeOf((*MockICache)(nil).IncrWithTTL), ctx, key, ttl)
+}
+
 // InvalidAllKey mocks base method.
 func (m *MockICache) InvalidAllKey(ctx context.Context, key string) error {
 	m.ctrl.T.Helper()
@@ -110,4 +126,18 @@ func (m *MockICache) Set(ctx context.Context, key string, value any) error {
 func (mr *MockICacheMockRecorder) Set(ctx, key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockICache)(nil).Set), ctx, key, value)
+}
+
+// SetWithTTL mocks base method.
+func (m *MockICache) SetWithTTL(ctx context.Context, key string, value any, ttl time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetWithTTL", ctx, key, value, ttl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetWithTTL indicates an expected call of SetWithTTL.
+func (mr *MockICacheMockRecorder) SetWithTTL(ctx, key, value, ttl any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetWithTTL", reflect.TypeOf((*MockICache)(nil).SetWithTTL), ctx, key, value, ttl)
 }

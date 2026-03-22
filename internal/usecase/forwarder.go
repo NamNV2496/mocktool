@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,9 +30,9 @@ import (
 )
 
 const (
-	sequenceCounterTTL  = 24 * time.Hour
-	notFoundSentinel    = "__not_found__"
-	notFoundCacheTTL    = 30 * time.Second
+	sequenceCounterTTL = 24 * time.Hour
+	notFoundSentinel   = "__not_found__"
+	notFoundCacheTTL   = 30 * time.Second
 )
 
 //go:generate mockgen -source=$GOFILE -destination=../../mocks/usecase/$GOFILE.mock.go -package=$GOPACKAGE
@@ -200,20 +201,26 @@ func (_self *ForwardUC) forward(
 		)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
+				// Exact path miss — try pattern matching (e.g. /api/users/:id).
+				mockAPI, err = findByPathPattern(fetchCtx, _self.MockAPIRepo, featureName, scenarioName, path, method, hash)
+			}
+			if err != nil {
 				// Negative cache: store sentinel so subsequent waves skip the DB.
 				_self.cacheRepo.SetWithTTL(fetchCtx, cacheKey, notFoundSentinel, notFoundCacheTTL)
-				metadata := map[string]string{
-					"x-trace-id": uuid.NewString(),
+				if err == mongo.ErrNoDocuments {
+					metadata := map[string]string{
+						"x-trace-id": uuid.NewString(),
+					}
+					return nil, errorcustome.NewError(
+						codes.Internal,
+						"ERR.001",
+						"Mock API not found: %s",
+						metadata,
+						"not found",
+					)
 				}
-				return nil, errorcustome.NewError(
-					codes.Internal,
-					"ERR.001",
-					"Mock API not found: %s",
-					metadata,
-					"not found",
-				)
+				return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
-			return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
 		if len(mockAPI.Responses) > 0 {
@@ -223,10 +230,8 @@ func (_self *ForwardUC) forward(
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
 		}
-		if entryBytes, err := json.Marshal(entity.CachedEntry{
-			Output:  string(outputBytes),
-			Latency: mockAPI.Latency,
-		}); err == nil {
+		entry := entity.CachedEntry{Output: string(outputBytes), Latency: int64(1000)} // delay 1000ms = 1s
+		if entryBytes, err := json.Marshal(entry); err == nil {
 			_self.cacheRepo.Set(fetchCtx, cacheKey, string(entryBytes))
 		}
 		return &sfResolved{
@@ -318,6 +323,44 @@ func rawToJSON(raw bson.Raw) ([]byte, error) {
 		}
 	}
 	return json.Marshal(m)
+}
+
+// findByPathPattern fetches all active APIs for the given feature/scenario/method
+// and returns the first one whose stored path pattern matches actualPath and whose
+// hash_input matches hashInput. Used as a fallback after an exact-path miss.
+func findByPathPattern(
+	ctx context.Context,
+	repo repository.IMockAPIRepository,
+	featureName, scenarioName, actualPath, method, hashInput string,
+) (*domain.MockAPI, error) {
+	candidates, err := repo.FindCandidatesByFeatureScenarioAndMethod(ctx, featureName, scenarioName, method)
+	if err != nil {
+		return nil, err
+	}
+	for i := range candidates {
+		c := &candidates[i]
+		if c.HashInput == hashInput && utils.MatchPath(c.Path, actualPath) {
+			return c, nil
+		}
+	}
+	return nil, mongo.ErrNoDocuments
+}
+
+// applyChaos randomly injects errors and/or latency jitter based on the mock's
+// ChaosConfig. It returns an HTTP error when an error is injected, nil otherwise.
+// Both mechanisms are independent — jitter is applied even when no error fires.
+func applyChaos(errorRate float64, errorStatus int, jitterMs int64) error {
+	if jitterMs > 0 {
+		time.Sleep(time.Duration(rand.Int63n(jitterMs)) * time.Millisecond)
+	}
+	if errorRate > 0 && rand.Float64() < errorRate {
+		status := errorStatus
+		if status == 0 {
+			status = http.StatusInternalServerError
+		}
+		return echo.NewHTTPError(status, "chaos: injected error")
+	}
+	return nil
 }
 
 func findMatchingResponse(responses []domain.SequenceResponse, count int) *domain.SequenceResponse {

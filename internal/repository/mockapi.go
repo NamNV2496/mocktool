@@ -22,6 +22,7 @@ type IMockAPIRepository interface {
 	UpdateByObjectID(ctx context.Context, id primitive.ObjectID, update bson.M) error
 	DeletByObjectID(ctx context.Context, id primitive.ObjectID) error
 	FindByFeatureScenarioPathMethodAndHash(ctx context.Context, featureName, scenarioName, path, method, hashInput string) (*domain.MockAPI, error)
+	FindCandidatesByFeatureScenarioAndMethod(ctx context.Context, featureName, scenarioName, method string) ([]domain.MockAPI, error)
 	DeleteByScenarioName(ctx context.Context, scenarioName string) error
 	DeleteByFeatureName(ctx context.Context, featureName string) error
 }
@@ -207,6 +208,20 @@ func (_self *MockAPIRepository) FindByFeatureScenarioPathMethodAndHash(
 	}
 
 	return &result, nil
+}
+
+func (_self *MockAPIRepository) FindCandidatesByFeatureScenarioAndMethod(
+	ctx context.Context,
+	featureName, scenarioName, method string,
+) ([]domain.MockAPI, error) {
+	var result []domain.MockAPI
+	err := _self.repo.FindMany(ctx, bson.M{
+		"feature_name":  featureName,
+		"scenario_name": scenarioName,
+		"method":        method,
+		"is_active":     true,
+	}, &result)
+	return result, err
 }
 
 func (_self *MockAPIRepository) DeletByObjectID(ctx context.Context, id primitive.ObjectID) error {

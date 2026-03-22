@@ -20,15 +20,10 @@ import (
 )
 
 func TestForwardUC_ResponseMockData(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockAPIRepo := mocks.NewMockIMockAPIRepository(ctrl)
-	scenarioRepo := mocks.NewMockIScenarioRepository(ctrl)
-	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
-	cacheRepo := repositoryMocks.NewMockICache(ctrl)
-
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	var mockAPIRepo *mocks.MockIMockAPIRepository
+	var scenarioRepo *mocks.MockIScenarioRepository
+	var accountScenarioRepo *mocks.MockIAccountScenarioRepository
+	var cacheRepo *repositoryMocks.MockICache
 
 	tests := []struct {
 		name           string
@@ -187,6 +182,15 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 					).
 					Return(nil, mongo.ErrNoDocuments)
 
+				mockAPIRepo.EXPECT().
+					FindCandidatesByFeatureScenarioAndMethod(
+						gomock.Any(),
+						"test-feature",
+						"test-scenario",
+						"POST",
+					).
+					Return(nil, mongo.ErrNoDocuments)
+
 				cacheRepo.EXPECT().
 					SetWithTTL(gomock.Any(), gomock.Any(), notFoundSentinel, notFoundCacheTTL).
 					Return(nil)
@@ -253,12 +257,23 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup
+			// Setup gomock for this subtest only
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAPIRepo = mocks.NewMockIMockAPIRepository(ctrl)
+			scenarioRepo = mocks.NewMockIScenarioRepository(ctrl)
+			accountScenarioRepo = mocks.NewMockIAccountScenarioRepository(ctrl)
+			cacheRepo = repositoryMocks.NewMockICache(ctrl)
+			uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+
+			// Request + context
 			e := echo.New()
 			req := tt.setupRequest()
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 
+			// Set expectations now with local mocks
 			tt.setupMocks()
 
 			// Execute
@@ -269,6 +284,7 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedStatus, rec.Code)
 			}
 
 			if tt.checkResponse != nil {

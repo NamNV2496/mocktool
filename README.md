@@ -477,7 +477,8 @@ return nil, errorcustome.NewError(codes.Internal, "ERR.001", "Forward error: %s"
 <summary>
 <details>
 
-```txt       
+## Singleflight
+```txt
 t=0ms ~~  Request A vào → fn() bắt đầu chạy                 
 t=50ms  Request B vào → chờ, KHÔNG chạy fn() mới
 t=100ms Request C vào chờ

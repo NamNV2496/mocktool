@@ -122,6 +122,7 @@ func (_self *MockController) StartHttpServer() error {
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario)              // update or inactive scenario
 	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)                    // update or inactive scenario
 	v1.POST("/mockapis/:api_id/reset-counter", _self.ResetSequenceCounter)           // reset sequence counter
+	v1.POST("/mockapis/:api_id/test-real", _self.TestRealData)                       // test real API and compare with mock responses
 
 	// Load test scenarios - delegate to LoadTestController
 	_self.loadTestController.RegisterRoutes(v1)
@@ -630,6 +631,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"name":          api.Name,
 			"description":   api.Description,
 			"is_active":     api.IsActive,
+			"base_url":      api.BaseURL,
 			"path":          api.Path,
 			"method":        api.Method,
 			"input":         inputJSON,
@@ -723,6 +725,7 @@ func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Contex
 			"scenario_name": api.ScenarioName,
 			"name":          api.Name,
 			"description":   api.Description,
+			"base_url":      api.BaseURL,
 			"path":          api.Path,
 			"method":        api.Method,
 			"input":         inputJSON,
@@ -784,6 +787,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		ScenarioName: reqBody.ScenarioName,
 		Name:         reqBody.Name,
 		Description:  reqBody.Description,
+		BaseURL:      reqBody.BaseURL,
 		Path:         reqBody.Path,
 		Method:       reqBody.Method,
 		Latency:      reqBody.Latency,
@@ -969,6 +973,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		"name":          req.Name,
 		"description":   req.Description,
 		"is_active":     req.IsActive,
+		"base_url":      req.BaseURL,
 		"path":          req.Path,
 		"method":        req.Method,
 		"input":         inputJSON,
@@ -1029,6 +1034,7 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 	if reqBody.Description != "" {
 		update["description"] = reqBody.Description
 	}
+	update["base_url"] = reqBody.BaseURL
 	if reqBody.Path != "" {
 		update["path"] = reqBody.Path
 	}
@@ -1270,6 +1276,136 @@ func convertSequenceResponsesToJSON(responses []domain.SequenceResponse) []map[s
 		result = append(result, entry)
 	}
 	return result
+}
+
+/* ---------- POST /mockapis/:api_id/test-real ---------- */
+
+func (_self *MockController) TestRealData(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	objectID, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+
+	mockAPI, err := _self.MockAPIRepo.FindByObjectID(ctx, objectID)
+	if err != nil || mockAPI == nil || mockAPI.Name == "" {
+		return echo.NewHTTPError(http.StatusNotFound, "mock API not found")
+	}
+
+	if mockAPI.BaseURL == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "base_url is not configured for this mock API")
+	}
+
+	// Build target URL
+	targetURL := strings.TrimRight(mockAPI.BaseURL, "/") + "/" + strings.TrimLeft(mockAPI.Path, "/")
+
+	// Build request body from input if present
+	var bodyReader *strings.Reader
+	if len(mockAPI.Input) > 0 {
+		var inputMap bson.M
+		if err := bson.Unmarshal(mockAPI.Input, &inputMap); err == nil {
+			inputJSON, _ := json.Marshal(inputMap)
+			bodyReader = strings.NewReader(string(inputJSON))
+		}
+	}
+	if bodyReader == nil {
+		bodyReader = strings.NewReader("")
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, mockAPI.Method, targetURL, bodyReader)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to build request: "+err.Error())
+	}
+
+	// Apply stored headers
+	if len(mockAPI.Headers) > 0 {
+		var headersMap bson.M
+		if err := bson.Unmarshal(mockAPI.Headers, &headersMap); err == nil {
+			for k, v := range headersMap {
+				if str, ok := v.(string); ok {
+					httpReq.Header.Set(k, str)
+				}
+			}
+		}
+	}
+	if len(mockAPI.Input) > 0 {
+		httpReq.Header.Set("Content-Type", "application/json")
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]any{
+			"success":       false,
+			"error":         err.Error(),
+			"real_response": nil,
+			"mock_response": nil,
+		})
+	}
+	defer resp.Body.Close()
+
+	// Read real response body
+	var realBody any
+	if err := json.NewDecoder(resp.Body).Decode(&realBody); err != nil {
+		realBody = nil
+	}
+	realJSON, _ := json.Marshal(realBody)
+
+	// Build default mock output
+	var defaultOutput any
+	if len(mockAPI.Output) > 0 {
+		var outputMap bson.M
+		if err := bson.Unmarshal(mockAPI.Output, &outputMap); err == nil {
+			defaultOutput = outputMap
+		}
+	}
+	defaultJSON, _ := json.Marshal(defaultOutput)
+	defaultMatched := string(realJSON) == string(defaultJSON)
+
+	// Build sequence response comparisons
+	type seqResult struct {
+		From    int  `json:"from"`
+		To      int  `json:"to"`
+		Output  any  `json:"output"`
+		Matched bool `json:"matched"`
+	}
+	var seqResults []seqResult
+	anySeqMatched := false
+	for _, seq := range mockAPI.Responses {
+		var seqOutput any
+		if len(seq.Output) > 0 {
+			var m bson.M
+			if err := bson.Unmarshal(seq.Output, &m); err == nil {
+				seqOutput = m
+			}
+		}
+		seqJSON, _ := json.Marshal(seqOutput)
+		matched := string(realJSON) == string(seqJSON)
+		if matched {
+			anySeqMatched = true
+		}
+		seqResults = append(seqResults, seqResult{
+			From:    seq.From,
+			To:      seq.To,
+			Output:  seqOutput,
+			Matched: matched,
+		})
+	}
+
+	overallMatched := defaultMatched || anySeqMatched
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"success":           true,
+		"matched":           overallMatched,
+		"default_matched":   defaultMatched,
+		"real_status":       resp.StatusCode,
+		"real_response":     realBody,
+		"mock_response":     defaultOutput,
+		"sequence_responses": seqResults,
+		"target_url":        targetURL,
+	})
 }
 
 /* ---------- Health Check Endpoints ---------- */

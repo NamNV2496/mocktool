@@ -255,6 +255,11 @@
                     <input type="text" id="mockapi-description" data-i18n-placeholder="mockapi.form.description.placeholder" placeholder="Enter API description">
                 </div>
                 <div class="form-group">
+                    <label for="mockapi-base-url">Base URL (Optional - for Test Real Data)</label>
+                    <input type="text" id="mockapi-base-url" placeholder="https://api.example.com">
+                    <small style="color: #718096; font-size: 0.85rem;">Real API base URL used when clicking "Test Real Data"</small>
+                </div>
+                <div class="form-group">
                     <label for="mockapi-path" data-i18n="mockapi.form.path.label">Path</label>
                     <input type="text" id="mockapi-path" data-i18n-placeholder="mockapi.form.path.placeholder" placeholder="/api/example" required>
                 </div>
@@ -420,6 +425,48 @@
         </div>
     </div>
 
+
+    <!-- Modal for Test Real Data Result -->
+    <div id="test-real-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>Test Real Data</h3>
+                <span class="close" onclick="closeModal('test-real-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="test-real-loading" style="text-align: center; padding: 20px; display: none;">
+                    <span>Calling real API...</span>
+                </div>
+                <div id="test-real-result" style="display: none;">
+                    <div id="test-real-status-bar" style="padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; font-weight: bold; font-size: 1rem;"></div>
+                    <p style="color: #718096; font-size: 0.85rem; margin-bottom: 6px;"><strong>Target URL:</strong> <span id="test-real-target-url" style="font-family: monospace;"></span></p>
+                    <p style="color: #718096; font-size: 0.85rem; margin-bottom: 16px;"><strong>HTTP Status:</strong> <span id="test-real-http-status"></span></p>
+
+                    <!-- Default response comparison -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                        <div>
+                            <h4 style="margin-bottom: 8px; color: #2d3748;">Real API Response</h4>
+                            <pre id="test-real-real-response" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; overflow: auto; max-height: 300px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;"></pre>
+                        </div>
+                        <div>
+                            <h4 style="margin-bottom: 8px; color: #2d3748;">Default Mock Response <span id="test-real-default-badge" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px;"></span></h4>
+                            <pre id="test-real-mock-response" style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; overflow: auto; max-height: 300px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all;"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Sequence responses comparison -->
+                    <div id="test-real-sequence-section" style="display: none;">
+                        <h4 style="margin-bottom: 10px; color: #2d3748; border-top: 1px solid #e2e8f0; padding-top: 14px;">Sequence Responses</h4>
+                        <div id="test-real-sequence-list"></div>
+                    </div>
+                </div>
+                <div id="test-real-error" style="display: none; color: #e53e3e; padding: 12px; background: #fff5f5; border-radius: 6px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('test-real-modal')">Close</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Variable Extraction Row Template (hidden) -->
     <template id="variable-row-template">

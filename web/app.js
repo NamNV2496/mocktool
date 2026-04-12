@@ -329,6 +329,7 @@ function renderMockAPIsTable() {
                 <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>${t('common.edit')}</button>
                 <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>${t('common.duplicate')}</button>
                 ${api.responses && api.responses.length > 0 ? `<button class="btn-reset-counter" onclick="resetSequenceCounter('${api.id}')">Reset Counter</button>` : ''}
+                ${api.is_active && api.base_url ? `<button class="btn btn-outline" style="background:#ebf8ff;color:#2b6cb0;border-color:#bee3f8;" onclick="testRealData('${api.id}')">Test Real</button>` : ''}
                 <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">${t('common.delete')}</button>
             </td>
         </tr>
@@ -956,6 +957,7 @@ async function showCreateMockAPIModal() {
     document.getElementById('mockapi-hash-input').value = '';
     document.getElementById('mockapi-output').value = '';
     document.getElementById('mockapi-latency').value = '0';
+    document.getElementById('mockapi-base-url').value = '';
     document.getElementById('mockapi-active').checked = true;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1044,6 +1046,7 @@ async function editMockAPI(api) {
     }
 
     document.getElementById('mockapi-latency').value = api.latency || 0;
+    document.getElementById('mockapi-base-url').value = api.base_url || '';
     document.getElementById('mockapi-active').checked = api.is_active;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1158,6 +1161,7 @@ async function duplicateMockAPI(api) {
     }
 
     document.getElementById('mockapi-latency').value = api.latency || 0;
+    document.getElementById('mockapi-base-url').value = api.base_url || '';
     document.getElementById('mockapi-active').checked = api.is_active;
 
     const featureSelect = document.getElementById('mockapi-feature');
@@ -1285,11 +1289,14 @@ async function saveMockAPI() {
     const responses = getSequenceResponsesFromForm();
     if (responses === null) return; // validation error
 
+    const baseUrl = document.getElementById('mockapi-base-url').value.trim();
+
     const data = {
         feature_name: featureName,
         scenario_name: scenarioName,
         name: name,
         description: description,
+        base_url: baseUrl,
         path: path,
         method: method,
         regex_path: regexPath,
@@ -1470,6 +1477,90 @@ async function resetSequenceCounter(apiId) {
     } catch (error) {
         console.error('Error resetting counter:', error);
         showError('Failed to reset counter');
+    }
+}
+
+async function testRealData(apiId) {
+    // Show modal with loading state
+    document.getElementById('test-real-loading').style.display = 'block';
+    document.getElementById('test-real-result').style.display = 'none';
+    document.getElementById('test-real-error').style.display = 'none';
+    showModal('test-real-modal');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/mockapis/${apiId}/test-real`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        document.getElementById('test-real-loading').style.display = 'none';
+
+        if (!result.success) {
+            document.getElementById('test-real-error').style.display = 'block';
+            document.getElementById('test-real-error').textContent = 'Error calling real API: ' + (result.error || 'Unknown error');
+            return;
+        }
+
+        document.getElementById('test-real-result').style.display = 'block';
+        document.getElementById('test-real-target-url').textContent = result.target_url || '';
+        document.getElementById('test-real-http-status').textContent = result.real_status || '';
+
+        // Overall status bar
+        const statusBar = document.getElementById('test-real-status-bar');
+        if (result.matched) {
+            statusBar.style.background = '#c6f6d5';
+            statusBar.style.color = '#276749';
+            statusBar.textContent = '✅ MATCH — Real API response matches at least one mock response';
+        } else {
+            statusBar.style.background = '#fed7d7';
+            statusBar.style.color = '#9b2c2c';
+            statusBar.textContent = '❌ MISMATCH — Real API response differs from all mock responses';
+        }
+
+        // Real response (left column, shown once)
+        document.getElementById('test-real-real-response').textContent =
+            JSON.stringify(result.real_response, null, 2);
+
+        // Default mock response with match badge
+        document.getElementById('test-real-mock-response').textContent =
+            JSON.stringify(result.mock_response, null, 2);
+        const defaultBadge = document.getElementById('test-real-default-badge');
+        if (result.default_matched) {
+            defaultBadge.style.background = '#c6f6d5';
+            defaultBadge.style.color = '#276749';
+            defaultBadge.textContent = '✅ matched';
+        } else {
+            defaultBadge.style.background = '#fed7d7';
+            defaultBadge.style.color = '#9b2c2c';
+            defaultBadge.textContent = '❌ no match';
+        }
+
+        // Sequence responses
+        const seqSection = document.getElementById('test-real-sequence-section');
+        const seqList = document.getElementById('test-real-sequence-list');
+        const seqs = result.sequence_responses;
+        if (seqs && seqs.length > 0) {
+            seqSection.style.display = 'block';
+            seqList.innerHTML = seqs.map(seq => {
+                const badge = seq.matched
+                    ? `<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:#c6f6d5;color:#276749;margin-left:8px;">✅ matched</span>`
+                    : `<span style="font-size:0.75rem;padding:2px 8px;border-radius:10px;background:#fed7d7;color:#9b2c2c;margin-left:8px;">❌ no match</span>`;
+                return `
+                    <div style="margin-bottom:12px;border:1px solid #e2e8f0;border-radius:6px;padding:10px;">
+                        <div style="font-weight:bold;margin-bottom:6px;color:#2d3748;">
+                            Calls ${seq.from}–${seq.to} ${badge}
+                        </div>
+                        <pre style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:4px;padding:8px;font-size:0.78rem;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow:auto;">${JSON.stringify(seq.output, null, 2)}</pre>
+                    </div>`;
+            }).join('');
+        } else {
+            seqSection.style.display = 'none';
+        }
+
+    } catch (error) {
+        document.getElementById('test-real-loading').style.display = 'none';
+        document.getElementById('test-real-error').style.display = 'block';
+        document.getElementById('test-real-error').textContent = 'Failed to call test endpoint: ' + error.message;
     }
 }
 

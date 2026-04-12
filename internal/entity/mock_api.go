@@ -15,6 +15,7 @@ type MockAPIRequest struct {
 	ScenarioName string                    `json:"scenario_name" validate:"required,no_spaces"`
 	Name         string                    `json:"name" validate:"required,no_spaces"`
 	Description  string                    `json:"description"`
+	BaseURL      string                    `json:"base_url"`
 	Path         string                    `json:"path" validate:"required,no_spaces"`
 	Method       string                    `json:"method" validate:"required,no_spaces"`
 	Input        json.RawMessage           `json:"input"`

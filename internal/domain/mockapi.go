@@ -22,6 +22,7 @@ type MockAPI struct {
 	Name         string             `bson:"name" json:"name" validate:"required,no_spaces"`
 	Description  string             `bson:"description" json:"description"`
 	IsActive     bool               `bson:"is_active" json:"is_active"`
+	BaseURL      string             `bson:"base_url" json:"base_url"`
 	Path         string             `bson:"path" json:"path" validate:"required,no_spaces"`
 	Method       string             `bson:"method" json:"method" validate:"required,no_spaces"`
 	Input        bson.Raw           `bson:"input,omitempty" json:"input"`

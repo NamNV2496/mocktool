@@ -315,7 +315,7 @@ const translations = {
         'tab.features': 'Tính năng',
         'tab.scenarios': 'Kịch bản',
         'tab.mockapis': 'Mock API',
-        'tab.loadtest': 'Công cụ kiểm tra tải',
+        // 'tab.loadtest': 'Công cụ kiểm tra tải',
 
         // Common
         'common.active': 'Hoạt động',

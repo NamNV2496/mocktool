@@ -1205,7 +1205,7 @@ select.tree-value-input {
 .ai-sidebar {
     position: fixed;
     top: 0;
-    right: -420px;
+    right: 0;
     width: 400px;
     height: 100vh;
     z-index: 999;
@@ -1214,7 +1214,8 @@ select.tree-value-input {
     background: #1a1d2e;
     border-left: 1px solid #2d3158;
     box-shadow: -4px 0 32px rgba(0, 0, 0, 0.4);
-    transition: right 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -1235,7 +1236,7 @@ select.tree-value-input {
 }
 
 .ai-sidebar.open {
-    right: 0;
+    transform: translateX(0);
 }
 
 /* Header */

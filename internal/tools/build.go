@@ -8,16 +8,25 @@ func BuildAll(d Deps) *Registry {
 		// Read
 		listFeatures(d),
 		listScenarios(d),
+		searchScenarios(d),
 		getActiveScenario(d),
 		listAPIs(d),
 		searchMocks(d),
 
 		// Write
+		createFeature(d),
+		updateFeature(d),
+		enableFeature(d),
+		createScenario(d),
+		updateScenario(d),
 		createMockAPI(d),
 		updateMockAPI(d),
+		resetMockAPICounter(d),
 		activateScenario(d),
 
 		// Destructive (Slack-side confirmation required)
+		disableFeature(d),
+		setScenarioInactive(d),
 		deactivateScenario(d),
 		deleteMockAPI(d),
 		deleteScenario(d),

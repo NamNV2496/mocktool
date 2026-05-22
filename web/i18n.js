@@ -12,7 +12,7 @@ const translations = {
         'tab.features': 'Features',
         'tab.scenarios': 'Scenarios',
         'tab.mockapis': 'Mock APIs',
-        'tab.loadtest': 'Load Test Tool',
+        // 'tab.loadtest': 'Load Test Tool',
 
         // Common
         'common.active': 'Active',

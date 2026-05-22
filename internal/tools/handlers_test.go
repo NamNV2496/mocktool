@@ -47,12 +47,13 @@ func TestBuildAll_ExposesExpectedTools(t *testing.T) {
 
 	got := r.Names()
 	want := []string{
-		"activate_scenario", "create_mock_api",
-		"deactivate_scenario", "delete_feature",
-		"delete_mock_api", "delete_scenario",
-		"get_active_scenario", "list_apis",
-		"list_features", "list_scenarios",
-		"search_mocks", "update_mock_api",
+		"activate_scenario", "create_feature", "create_mock_api",
+		"create_scenario", "deactivate_scenario", "delete_feature",
+		"delete_mock_api", "delete_scenario", "disable_feature",
+		"enable_feature", "get_active_scenario", "list_apis",
+		"list_features", "list_scenarios", "reset_mock_api_counter",
+		"search_mocks", "search_scenarios", "set_scenario_inactive",
+		"update_feature", "update_mock_api", "update_scenario",
 	}
 	assert.ElementsMatch(t, want, got)
 }
@@ -62,10 +63,12 @@ func TestBuildAll_DestructiveFlagsCorrectlySet(t *testing.T) {
 	r := BuildAll(d)
 
 	destructive := map[string]bool{
-		"deactivate_scenario": true,
-		"delete_feature":      true,
-		"delete_scenario":     true,
-		"delete_mock_api":     true,
+		"deactivate_scenario":  true,
+		"delete_feature":       true,
+		"delete_scenario":      true,
+		"delete_mock_api":      true,
+		"disable_feature":      true,
+		"set_scenario_inactive": true,
 	}
 	for _, tool := range r.List() {
 		assert.Equal(t, destructive[tool.Name], tool.Destructive, "tool=%s", tool.Name)

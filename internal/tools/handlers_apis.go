@@ -375,6 +375,51 @@ func deleteMockAPI(d Deps) Tool {
 	}
 }
 
+// resetMockAPICounter clears the sequence-response counter for a mock API
+// so the next request starts from the first sequence entry again.
+func resetMockAPICounter(d Deps) Tool {
+	type args struct {
+		Feature  string `json:"feature"`
+		Scenario string `json:"scenario"`
+		Name     string `json:"name"`
+	}
+	return Tool{
+		Name:        "reset_mock_api_counter",
+		Description: "Reset the sequence-response counter for a mock API so the next call starts from the first sequence entry.",
+		InputSchema: schema(`{
+            "type": "object",
+            "required": ["feature", "scenario", "name"],
+            "properties": {
+                "feature":  {"type": "string"},
+                "scenario": {"type": "string"},
+                "name":     {"type": "string", "description": "mock API name"}
+            }
+        }`),
+		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+			var a args
+			if err := decodeArgs(raw, &a); err != nil {
+				return nil, err
+			}
+			if a.Feature == "" || a.Scenario == "" || a.Name == "" {
+				return nil, fmt.Errorf("feature, scenario, and name are required")
+			}
+			api, err := d.MockAPI.FindByNameAndFeatureAndScenario(ctx, a.Name, a.Feature, a.Scenario)
+			if err != nil || api == nil {
+				return nil, fmt.Errorf("mock API %q not found in %s/%s", a.Name, a.Feature, a.Scenario)
+			}
+			pattern := fmt.Sprintf("mocktool:seq:%s:%s:*:%s:%s:*",
+				api.FeatureName, api.ScenarioName, api.Path, api.Method)
+			_ = d.Cache.InvalidAllKey(ctx, pattern)
+			return map[string]any{
+				"feature":  a.Feature,
+				"scenario": a.Scenario,
+				"name":     a.Name,
+				"reset":    true,
+			}, nil
+		},
+	}
+}
+
 func mockAPIsToJSON(apis []domain.MockAPI) []map[string]any {
 	out := make([]map[string]any, 0, len(apis))
 	for _, api := range apis {

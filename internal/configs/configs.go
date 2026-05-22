@@ -38,12 +38,19 @@ type LoadSheddingCfg struct {
 	MaxLatency     int64 `env:"LOAD_SHEDDING_MAX_LATENCY" envDefault:"2000"`     // 2 seconds
 }
 
+type OpenAIConfig struct {
+	APIKey      string `env:"OPENAI_API_KEY" envDefault:""`
+	Model       string `env:"OPENAI_MODEL" envDefault:"openrouter/auto"`
+	APIEndpoint string `env:"OPENAI_API_ENDPOINT" envDefault:"https://openrouter.ai/api/v1"`
+}
+
 type Config struct {
 	AppConfig       AppConfig
 	MongoDB         MongoDB
 	RedisConf       RedisConf
 	RateLimiterCfg  RateLimiterCfg
 	LoadSheddingCfg LoadSheddingCfg
+	OpenAIConfig    OpenAIConfig
 }
 
 func LoadConfig() *Config {

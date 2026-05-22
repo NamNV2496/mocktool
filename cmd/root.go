@@ -7,5 +7,7 @@ func Execute() error {
 		Short: "A simple mock tool",
 	}
 	rootCmd.AddCommand(serviceCmd)
+	rootCmd.AddCommand(mcpServerCmd)
+	rootCmd.AddCommand(slackBotCmd)
 	return rootCmd.Execute()
 }

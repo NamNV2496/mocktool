@@ -17,6 +17,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/namnv2496/mocktool/internal/chat"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
@@ -42,6 +43,7 @@ type MockController struct {
 	MockAPIRepo         repository.IMockAPIRepository
 	loadTestController  ILoadTestController
 	cacheRepo           repository.ICache
+	chatHandler         *chat.Handler
 }
 
 func NewMockController(
@@ -52,6 +54,7 @@ func NewMockController(
 	mockAPIRepo repository.IMockAPIRepository,
 	loadTestController ILoadTestController,
 	cacheRepo repository.ICache,
+	chatHandler *chat.Handler,
 ) IMockController {
 
 	return &MockController{
@@ -62,6 +65,7 @@ func NewMockController(
 		MockAPIRepo:         mockAPIRepo,
 		loadTestController:  loadTestController,
 		cacheRepo:           cacheRepo,
+		chatHandler:         chatHandler,
 	}
 }
 
@@ -120,9 +124,13 @@ func (_self *MockController) StartHttpServer() error {
 	v1.GET("/mockapis/search", _self.SearchMockAPIsByScenarioAndNameOrPath) // search APIs by scenario and name/path
 	v1.POST("/mockapis", _self.CreateMockAPIByScenario)                     // create new scenario
 	v1.PUT("/mockapis/:api_id", _self.UpdateMockAPIByScenario)              // update or inactive scenario
-	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)                    // update or inactive scenario
-	v1.POST("/mockapis/:api_id/reset-counter", _self.ResetSequenceCounter)           // reset sequence counter
-	v1.POST("/mockapis/:api_id/test-real", _self.TestRealData)                       // test real API and compare with mock responses
+	v1.DELETE("/mockapis/:api_id", _self.DeleteMockAPIByScenario)           // update or inactive scenario
+	v1.POST("/mockapis/:api_id/reset-counter", _self.ResetSequenceCounter)  // reset sequence counter
+	v1.POST("/mockapis/:api_id/test-real", _self.TestRealData)              // test real API and compare with mock responses
+
+	// AI chat assistant
+	v1.POST("/chat", _self.HandleChat)
+	v1.POST("/chat/clear", _self.HandleChatClear)
 
 	// Load test scenarios - delegate to LoadTestController
 	_self.loadTestController.RegisterRoutes(v1)
@@ -1397,14 +1405,14 @@ func (_self *MockController) TestRealData(c echo.Context) error {
 	overallMatched := defaultMatched || anySeqMatched
 
 	return c.JSON(http.StatusOK, map[string]any{
-		"success":           true,
-		"matched":           overallMatched,
-		"default_matched":   defaultMatched,
-		"real_status":       resp.StatusCode,
-		"real_response":     realBody,
-		"mock_response":     defaultOutput,
+		"success":            true,
+		"matched":            overallMatched,
+		"default_matched":    defaultMatched,
+		"real_status":        resp.StatusCode,
+		"real_response":      realBody,
+		"mock_response":      defaultOutput,
 		"sequence_responses": seqResults,
-		"target_url":        targetURL,
+		"target_url":         targetURL,
 	})
 }
 
@@ -1443,4 +1451,40 @@ func (_self *MockController) ReadinessCheck(c echo.Context) error {
 		"service":  "mocktool",
 		"database": "connected",
 	})
+}
+
+// ---------- POST /chat ----------
+
+type chatRequest struct {
+	Message string             `json:"message"`
+	History []chat.ChatMessage `json:"history,omitempty"`
+}
+
+func (_self *MockController) HandleChat(c echo.Context) error {
+	if _self.chatHandler == nil {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "AI chat not configured — set OPENAI_API_KEY to enable",
+		})
+	}
+	var req chatRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+	if req.Message == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "message is required"})
+	}
+	reply, err := _self.chatHandler.Chat(c.Request().Context(), req.History, req.Message)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"reply": reply})
+}
+
+// ---------- POST /chat/clear ----------
+
+func (_self *MockController) HandleChatClear(c echo.Context) error {
+	// Chat history is maintained client-side (in browser cookies).
+	// This endpoint is a notification endpoint that the frontend calls
+	// when the user clears the conversation. No server-side state to clear.
+	return c.JSON(http.StatusOK, map[string]string{"status": "cleared"})
 }

@@ -5,11 +5,13 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/namnv2496/mocktool/internal/chat"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/controller"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
 	"github.com/namnv2496/mocktool/internal/repository/ratelimiter"
+	"github.com/namnv2496/mocktool/internal/tools"
 	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
@@ -65,6 +67,11 @@ func InvokeServer(invokers ...any) *fx.App {
 			fx.Annotate(ratelimiter.NewLimiter, fx.As(new(ratelimiter.ILimiter))),
 
 			repository.NewMongoConnect,
+
+			// AI chat assistant
+			buildToolsDeps,
+			func(d tools.Deps) *tools.Registry { return tools.BuildAll(d) },
+			newChatHandler,
 		),
 		fx.Supply(
 			config,
@@ -73,6 +80,10 @@ func InvokeServer(invokers ...any) *fx.App {
 		fx.Invoke(invokers...),
 	)
 	return app
+}
+
+func newChatHandler(reg *tools.Registry, cfg *configs.Config) *chat.Handler {
+	return chat.NewWithEndpoint(reg, cfg.OpenAIConfig.APIKey, cfg.OpenAIConfig.Model, cfg.OpenAIConfig.APIEndpoint)
 }
 
 func startServer(

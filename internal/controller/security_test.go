@@ -36,6 +36,7 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil,
 	).(*MockController)
 
 	tests := []struct {
@@ -204,6 +205,7 @@ func TestSecurity_ValidationPreventsInjection(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil,
 	).(*MockController)
 
 	tests := []struct {

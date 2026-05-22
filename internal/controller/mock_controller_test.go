@@ -45,6 +45,7 @@ func setupTestController(t *testing.T) (*MockController, *gomock.Controller, *re
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil, // chatHandler not needed in unit tests
 	).(*MockController)
 
 	return controller, ctrl, featureRepo, scenarioRepo, accountScenarioRepo, mockAPIRepo
@@ -499,6 +500,7 @@ func TestNewMockController(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil, // chatHandler not needed in unit tests
 	)
 
 	assert.NotNil(t, controller)

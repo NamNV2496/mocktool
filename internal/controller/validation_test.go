@@ -36,6 +36,7 @@ func TestValidation_CreateNewFeature(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil,
 	).(*MockController)
 
 	tests := []struct {
@@ -130,6 +131,7 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil,
 	).(*MockController)
 
 	tests := []struct {
@@ -224,6 +226,7 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 		mockAPIRepo,
 		loadTestController,
 		cacheRepo,
+		nil,
 	).(*MockController)
 
 	tests := []struct {

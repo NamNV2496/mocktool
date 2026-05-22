@@ -21,6 +21,16 @@ run:
 	@echo "$(COLOR_GREEN)Starting $(APP_NAME)...$(COLOR_RESET)"
 	$(GO) run . service
 
+## run-mcpserver: Start the MCP-over-SSE adapter on $$MCP_SERVER_ADDR (default :8083)
+run-mcpserver:
+	@echo "$(COLOR_GREEN)Starting MCP server...$(COLOR_RESET)"
+	$(GO) run . mcpserver
+
+## run-slackbot: Start the Slack Socket Mode bot. Requires SLACK_APP_TOKEN, SLACK_BOT_TOKEN, OPENAI_API_KEY env vars.
+run-slackbot:
+	@echo "$(COLOR_GREEN)Starting Slack bot...$(COLOR_RESET)"
+	$(GO) run . slackbot
+
 ## test: Run all tests
 test:
 	@echo "$(COLOR_GREEN)Running tests...$(COLOR_RESET)"

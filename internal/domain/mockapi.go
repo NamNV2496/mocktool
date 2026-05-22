@@ -8,11 +8,12 @@ import (
 )
 
 type SequenceResponse struct {
-	From    int      `bson:"from" json:"from"`
-	To      int      `bson:"to" json:"to"`
-	Output  bson.Raw `bson:"output,omitempty" json:"output"`
-	Headers bson.Raw `bson:"headers,omitempty" json:"headers"`
-	Latency int64    `bson:"latency" json:"latency"`
+	From       int      `bson:"from" json:"from"`
+	To         int      `bson:"to" json:"to"`
+	StatusCode int      `bson:"status_code,omitempty" json:"status_code,omitempty"`
+	Output     bson.Raw `bson:"output,omitempty" json:"output"`
+	Headers    bson.Raw `bson:"headers,omitempty" json:"headers"`
+	Latency    int64    `bson:"latency" json:"latency"`
 }
 
 type MockAPI struct {
@@ -29,6 +30,7 @@ type MockAPI struct {
 	HashInput    string             `bson:"hash_input" json:"hash_input"`
 	Headers      bson.Raw           `bson:"headers,omitempty" json:"headers"`
 	Output       bson.Raw           `bson:"output,omitempty" json:"output"`
+	StatusCode   int                `bson:"status_code,omitempty" json:"status_code,omitempty"`
 	Latency      int64              `bson:"latency" json:"latency"`
 	Responses    []SequenceResponse `bson:"responses,omitempty" json:"responses"`
 	CreatedAt    time.Time          `bson:"created_at" json:"created_at"`

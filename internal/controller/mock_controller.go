@@ -644,6 +644,7 @@ func (_self *MockController) ListMockAPIsByScenario(c echo.Context) error {
 			"method":        api.Method,
 			"input":         inputJSON,
 			"latency":       api.Latency,
+			"status_code":   api.StatusCode,
 			// "hash_input":    api.HashInput,
 			"output":     outputJSON,
 			"headers":    headers,
@@ -742,6 +743,7 @@ func (_self *MockController) SearchMockAPIsByScenarioAndNameOrPath(c echo.Contex
 			"output":        outputJSON,
 			"is_active":     api.IsActive,
 			"latency":       api.Latency,
+			"status_code":   api.StatusCode,
 			"created_at":    api.CreatedAt,
 		}
 
@@ -799,6 +801,7 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		Path:         reqBody.Path,
 		Method:       reqBody.Method,
 		Latency:      reqBody.Latency,
+		StatusCode:   reqBody.StatusCode,
 		IsActive:     true,
 	}
 
@@ -834,31 +837,32 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, "API is duplicated")
 	}
 
-	// Process output - required field
-	if len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "" {
+	// Process output - required unless sequence responses are provided
+	if (len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "") && len(reqBody.Responses) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "output is required")
 	}
 
-	// Convert json.RawMessage to bson.Raw
-	var outputData any
-	if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
-	}
-
-	// If the output is a string, try to parse it as JSON
-	if outputStr, ok := outputData.(string); ok {
-		var parsedData any
-		if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+	// Convert json.RawMessage to bson.Raw (only when output is provided)
+	if len(reqBody.Output) > 0 && string(reqBody.Output) != "null" && string(reqBody.Output) != "" {
+		var outputData any
+		if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
 		}
-		outputData = parsedData
-	}
 
-	bsonData, err := bson.Marshal(outputData)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		if outputStr, ok := outputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+			}
+			outputData = parsedData
+		}
+
+		bsonData, err := bson.Marshal(outputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		}
+		req.Output = bsonData
 	}
-	req.Output = bsonData
 	// headers
 	if len(reqBody.Headers) != 0 {
 		// Step 1: json.RawMessage -> string
@@ -908,9 +912,10 @@ func (_self *MockController) CreateMockAPIByScenario(c echo.Context) error {
 	if len(reqBody.Responses) > 0 {
 		for _, seqReq := range reqBody.Responses {
 			seqResp := domain.SequenceResponse{
-				From:    seqReq.From,
-				To:      seqReq.To,
-				Latency: seqReq.Latency,
+				From:       seqReq.From,
+				To:         seqReq.To,
+				Latency:    seqReq.Latency,
+				StatusCode: seqReq.StatusCode,
 			}
 
 			// Convert output
@@ -1086,39 +1091,38 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		update["hash_input"] = utils.GenerateHashFromInput(inputBsonData)
 	}
 
-	// Process output if provided
-	// Only process if not empty and not null
-	if len(reqBody.Output) == 0 || string(reqBody.Output) == "null" || string(reqBody.Output) == "" {
+	// Process output if provided (not required when sequence responses are present)
+	if len(reqBody.Output) > 0 && string(reqBody.Output) != "null" && string(reqBody.Output) != "" {
+		var outputData any
+		if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+		}
+
+		if outputStr, ok := outputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+			}
+			outputData = parsedData
+		}
+
+		bsonData, err := bson.Marshal(outputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		}
+		var outputJSON any
+		if len(bsonData) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(bsonData, &result); err == nil {
+				outputJSON = result
+			}
+		}
+		update["output"] = outputJSON
+	} else if len(reqBody.Responses) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "output is required")
 	}
 
-	// Convert json.RawMessage to bson.Raw
-	var outputData any
-	if err := json.Unmarshal(reqBody.Output, &outputData); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
-	}
-
-	// If the output is a string, try to parse it as JSON
-	if outputStr, ok := outputData.(string); ok {
-		var parsedData any
-		if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
-		}
-		outputData = parsedData
-	}
-
-	bsonData, err := bson.Marshal(outputData)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
-	}
-	var outputJSON any
-	if len(bsonData) > 0 {
-		var result bson.M
-		if err := bson.Unmarshal(bsonData, &result); err == nil {
-			outputJSON = result
-		}
-	}
-	update["output"] = outputJSON
+	update["status_code"] = reqBody.StatusCode
 	// headers
 	if len(reqBody.Headers) != 0 {
 		// Step 1: json.RawMessage -> string
@@ -1169,9 +1173,10 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 		var seqResponses []domain.SequenceResponse
 		for _, seqReq := range reqBody.Responses {
 			seqResp := domain.SequenceResponse{
-				From:    seqReq.From,
-				To:      seqReq.To,
-				Latency: seqReq.Latency,
+				From:       seqReq.From,
+				To:         seqReq.To,
+				Latency:    seqReq.Latency,
+				StatusCode: seqReq.StatusCode,
 			}
 
 			if len(seqReq.Output) > 0 && string(seqReq.Output) != "null" {
@@ -1262,9 +1267,10 @@ func convertSequenceResponsesToJSON(responses []domain.SequenceResponse) []map[s
 	var result []map[string]any
 	for _, r := range responses {
 		entry := map[string]any{
-			"from":    r.From,
-			"to":      r.To,
-			"latency": r.Latency,
+			"from":        r.From,
+			"to":          r.To,
+			"latency":     r.Latency,
+			"status_code": r.StatusCode,
 		}
 
 		if len(r.Output) > 0 {

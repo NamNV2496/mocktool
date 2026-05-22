@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -100,26 +101,69 @@ func searchMocks(d Deps) Tool {
 	}
 }
 
+type seqResponseArg struct {
+	From       int               `json:"from"`
+	To         int               `json:"to"`
+	StatusCode int               `json:"status_code"`
+	Output     json.RawMessage   `json:"output"`
+	Headers    map[string]string `json:"headers"`
+	LatencyMs  int64             `json:"latency_ms"`
+}
+
+func seqArgsToDomain(in []seqResponseArg) ([]domain.SequenceResponse, error) {
+	out := make([]domain.SequenceResponse, 0, len(in))
+	for _, s := range in {
+		sr := domain.SequenceResponse{
+			From:       s.From,
+			To:         s.To,
+			StatusCode: s.StatusCode,
+			Latency:    s.LatencyMs,
+		}
+		if len(s.Output) > 0 && string(s.Output) != "null" {
+			var d any
+			if err := json.Unmarshal(s.Output, &d); err != nil {
+				return nil, fmt.Errorf("invalid sequence response output: %w", err)
+			}
+			b, err := bson.Marshal(d)
+			if err != nil {
+				return nil, fmt.Errorf("marshal sequence response output: %w", err)
+			}
+			sr.Output = b
+		}
+		if len(s.Headers) > 0 {
+			b, err := bson.Marshal(s.Headers)
+			if err != nil {
+				return nil, fmt.Errorf("marshal sequence response headers: %w", err)
+			}
+			sr.Headers = b
+		}
+		out = append(out, sr)
+	}
+	return out, nil
+}
+
 func createMockAPI(d Deps) Tool {
 	type args struct {
-		Feature      string          `json:"feature"`
-		Scenario     string          `json:"scenario"`
-		Name         string          `json:"name"`
-		Description  string          `json:"description"`
-		BaseURL      string          `json:"base_url"`
-		Path         string          `json:"path"`
-		Method       string          `json:"method"`
-		RequestBody  json.RawMessage `json:"request_body"`
-		Response     json.RawMessage `json:"response"`
-		Headers      map[string]string `json:"headers"`
-		LatencyMs    int64           `json:"latency_ms"`
+		Feature     string            `json:"feature"`
+		Scenario    string            `json:"scenario"`
+		Name        string            `json:"name"`
+		Description string            `json:"description"`
+		BaseURL     string            `json:"base_url"`
+		Path        string            `json:"path"`
+		Method      string            `json:"method"`
+		RequestBody json.RawMessage   `json:"request_body"`
+		Response    json.RawMessage   `json:"response"`
+		StatusCode  int               `json:"status_code"`
+		Headers     map[string]string `json:"headers"`
+		LatencyMs   int64             `json:"latency_ms"`
+		Responses   []seqResponseArg  `json:"responses"`
 	}
 	return Tool{
 		Name:        "create_mock_api",
-		Description: "Create a new mock API under a feature+scenario. The request_body hash uniquely identifies an entry along with path+method. Headers are arbitrary string->string map.",
+		Description: "Create a new mock API under a feature+scenario. The request_body hash uniquely identifies an entry along with path+method. Use status_code to return a non-200 default response. Optionally provide a 'responses' array for sequence responses (different reply per call count, each with its own status_code).",
 		InputSchema: schema(`{
             "type": "object",
-            "required": ["feature", "scenario", "name", "path", "method", "response"],
+            "required": ["feature", "scenario", "name", "path", "method"],
             "properties": {
                 "feature":      {"type": "string"},
                 "scenario":     {"type": "string"},
@@ -129,9 +173,25 @@ func createMockAPI(d Deps) Tool {
                 "path":         {"type": "string", "description": "supports :param placeholders, e.g. /api/v1/user/:id"},
                 "method":       {"type": "string", "enum": ["GET","POST","PUT","PATCH","DELETE"]},
                 "request_body": {"description": "JSON value used as match filter; the hash of this determines which mock entry matches"},
-                "response":     {"description": "JSON value returned to the caller"},
+                "response":     {"description": "default JSON response returned when no sequence entry matches"},
+                "status_code":  {"type": "integer", "description": "HTTP status code for the default response (default 200)"},
                 "headers":      {"type": "object", "additionalProperties": {"type": "string"}},
-                "latency_ms":   {"type": "integer", "minimum": 0}
+                "latency_ms":   {"type": "integer", "minimum": 0},
+                "responses": {
+                    "type": "array",
+                    "description": "optional sequence responses — each entry matches call counts in [from, to]. status_code overrides the HTTP status for that entry.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "from":        {"type": "integer", "description": "first call count this entry applies to (1-based)"},
+                            "to":          {"type": "integer", "description": "last call count (0 = unbounded)"},
+                            "status_code": {"type": "integer", "description": "HTTP status code, e.g. 200, 400, 404"},
+                            "output":      {"description": "JSON body to return"},
+                            "headers":     {"type": "object", "additionalProperties": {"type": "string"}},
+                            "latency_ms":  {"type": "integer"}
+                        }
+                    }
+                }
             }
         }`),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -142,8 +202,8 @@ func createMockAPI(d Deps) Tool {
 			if a.Feature == "" || a.Scenario == "" || a.Name == "" || a.Path == "" || a.Method == "" {
 				return nil, fmt.Errorf("feature, scenario, name, path, method are required")
 			}
-			if len(a.Response) == 0 || string(a.Response) == "null" {
-				return nil, fmt.Errorf("response is required")
+			if len(a.Responses) == 0 && (len(a.Response) == 0 || string(a.Response) == "null") {
+				return nil, fmt.Errorf("either response or responses is required")
 			}
 
 			// Check duplicate by name within the same scenario.
@@ -160,6 +220,7 @@ func createMockAPI(d Deps) Tool {
 				Path:         a.Path,
 				Method:       a.Method,
 				Latency:      a.LatencyMs,
+				StatusCode:   a.StatusCode,
 				IsActive:     true,
 				CreatedAt:    time.Now().UTC(),
 				UpdatedAt:    time.Now().UTC(),
@@ -184,20 +245,29 @@ func createMockAPI(d Deps) Tool {
 				return nil, fmt.Errorf("a mock api with same path+method+request_body already exists (%s)", existing.Name)
 			}
 
-			// Convert response -> bson.Raw.
-			var respData any
-			if err := json.Unmarshal(a.Response, &respData); err != nil {
-				return nil, fmt.Errorf("invalid response: %w", err)
+			// Default response body.
+			if len(a.Response) > 0 && string(a.Response) != "null" {
+				var respData any
+				if err := json.Unmarshal(a.Response, &respData); err != nil {
+					return nil, fmt.Errorf("invalid response: %w", err)
+				}
+				outputBSON, err := bson.Marshal(respData)
+				if err != nil {
+					return nil, fmt.Errorf("marshal response to bson: %w", err)
+				}
+				req.Output = outputBSON
 			}
-			outputBSON, err := bson.Marshal(respData)
-			if err != nil {
-				return nil, fmt.Errorf("marshal response to bson: %w", err)
-			}
-			req.Output = outputBSON
 
-			// Headers — pass through as-is; existing controller does additional
-			// sanitization for HTTP-clients; mocking should not silently mutate
-			// what the user asked for here.
+			// Sequence responses.
+			if len(a.Responses) > 0 {
+				seqDomain, err := seqArgsToDomain(a.Responses)
+				if err != nil {
+					return nil, err
+				}
+				req.Responses = seqDomain
+			}
+
+			// Headers.
 			if len(a.Headers) > 0 {
 				hBSON, err := bson.Marshal(a.Headers)
 				if err != nil {
@@ -213,14 +283,15 @@ func createMockAPI(d Deps) Tool {
 			_ = d.Cache.InvalidAllKey(ctx, fmt.Sprintf(repository.KeyScnarioTemplate, a.Feature, a.Scenario))
 
 			return map[string]any{
-				"id":            req.ID.Hex(),
-				"feature":       req.FeatureName,
-				"scenario":      req.ScenarioName,
-				"name":          req.Name,
-				"path":          req.Path,
-				"method":        req.Method,
-				"hash_input":    req.HashInput,
-				"created_at":    req.CreatedAt.Format(time.RFC3339),
+				"id":             req.ID.Hex(),
+				"feature":        req.FeatureName,
+				"scenario":       req.ScenarioName,
+				"name":           req.Name,
+				"path":           req.Path,
+				"method":         req.Method,
+				"hash_input":     req.HashInput,
+				"sequence_count": len(req.Responses),
+				"created_at":     req.CreatedAt.Format(time.RFC3339),
 			}, nil
 		},
 	}
@@ -235,13 +306,15 @@ func updateMockAPI(d Deps) Tool {
 		Path        string            `json:"path"`
 		Method      string            `json:"method"`
 		Response    json.RawMessage   `json:"response"`
+		StatusCode  *int              `json:"status_code"`
 		Headers     map[string]string `json:"headers"`
 		LatencyMs   *int64            `json:"latency_ms"`
 		IsActive    *bool             `json:"is_active"`
+		Responses   *[]seqResponseArg `json:"responses"` // nil = don't touch; [] = clear all sequences
 	}
 	return Tool{
 		Name:        "update_mock_api",
-		Description: "Update an existing mock API by id. Only provided fields are changed.",
+		Description: "Update an existing mock API by id. Only provided fields are changed. Supports updating status_code and sequence responses.",
 		InputSchema: schema(`{
             "type": "object",
             "required": ["api_id"],
@@ -252,10 +325,26 @@ func updateMockAPI(d Deps) Tool {
                 "base_url":    {"type": "string"},
                 "path":        {"type": "string"},
                 "method":      {"type": "string"},
-                "response":    {},
+                "response":    {"description": "default JSON response"},
+                "status_code": {"type": "integer", "description": "HTTP status code for the default response"},
                 "headers":     {"type": "object", "additionalProperties": {"type": "string"}},
                 "latency_ms":  {"type": "integer", "minimum": 0},
-                "is_active":   {"type": "boolean"}
+                "is_active":   {"type": "boolean"},
+                "responses": {
+                    "type": "array",
+                    "description": "replace the full sequence responses list",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "from":        {"type": "integer"},
+                            "to":          {"type": "integer"},
+                            "status_code": {"type": "integer"},
+                            "output":      {},
+                            "headers":     {"type": "object", "additionalProperties": {"type": "string"}},
+                            "latency_ms":  {"type": "integer"}
+                        }
+                    }
+                }
             }
         }`),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -292,6 +381,9 @@ func updateMockAPI(d Deps) Tool {
 			if a.IsActive != nil {
 				update["is_active"] = *a.IsActive
 			}
+			if a.StatusCode != nil {
+				update["status_code"] = *a.StatusCode
+			}
 			if len(a.Response) > 0 && string(a.Response) != "null" {
 				var respData any
 				if err := json.Unmarshal(a.Response, &respData); err != nil {
@@ -309,6 +401,13 @@ func updateMockAPI(d Deps) Tool {
 					return nil, fmt.Errorf("marshal headers to bson: %w", err)
 				}
 				update["headers"] = bson.Raw(hBSON)
+			}
+			if a.Responses != nil {
+				seqDomain, err := seqArgsToDomain(*a.Responses)
+				if err != nil {
+					return nil, err
+				}
+				update["responses"] = seqDomain // empty slice clears all sequences
 			}
 			if len(update) == 0 {
 				return nil, fmt.Errorf("no fields to update")
@@ -370,6 +469,104 @@ func deleteMockAPI(d Deps) Tool {
 				"scenario":   mockAPI.ScenarioName,
 				"name":       mockAPI.Name,
 				"deleted_at": time.Now().UTC().Format(time.RFC3339),
+			}, nil
+		},
+	}
+}
+
+// getMockAPICurl returns a ready-to-run cURL command for a mock API.
+func getMockAPICurl(d Deps) Tool {
+	type args struct {
+		Feature   string `json:"feature"`
+		Scenario  string `json:"scenario"`
+		Name      string `json:"name"`
+		AccountID string `json:"account_id"`
+		Host      string `json:"host"`
+	}
+	return Tool{
+		Name:        "get_mock_api_curl",
+		Description: "Generate a ready-to-run cURL command that calls a mock API on the forward server (port 8082). Includes all required headers (X-Feature-Name, X-Account-Id) and the request body if the API has a hash input.",
+		InputSchema: schema(`{
+            "type": "object",
+            "required": ["feature", "scenario", "name"],
+            "properties": {
+                "feature":    {"type": "string"},
+                "scenario":   {"type": "string"},
+                "name":       {"type": "string", "description": "mock API name"},
+                "account_id": {"type": "string", "description": "X-Account-Id header value, defaults to 'test-account'"},
+                "host":       {"type": "string", "description": "forward server host, defaults to 'http://localhost:8082'"}
+            }
+        }`),
+		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
+			var a args
+			if err := decodeArgs(raw, &a); err != nil {
+				return nil, err
+			}
+			if a.Feature == "" || a.Scenario == "" || a.Name == "" {
+				return nil, fmt.Errorf("feature, scenario, and name are required")
+			}
+			if a.AccountID == "" {
+				a.AccountID = "test-account"
+			}
+			if a.Host == "" {
+				a.Host = "http://localhost:8082"
+			}
+
+			api, err := d.MockAPI.FindByNameAndFeatureAndScenario(ctx, a.Name, a.Feature, a.Scenario)
+			if err != nil || api == nil {
+				return nil, fmt.Errorf("mock API %q not found in %s/%s", a.Name, a.Feature, a.Scenario)
+			}
+
+			path := api.Path
+			if len(path) > 0 && path[0] == '/' {
+				path = path[1:]
+			}
+			apiURL := fmt.Sprintf("%s/forward/%s", a.Host, path)
+
+			// Required routing headers first.
+			headerParts := []string{
+				"--header 'Content-Type: application/json'",
+				fmt.Sprintf("--header 'X-Feature-Name: %s'", a.Feature),
+				fmt.Sprintf("--header 'X-Account-Id: %s'", a.AccountID),
+			}
+
+			// Append any custom headers stored on the mock API.
+			if len(api.Headers) > 0 {
+				var customHeaders map[string]string
+				if err := bson.Unmarshal(api.Headers, &customHeaders); err == nil {
+					for k, v := range customHeaders {
+						headerParts = append(headerParts, fmt.Sprintf("--header '%s: %s'", k, v))
+					}
+				}
+			}
+
+			var sb strings.Builder
+			for _, h := range headerParts {
+				sb.WriteByte(' ')
+				sb.WriteString(h)
+			}
+			headersStr := sb.String()
+
+			// Build body from stored input.
+			body := ""
+			if len(api.Input) > 0 {
+				if b, err := json.Marshal(bsonRawToJSON(api.Input)); err == nil {
+					body = string(b)
+				}
+			}
+
+			curl := fmt.Sprintf("curl --location '%s' --request %s%s", apiURL, api.Method, headersStr)
+			if body != "" {
+				curl += fmt.Sprintf(" --data-raw '%s'", body)
+			}
+
+			return map[string]any{
+				"curl":     curl,
+				"method":   api.Method,
+				"url":      apiURL,
+				"feature":  a.Feature,
+				"scenario": a.Scenario,
+				"name":     a.Name,
 			}, nil
 		},
 	}

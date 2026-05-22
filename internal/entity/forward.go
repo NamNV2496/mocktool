@@ -26,6 +26,7 @@ type ServiceFlags struct {
 }
 
 type CachedEntry struct {
-	Output  string `json:"output"`
-	Latency int64  `json:"latency"`
+	Output     string `json:"output"`
+	Latency    int64  `json:"latency"`
+	StatusCode int    `json:"status_code,omitempty"`
 }

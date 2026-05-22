@@ -21,7 +21,7 @@
             <button class="tab-btn active" data-tab="features" data-i18n="tab.features">Features</button>
             <button class="tab-btn" data-tab="scenarios" data-i18n="tab.scenarios">Scenarios</button>
             <button class="tab-btn" data-tab="mockapis" data-i18n="tab.mockapis">Mock APIs</button>
-            <!-- <button class="tab-btn" data-tab="loadtest" data-i18n="tab.loadtest">Load Test Tool</button> -->
+            <button class="tab-btn" data-tab="loadtest" data-i18n="tab.loadtest">Load Test Tool</button>
         </div>
 
         <!-- Features Tab -->
@@ -324,10 +324,17 @@
                         <textarea id="mockapi-output-header" placeholder='"x-corr-id":"jfd4-dsf3-3dde"' rows="4"></textarea>
                         <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.outputHeader.hint">Response header</small>
                     </div>
-                    <div class="form-group">
-                        <label for="mockapi-latency" data-i18n="mockapi.form.latency.label">Latency (seconds)</label>
-                        <input type="number" id="mockapi-latency" min="0" value="0" placeholder="0">
-                        <small style="color: #718096; font-size: 0.85rem;" data-i18n="mockapi.form.latency.hint">Delay response by this many seconds. 0 = no delay.</small>
+                    <div class="form-group" style="display:flex;gap:12px;">
+                        <div style="flex:1">
+                            <label for="mockapi-status-code">HTTP Status Code</label>
+                            <input type="number" id="mockapi-status-code" min="100" max="599" value="200" placeholder="200">
+                            <small style="color:#718096;font-size:0.85rem;">e.g. 200, 400, 401, 404, 500</small>
+                        </div>
+                        <div style="flex:1">
+                            <label for="mockapi-latency" data-i18n="mockapi.form.latency.label">Latency (seconds)</label>
+                            <input type="number" id="mockapi-latency" min="0" value="0" placeholder="0">
+                            <small style="color:#718096;font-size:0.85rem;" data-i18n="mockapi.form.latency.hint">Delay response by this many seconds. 0 = no delay.</small>
+                        </div>
                     </div>
                 </div>
 

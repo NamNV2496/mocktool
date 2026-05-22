@@ -55,10 +55,16 @@ If the user is ambiguous (e.g. asks about "the feature" without naming it), ask 
 // HandleText processes one user message in a thread. If the text is a
 // "confirm <token>" / "cancel <token>" reply to a pending destructive
 // action, that branch is taken instead of consulting the LLM.
+// If the text is a "/mock <contract>" command, the mock-generation flow runs.
 func (d *Dispatcher) HandleText(ctx context.Context, threadTS, channel, text string, reply Replier) error {
 	// Confirmation/cancellation short-circuit (no LLM call).
 	if action, token, ok := parseConfirmCommand(text); ok {
 		return d.handleConfirm(ctx, action, token, reply)
+	}
+
+	// /mock contract generation — dedicated flow.
+	if isMockCommand(text) {
+		return d.handleMockCommand(ctx, threadTS, channel, text, reply)
 	}
 
 	history := d.memory.Get(threadTS)

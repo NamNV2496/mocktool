@@ -3,11 +3,12 @@ package entity
 import "encoding/json"
 
 type SequenceResponseRequest struct {
-	From    int             `json:"from"`
-	To      int             `json:"to"`
-	Output  json.RawMessage `json:"output"`
-	Headers json.RawMessage `json:"headers"`
-	Latency int64           `json:"latency"`
+	From       int             `json:"from"`
+	To         int             `json:"to"`
+	StatusCode int             `json:"status_code,omitempty"`
+	Output     json.RawMessage `json:"output"`
+	Headers    json.RawMessage `json:"headers"`
+	Latency    int64           `json:"latency"`
 }
 
 type MockAPIRequest struct {
@@ -21,6 +22,7 @@ type MockAPIRequest struct {
 	Input        json.RawMessage           `json:"input"`
 	Headers      json.RawMessage           `json:"headers"`
 	Output       json.RawMessage           `json:"output"`
+	StatusCode   int                       `json:"status_code,omitempty"`
 	IsActive     bool                      `json:"is_active"`
 	Latency      int64                     `json:"latency"`
 	Responses    []SequenceResponseRequest `json:"responses"`

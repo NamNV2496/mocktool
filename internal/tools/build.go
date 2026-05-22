@@ -12,6 +12,7 @@ func BuildAll(d Deps) *Registry {
 		getActiveScenario(d),
 		listAPIs(d),
 		searchMocks(d),
+		getMockAPICurl(d),
 
 		// Write
 		createFeature(d),

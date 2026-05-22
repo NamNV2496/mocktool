@@ -18,6 +18,9 @@
     { cmd: '/list-features', desc: 'List all features' },
     { cmd: '/list-scenarios', desc: 'List scenarios for a feature' },
     { cmd: '/list-apis', desc: 'List APIs for a scenario' },
+    { cmd: '/curl', desc: 'Get cURL command for a mock API' },
+    { cmd: '/proto', desc: 'Paste a .proto file → generate mock APIs' },
+    { cmd: '/mock', desc: 'Paste an API contract → generate all test cases' },
     { cmd: '/search', desc: 'Search mock APIs by name or path' },
     { cmd: '/activate', desc: 'Activate a scenario' },
     { cmd: '/create-api', desc: 'Create a new mock API' },
@@ -110,6 +113,64 @@
         </div>
       </div>
 
+      <!-- Proto panel (hidden by default) -->
+      <div class="ai-proto-panel" id="ai-proto-panel" style="display:none">
+        <div class="ai-proto-panel-header">
+          <span class="ai-proto-title">📋 Proto → Mock Generator</span>
+          <button class="ai-icon-btn" id="ai-proto-cancel">✕</button>
+        </div>
+        <div class="ai-proto-fields">
+          <input id="ai-proto-feature" class="ai-proto-input" placeholder="Feature name" />
+          <input id="ai-proto-scenario" class="ai-proto-input" placeholder="Scenario name" />
+        </div>
+        <textarea
+          id="ai-proto-content"
+          class="ai-proto-textarea"
+          placeholder="Paste your .proto file content here…"
+          rows="8"
+          spellcheck="false"
+        ></textarea>
+        <div class="ai-proto-footer">
+          <span class="ai-proto-hint" id="ai-proto-hint"></span>
+          <button class="ai-proto-submit" id="ai-proto-submit">⚡ Generate Mocks</button>
+        </div>
+      </div>
+
+      <!-- Mock panel (hidden by default) -->
+      <div class="ai-proto-panel" id="ai-mock-panel" style="display:none">
+        <div class="ai-proto-panel-header">
+          <span class="ai-proto-title">📄 Contract → Mock Generator</span>
+          <button class="ai-icon-btn" id="ai-mock-cancel">✕</button>
+        </div>
+        <div class="ai-proto-fields">
+          <input id="ai-mock-feature" class="ai-proto-input" placeholder="Feature name (optional)" />
+          <input id="ai-mock-scenario" class="ai-proto-input" placeholder="Scenario prefix (optional)" />
+        </div>
+        <textarea
+          id="ai-mock-content"
+          class="ai-proto-textarea"
+          placeholder="Paste your API contract here…
+
+Example:
+API-001: GET — /api/referrals
+Request: {&quot;vertical&quot;: &quot;JOBS&quot;}
+Response: {&quot;data&quot;: {...}, &quot;success&quot;: true}
+
+or
+
+Response: {&quot;data&quot;: {...}, &quot;success&quot;: true}
+
+Error:
+{&quot;error_code&quot;: &quot;ERR-001&quot;, &quot;error_message&quot;: &quot;Login required&quot;}"
+          rows="10"
+          spellcheck="false"
+        ></textarea>
+        <div class="ai-proto-footer">
+          <span class="ai-proto-hint" id="ai-mock-hint"></span>
+          <button class="ai-proto-submit" id="ai-mock-submit">⚡ Generate Cases</button>
+        </div>
+      </div>
+
       <div class="ai-input-area">
         <div class="ai-input-wrapper">
           <textarea
@@ -157,9 +218,15 @@
       row.className = 'ai-command-row';
       row.innerHTML = `<span class="ai-command-name">${cmd}</span><span class="ai-command-desc">${desc}</span>`;
       row.onclick = () => {
-        el('ai-input').value = cmd + ' ';
-        el('ai-input').focus();
-        autoResize(el('ai-input'));
+        if (cmd === '/proto') {
+          showProtoPanel();
+        } else if (cmd === '/mock') {
+          showMockPanel();
+        } else {
+          el('ai-input').value = cmd + ' ';
+          el('ai-input').focus();
+          autoResize(el('ai-input'));
+        }
       };
       container.appendChild(row);
     });
@@ -299,6 +366,7 @@
       '/list-features': 'List all features',
       '/list-scenarios': 'List all scenarios',
       '/list-apis': 'List all APIs',
+      '/curl': 'Give me the cURL command for mock API',
       '/search': 'Search mock APIs',
       '/activate': 'Activate a scenario',
       '/create-api': 'Help me create a new mock API',
@@ -310,6 +378,217 @@
       if (text.startsWith(cmd + ' ')) return expansion + ': ' + text.slice(cmd.length + 1);
     }
     return text;
+  }
+
+  // ───────────── Proto panel ─────────────
+
+  function showProtoPanel() {
+    el('ai-mock-panel').style.display = 'none';
+    el('ai-proto-panel').style.display = 'flex';
+    el('ai-proto-hint').textContent = '';
+    el('ai-proto-feature').focus();
+  }
+
+  function hideProtoPanel() {
+    el('ai-proto-panel').style.display = 'none';
+    el('ai-proto-content').value = '';
+    el('ai-proto-feature').value = '';
+    el('ai-proto-scenario').value = '';
+    el('ai-proto-hint').textContent = '';
+  }
+
+  // ── Proto parsing helpers (reuse app.js globals when available) ──
+
+  function protoExtractServices(cleaned) {
+    const services = [];
+    const svcRe = /\bservice\s+(\w+)\s*\{/g;
+    let m;
+    while ((m = svcRe.exec(cleaned)) !== null) {
+      const name = m[1];
+      let depth = 1, i = m.index + m[0].length;
+      while (i < cleaned.length && depth > 0) {
+        if (cleaned[i] === '{') depth++;
+        else if (cleaned[i] === '}') depth--;
+        i++;
+      }
+      const body = cleaned.substring(m.index + m[0].length, i - 1);
+      const rpcs = [];
+      const rpcRe = /\brpc\s+(\w+)\s*\(\s*(?:stream\s+)?(\w+)\s*\)\s*returns\s*\(\s*(?:stream\s+)?(\w+)\s*\)/g;
+      let r;
+      while ((r = rpcRe.exec(body)) !== null) {
+        rpcs.push({ name: r[1], requestType: r[2], responseType: r[3] });
+      }
+      if (rpcs.length) services.push({ name, rpcs });
+    }
+    return services;
+  }
+
+  function protoGetTemplate(messageType) {
+    // Reuse app.js globals if available
+    if (typeof generateTemplate === 'function' &&
+        typeof parsedMessages !== 'undefined' &&
+        parsedMessages[messageType]) {
+      try { return generateTemplate(parsedMessages[messageType]); } catch (_) {}
+    }
+    return {};
+  }
+
+  function parseProtoForPanel(protoText) {
+    const cleaned = protoText
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Seed app.js message/enum parsers if available
+    if (typeof extractEnums === 'function' && typeof extractMessages === 'function') {
+      if (typeof parsedEnums !== 'undefined')   Object.keys(parsedEnums).forEach(k => delete parsedEnums[k]);
+      if (typeof parsedMessages !== 'undefined') Object.keys(parsedMessages).forEach(k => delete parsedMessages[k]);
+      extractEnums(cleaned);
+      extractMessages(cleaned);
+    }
+
+    return protoExtractServices(cleaned);
+  }
+
+  function buildProtoPrompt(feature, scenario, protoText, services) {
+    const lines = [
+      `I have a proto file. Please create mock APIs for every RPC in feature "${feature}", scenario "${scenario}".`,
+      '',
+      'Rules:',
+      '- Use create_mock_api for EACH RPC.',
+      '- HTTP method: POST (gRPC-HTTP uses POST for all RPCs).',
+      '- Path: /{ServiceName}/{RpcName}',
+      '- API name: {ServiceName}_{RpcName}',
+      '- Set the output JSON to the response template below (fill with realistic fake values).',
+      '',
+    ];
+
+    if (services.length > 0) {
+      lines.push('Parsed services and response templates:');
+      for (const svc of services) {
+        lines.push(`\nService: ${svc.name}`);
+        for (const rpc of svc.rpcs) {
+          const tpl = protoGetTemplate(rpc.responseType);
+          const tplStr = Object.keys(tpl).length
+            ? JSON.stringify(tpl, null, 2)
+            : `{ /* ${rpc.responseType} fields */ }`;
+          lines.push(`  RPC: ${rpc.name}`);
+          lines.push(`    request: ${rpc.requestType}  response: ${rpc.responseType}`);
+          lines.push(`    path: /${svc.name}/${rpc.name}`);
+          lines.push(`    response template:\n${tplStr}`);
+        }
+      }
+      lines.push('');
+    }
+
+    lines.push('Proto source:');
+    lines.push('```proto');
+    lines.push(protoText.trim());
+    lines.push('```');
+    lines.push('');
+    lines.push('Create a mock API for every RPC above. Fill response fields with realistic fake data (e.g. id=1, name="John Doe", status="active", etc.).');
+
+    return lines.join('\n');
+  }
+
+  function submitProto() {
+    const feature  = (el('ai-proto-feature').value  || '').trim();
+    const scenario = (el('ai-proto-scenario').value || '').trim();
+    const proto    = (el('ai-proto-content').value  || '').trim();
+
+    if (!feature)  { el('ai-proto-hint').textContent = '⚠ Feature name is required.';  return; }
+    if (!scenario) { el('ai-proto-hint').textContent = '⚠ Scenario name is required.'; return; }
+    if (!proto)    { el('ai-proto-hint').textContent = '⚠ Please paste a .proto file.'; return; }
+
+    const services = parseProtoForPanel(proto);
+    const rpcCount = services.reduce((n, s) => n + s.rpcs.length, 0);
+
+    if (rpcCount === 0) {
+      el('ai-proto-hint').textContent = '⚠ No service/rpc definitions found. Make sure your proto has a "service { rpc … }" block.';
+      return;
+    }
+
+    el('ai-proto-hint').textContent = `Found ${rpcCount} RPC(s) across ${services.length} service(s). Sending to AI…`;
+
+    const prompt = buildProtoPrompt(feature, scenario, proto, services);
+    hideProtoPanel();
+    sendMessage(prompt);
+  }
+
+  // ───────────── Mock panel ─────────────
+
+  function showMockPanel() {
+    // Hide proto panel if open
+    el('ai-proto-panel').style.display = 'none';
+    el('ai-mock-panel').style.display = 'flex';
+    el('ai-mock-hint').textContent = '';
+    el('ai-mock-feature').focus();
+  }
+
+  function hideMockPanel() {
+    el('ai-mock-panel').style.display = 'none';
+    el('ai-mock-content').value = '';
+    el('ai-mock-feature').value = '';
+    el('ai-mock-scenario').value = '';
+    el('ai-mock-hint').textContent = '';
+  }
+
+  function buildMockPrompt(feature, scenario, contract) {
+    const lines = [
+      'You are a mock-API generator. From the API contract below, create mock APIs that cover every example case.',
+      '',
+      '## Instructions',
+      '1. **One feature** per API (use the provided feature name, or derive it from the API path — e.g. `referrals` from `/api-mf/private/referrals`).',
+      '2. Check whether the feature already exists (`list_features`). Create it only if missing.',
+      '3. **One scenario per logical case** (success variants, error cases). Name them descriptively:',
+      '   - Success cases: `success_<variant>` (e.g. `success_jobs`, `success_pty`)',
+      '   - Error cases: `error_<code_or_reason>` (e.g. `error_login_required`, `error_unauthorized`)',
+      '   - If the contract shows multiple responses for the same request (a sequence), use the `responses` array with `from`/`to`/`status_code` entries instead of separate scenarios.',
+      '4. **Per scenario** call `create_scenario` then `create_mock_api`:',
+      '   - `request_body` = the example request JSON (omit if the contract has no request body).',
+      '   - `response` = the example response JSON.',
+      '   - `status_code` = HTTP status: 200 for success, 4xx/5xx for errors.',
+      '   - `method` = from the contract (GET, POST, PUT, DELETE, etc.).',
+      '   - `path` = exactly as in the contract.',
+      '5. After creating everything, reply with a markdown summary table: scenario | path | method | status.',
+      '',
+    ];
+
+    if (feature) {
+      lines.push('## Requested feature name');
+      lines.push('`' + feature + '`');
+      lines.push('');
+    }
+    if (scenario) {
+      lines.push('## Requested base scenario name');
+      lines.push('`' + scenario + '` (use as prefix or as-is for the primary case)');
+      lines.push('');
+    }
+
+    lines.push('## API Contract');
+    lines.push('```');
+    lines.push(contract.trim());
+    lines.push('```');
+    lines.push('');
+    lines.push('Now create the feature, scenarios, and mock APIs. Start by checking if the feature already exists.');
+
+    return lines.join('\n');
+  }
+
+  function submitMock() {
+    const feature  = (el('ai-mock-feature').value  || '').trim();
+    const scenario = (el('ai-mock-scenario').value || '').trim();
+    const contract = (el('ai-mock-content').value  || '').trim();
+
+    if (!contract) {
+      el('ai-mock-hint').textContent = '⚠ Please paste an API contract.';
+      return;
+    }
+
+    el('ai-mock-hint').textContent = 'Sending to AI…';
+
+    const prompt = buildMockPrompt(feature, scenario, contract);
+    hideMockPanel();
+    sendMessage(prompt);
   }
 
   // ───────────── Clear conversation ─────────────
@@ -345,16 +624,40 @@
   function bindInputEvents() {
     const input = el('ai-input');
     input.addEventListener('input', () => autoResize(input));
+    function handlePanelShortcuts(val) {
+      if (val === '/proto') { showProtoPanel(); return true; }
+      if (val === '/mock')  { showMockPanel();  return true; }
+      return false;
+    }
+
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendMessage(input.value);
+        const val = input.value.trim();
+        if (handlePanelShortcuts(val)) {
+          input.value = '';
+          autoResize(input);
+        } else {
+          sendMessage(input.value);
+        }
       }
     });
-    el('ai-send-btn').addEventListener('click', () => sendMessage(input.value));
+    el('ai-send-btn').addEventListener('click', () => {
+      const val = el('ai-input').value.trim();
+      if (handlePanelShortcuts(val)) {
+        el('ai-input').value = '';
+        autoResize(el('ai-input'));
+      } else {
+        sendMessage(el('ai-input').value);
+      }
+    });
     el('ai-clear-btn').addEventListener('click', clearConversation);
     el('ai-close-btn').addEventListener('click', closeSidebar);
     el('ai-toggle-btn').addEventListener('click', toggleSidebar);
+    el('ai-proto-submit').addEventListener('click', submitProto);
+    el('ai-proto-cancel').addEventListener('click', hideProtoPanel);
+    el('ai-mock-submit').addEventListener('click', submitMock);
+    el('ai-mock-cancel').addEventListener('click', hideMockPanel);
     bindResizeHandle();
   }
 

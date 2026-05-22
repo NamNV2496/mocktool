@@ -956,6 +956,7 @@ async function showCreateMockAPIModal() {
     document.getElementById('mockapi-regex-path').value = '';
     document.getElementById('mockapi-hash-input').value = '';
     document.getElementById('mockapi-output').value = '';
+    document.getElementById('mockapi-status-code').value = '200';
     document.getElementById('mockapi-latency').value = '0';
     document.getElementById('mockapi-base-url').value = '';
     document.getElementById('mockapi-active').checked = true;
@@ -1045,6 +1046,7 @@ async function editMockAPI(api) {
         document.getElementById('mockapi-output-header').value = '';
     }
 
+    document.getElementById('mockapi-status-code').value = api.status_code || 200;
     document.getElementById('mockapi-latency').value = api.latency || 0;
     document.getElementById('mockapi-base-url').value = api.base_url || '';
     document.getElementById('mockapi-active').checked = api.is_active;
@@ -1160,6 +1162,7 @@ async function duplicateMockAPI(api) {
         document.getElementById('mockapi-output-header').value = '';
     }
 
+    document.getElementById('mockapi-status-code').value = api.status_code || 200;
     document.getElementById('mockapi-latency').value = api.latency || 0;
     document.getElementById('mockapi-base-url').value = api.base_url || '';
     document.getElementById('mockapi-active').checked = api.is_active;
@@ -1220,6 +1223,7 @@ async function saveMockAPI() {
     const hashInputStr = getJsonFieldValue('mockapi-hash-input');
     const outputStr = getJsonFieldValue('mockapi-output');
     const outputHeaders = document.getElementById('mockapi-output-header').value.trim();
+    const statusCode = parseInt(document.getElementById('mockapi-status-code').value, 10) || 200;
     const latency = parseInt(document.getElementById('mockapi-latency').value, 10) || 0;
     const isActive = document.getElementById('mockapi-active').checked;
 
@@ -1260,18 +1264,28 @@ async function saveMockAPI() {
         return;
     }
 
-    if (!method || !outputStr) {
+    if (!method) {
         showError(t('mockapi.error.methodOutputRequired'));
         return;
     }
 
-    // Parse output JSON - will be automatically minified when sent to server
-    let output;
-    try {
-        output = JSON.parse(outputStr);
-    } catch (e) {
-        showError(t('mockapi.error.invalidOutput'));
-        return;
+    // Determine which response mode is active
+    const activeMode = document.querySelector('.response-mode-btn.active')?.dataset.mode || 'default';
+    const isSequenceMode = activeMode === 'sequence';
+
+    // Parse output JSON (required only in default mode)
+    let output = null;
+    if (!isSequenceMode) {
+        if (!outputStr) {
+            showError(t('mockapi.error.methodOutputRequired'));
+            return;
+        }
+        try {
+            output = JSON.parse(outputStr);
+        } catch (e) {
+            showError(t('mockapi.error.invalidOutput'));
+            return;
+        }
     }
 
     // Parse input JSON if provided - will be automatically minified when sent to server
@@ -1285,9 +1299,15 @@ async function saveMockAPI() {
         }
     }
 
-    // Collect sequence responses
-    const responses = getSequenceResponsesFromForm();
-    if (responses === null) return; // validation error
+    // Collect sequence responses only when in sequence mode.
+    // Send [] explicitly when switching from sequence→default to clear stored sequences.
+    let responses;
+    if (isSequenceMode) {
+        responses = getSequenceResponsesFromForm();
+        if (responses === null) return; // validation error
+    } else {
+        responses = []; // explicitly clear any previously stored sequences
+    }
 
     const baseUrl = document.getElementById('mockapi-base-url').value.trim();
 
@@ -1302,10 +1322,11 @@ async function saveMockAPI() {
         regex_path: regexPath,
         input: input,
         output: output,
+        status_code: statusCode !== 200 ? statusCode : undefined,
         headers: outputHeaders,
         latency: latency,
         is_active: isActive,
-        responses: responses.length > 0 ? responses : undefined
+        responses: responses,
     };
 
     try {
@@ -1356,6 +1377,7 @@ function addSequenceResponse(data = null) {
     const idx = container.children.length;
     const from = data ? data.from : (idx === 0 ? 1 : '');
     const to = data ? data.to : 0;
+    const statusCode = data ? (data.status_code || 200) : 200;
     const output = data && data.output
         ? (typeof data.output === 'string' ? data.output : JSON.stringify(data.output, null, 2))
         : '';
@@ -1381,8 +1403,12 @@ function addSequenceResponse(data = null) {
                     <input type="number" class="seq-from" min="1" value="${from}" placeholder="1">
                 </div>
                 <div>
-                    <label>To (<= call, 0=unlimited)</label>
+                    <label>To (0 = unlimited, < 2)</label>
                     <input type="number" class="seq-to" min="0" value="${to}" placeholder="0">
+                </div>
+                <div>
+                    <label>Status Code</label>
+                    <input type="number" class="seq-status-code" min="100" max="599" value="${statusCode}" placeholder="200">
                 </div>
                 <div>
                     <label>Latency (seconds)</label>
@@ -1441,6 +1467,7 @@ function getSequenceResponsesFromForm() {
     for (const item of items) {
         const from = parseInt(item.querySelector('.seq-from').value, 10) || 1;
         const to = parseInt(item.querySelector('.seq-to').value, 10) || 0;
+        const statusCode = parseInt(item.querySelector('.seq-status-code').value, 10) || 200;
         const latency = parseInt(item.querySelector('.seq-latency').value, 10) || 0;
         const outputStr = item.querySelector('.seq-output').value.trim();
         const headersStr = item.querySelector('.seq-headers').value.trim();
@@ -1458,6 +1485,7 @@ function getSequenceResponsesFromForm() {
         responses.push({
             from: from,
             to: to,
+            status_code: statusCode,
             output: output,
             headers: headersStr || null,
             latency: latency

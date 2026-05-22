@@ -50,10 +50,11 @@ func TestBuildAll_ExposesExpectedTools(t *testing.T) {
 		"activate_scenario", "create_feature", "create_mock_api",
 		"create_scenario", "deactivate_scenario", "delete_feature",
 		"delete_mock_api", "delete_scenario", "disable_feature",
-		"enable_feature", "get_active_scenario", "list_apis",
-		"list_features", "list_scenarios", "reset_mock_api_counter",
-		"search_mocks", "search_scenarios", "set_scenario_inactive",
-		"update_feature", "update_mock_api", "update_scenario",
+		"enable_feature", "get_active_scenario", "get_mock_api_curl",
+		"list_apis", "list_features", "list_scenarios",
+		"reset_mock_api_counter", "search_mocks", "search_scenarios",
+		"set_scenario_inactive", "update_feature", "update_mock_api",
+		"update_scenario",
 	}
 	assert.ElementsMatch(t, want, got)
 }

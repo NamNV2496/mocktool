@@ -99,6 +99,7 @@ type sfResolved struct {
 	outputBytes []byte
 	headersRaw  bson.Raw
 	latency     int64
+	statusCode  int
 	mockAPI     *domain.MockAPI
 	isSequence  bool
 }
@@ -181,6 +182,11 @@ func (_self *ForwardUC) forward(
 				time.Sleep(time.Duration(entry.Latency) * time.Second)
 			}
 			c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			sc := http.StatusOK
+			if entry.StatusCode != 0 {
+				sc = entry.StatusCode
+			}
+			c.Response().WriteHeader(sc)
 			_, err := c.Response().Write([]byte(entry.Output))
 			return err
 		}
@@ -230,7 +236,7 @@ func (_self *ForwardUC) forward(
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
 		}
-		entry := entity.CachedEntry{Output: string(outputBytes), Latency: int64(1000)} // delay 1000ms = 1s
+		entry := entity.CachedEntry{Output: string(outputBytes), Latency: mockAPI.Latency, StatusCode: mockAPI.StatusCode}
 		if entryBytes, err := json.Marshal(entry); err == nil {
 			_self.cacheRepo.Set(fetchCtx, cacheKey, string(entryBytes))
 		}
@@ -238,6 +244,7 @@ func (_self *ForwardUC) forward(
 			outputBytes: outputBytes,
 			headersRaw:  mockAPI.Headers,
 			latency:     mockAPI.Latency,
+			statusCode:  mockAPI.StatusCode,
 			isSequence:  false,
 		}, nil
 	})
@@ -250,6 +257,7 @@ func (_self *ForwardUC) forward(
 	var outputBytes []byte
 	var headersRaw bson.Raw
 	var latency int64
+	statusCode := http.StatusOK
 
 	if r.isSequence {
 		seqKey := fmt.Sprintf(
@@ -275,6 +283,9 @@ func (_self *ForwardUC) forward(
 			}
 			headersRaw = matched.Headers
 			latency = matched.Latency
+			if matched.StatusCode != 0 {
+				statusCode = matched.StatusCode
+			}
 		} else {
 			outputBytes, err = rawToJSON(r.mockAPI.Output)
 			if err != nil {
@@ -282,11 +293,17 @@ func (_self *ForwardUC) forward(
 			}
 			headersRaw = r.mockAPI.Headers
 			latency = r.mockAPI.Latency
+			if r.mockAPI.StatusCode != 0 {
+				statusCode = r.mockAPI.StatusCode
+			}
 		}
 	} else {
 		outputBytes = r.outputBytes
 		headersRaw = r.headersRaw
 		latency = r.latency
+		if r.statusCode != 0 {
+			statusCode = r.statusCode
+		}
 	}
 	if latency > 0 {
 		time.Sleep(time.Duration(latency) * time.Second)
@@ -306,9 +323,12 @@ func (_self *ForwardUC) forward(
 	}
 
 	// 11. Write response
-	_, err = c.Response().Write(outputBytes)
-	if err != nil {
-		return err
+	c.Response().WriteHeader(statusCode)
+	if statusCode == http.StatusOK {
+		_, err = c.Response().Write(outputBytes)
+		if err != nil {
+			return err
+		}
 	}
 	observability.MockAPICacheHits.WithLabelValues("miss").Inc()
 	observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
@@ -366,7 +386,7 @@ func applyChaos(errorRate float64, errorStatus int, jitterMs int64) error {
 func findMatchingResponse(responses []domain.SequenceResponse, count int) *domain.SequenceResponse {
 	for i := range responses {
 		r := &responses[i]
-		if count >= r.From && (r.To == 0 || count <= r.To) {
+		if count >= r.From && (r.To == 0 || count < r.To) {
 			return r
 		}
 	}

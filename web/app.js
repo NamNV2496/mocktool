@@ -3,7 +3,10 @@ const API_BASE_URL = 'http://localhost:8081/api/v1/mocktool';
 let features = [];
 let scenarios = [];
 let mockAPIs = [];
+let grpcMocks = [];
 let loadTestScenarios = [];
+let statsData = null;
+let statsRefreshTimer = null;
 let activeScenarioId = null; // Track the active scenario ID for the current accountId
 let globalActiveScenarioId = null; // Track the global active scenario ID
 
@@ -152,6 +155,8 @@ function switchTab(tabName) {
         populateFeatureFilters();
     } else if (tabName === 'mockapis') {
         populateMockAPIFilters();
+    } else if (tabName === 'grpcapis') {
+        populateGRPCAPIFilters();
     } else if (tabName === 'loadtest') {
         loadLoadTestScenarios();
 
@@ -165,6 +170,17 @@ function switchTab(tabName) {
                 }
             });
         }
+    } else if (tabName === 'stats') {
+        loadStats();
+        if (!statsRefreshTimer) {
+            statsRefreshTimer = setInterval(loadStats, 30000);
+        }
+        return; // skip clearing timer below
+    }
+    // Stop stats auto-refresh when leaving the stats tab
+    if (statsRefreshTimer) {
+        clearInterval(statsRefreshTimer);
+        statsRefreshTimer = null;
     }
 }
 
@@ -2669,6 +2685,66 @@ function renderDropdownOptions(inputId, items, options) {
     });
 }
 
+// ==================== Stats ====================
+
+async function loadStats() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/stats`);
+        if (!response.ok) throw new Error('Failed to load stats');
+        statsData = await response.json();
+        renderStatsCards(statsData);
+        renderStatsTable(statsData);
+        const el = document.getElementById('stats-last-updated');
+        if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch (error) {
+        console.error('Error loading stats:', error);
+        document.getElementById('stats-table-body').innerHTML =
+            '<tr><td colspan="8" class="loading">Failed to load stats</td></tr>';
+    }
+}
+
+function renderStatsCards(data) {
+    const totalEl = document.getElementById('stats-total-hits');
+    const cacheEl = document.getElementById('stats-cache-rate');
+    const latEl   = document.getElementById('stats-avg-latency');
+    if (totalEl) totalEl.textContent = data.total_hits.toLocaleString();
+    if (cacheEl) cacheEl.textContent = data.cache_hit_rate.toFixed(1) + '%';
+    if (latEl)   latEl.textContent   = data.avg_latency_ms.toFixed(1) + ' ms';
+}
+
+function renderStatsTable(data) {
+    const tbody = document.getElementById('stats-table-body');
+    if (!data.apis || data.apis.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No requests recorded yet</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.apis.map((api, idx) => {
+        const topClass = idx < 3 ? ' class="top-row"' : '';
+        const { bg, color } = statusMethodColor(api.method);
+        return `<tr${topClass}>
+            <td class="text-truncate">${api.feature || '—'}</td>
+            <td class="text-truncate">${api.scenario || '—'}</td>
+            <td><span class="status-badge" style="background:${bg};color:${color}">${api.method}</span></td>
+            <td class="text-truncate"><code>${api.path}</code></td>
+            <td><strong>${api.hits.toLocaleString()}</strong></td>
+            <td>${api.cache_hits.toLocaleString()}</td>
+            <td>${api.cache_hit_rate.toFixed(1)}%</td>
+            <td>${api.avg_latency_ms.toFixed(1)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function statusMethodColor(method) {
+    const map = {
+        GET:    { bg: '#c6f6d5', color: '#22543d' },
+        POST:   { bg: '#bee3f8', color: '#2a4365' },
+        PUT:    { bg: '#feebc8', color: '#7b341e' },
+        DELETE: { bg: '#fed7d7', color: '#742a2a' },
+        PATCH:  { bg: '#e9d8fd', color: '#44337a' },
+    };
+    return map[method] || { bg: '#e2e8f0', color: '#4a5568' };
+}
+
 // ==================== Load Test Scenarios ====================
 
 async function loadLoadTestScenarios(page = 1, searchQuery = '') {
@@ -3424,5 +3500,273 @@ async function exportScenarioToJSON(scenarioId) {
     } catch (error) {
         console.error('Error exporting scenario:', error);
         showError(t('loadtest.error.run'));
+    }
+}
+
+/* ============================================================
+   gRPC Mock APIs
+   ============================================================ */
+
+function populateGRPCAPIFilters() {
+    const featureFilter = document.getElementById('grpcapi-feature-filter');
+    const scenarioFilter = document.getElementById('grpcapi-scenario-filter');
+
+    if (!featureFilter.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-feature-filter', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioFilter.dataset.featureName = featureName;
+                scenarioFilter.value = '';
+                scenarioFilter.dataset.selectedValue = '';
+                document.getElementById('grpcapis-table-body').innerHTML =
+                    '<tr><td colspan="8" class="loading">Select a scenario to view gRPC mocks</td></tr>';
+            }
+        });
+    }
+
+    if (!scenarioFilter.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-scenario-filter', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...',
+            onChange: (scenarioName) => {
+                const featureName = document.getElementById('grpcapi-feature-filter').dataset.selectedValue || '';
+                loadGRPCMocks(featureName, scenarioName);
+            }
+        });
+    }
+}
+
+async function loadGRPCMocks(featureName, scenarioName = '') {
+    if (!featureName) {
+        document.getElementById('grpcapis-table-body').innerHTML =
+            '<tr><td colspan="8" class="loading">Select a feature to view gRPC mocks</td></tr>';
+        return;
+    }
+    try {
+        let url = `${API_BASE_URL}/grpc/apis?feature_name=${encodeURIComponent(featureName)}`;
+        if (scenarioName) url += `&scenario_name=${encodeURIComponent(scenarioName)}`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('Failed to load gRPC mocks');
+        grpcMocks = await resp.json();
+        renderGRPCMocksTable();
+    } catch (err) {
+        console.error('Error loading gRPC mocks:', err);
+        showError('Failed to load gRPC mocks');
+    }
+}
+
+const GRPC_CODE_LABELS = {
+    0: 'OK', 1: 'Cancelled', 2: 'Unknown', 3: 'InvalidArgument',
+    4: 'DeadlineExceeded', 5: 'NotFound', 7: 'PermissionDenied',
+    13: 'Internal', 16: 'Unauthenticated'
+};
+
+function grpcCodeBadge(code) {
+    const label = GRPC_CODE_LABELS[code] || String(code);
+    const bg = code === 0 ? '#c6f6d5' : '#fed7d7';
+    const color = code === 0 ? '#22543d' : '#742a2a';
+    return `<span class="status-badge" style="background:${bg};color:${color}">${code} ${label}</span>`;
+}
+
+function renderGRPCMocksTable() {
+    const tbody = document.getElementById('grpcapis-table-body');
+    if (!grpcMocks || grpcMocks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No gRPC mocks found</td></tr>';
+        return;
+    }
+    tbody.innerHTML = grpcMocks.map(m => `
+        <tr>
+            <td>${m.feature_name}</td>
+            <td>${m.scenario_name}</td>
+            <td style="font-family:monospace;font-size:0.85rem">${m.service_name}</td>
+            <td style="font-family:monospace;font-size:0.85rem">${m.method_name}</td>
+            <td>${grpcCodeBadge(m.status_code || 0)}</td>
+            <td>${m.latency || 0}</td>
+            <td><span class="status-badge" style="background:${m.is_active ? '#c6f6d5' : '#fed7d7'};color:${m.is_active ? '#22543d' : '#742a2a'}">${m.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td class="actions">
+                <button class="btn btn-edit" onclick='editGRPCMock(${JSON.stringify(m)})'>Edit</button>
+                <button class="btn btn-delete" onclick="deleteGRPCMock('${m.id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showCreateGRPCMockModal() {
+    document.getElementById('grpcapi-id').value = '';
+    document.getElementById('grpcapi-modal-title').textContent = 'Create gRPC Mock';
+    document.getElementById('grpcapi-service').value = '';
+    document.getElementById('grpcapi-method').value = '';
+    
+    // Reset JSON modes to raw
+    resetJsonTreeMode('grpcapi-input');
+    resetJsonTreeMode('grpcapi-output');
+    
+    document.getElementById('grpcapi-input').value = '';
+    document.getElementById('grpcapi-output').value = '';
+    document.getElementById('grpcapi-status-code').value = '0';
+    document.getElementById('grpcapi-latency').value = '0';
+    document.getElementById('grpcapi-active').checked = true;
+
+    const featureEl = document.getElementById('grpcapi-feature');
+    const scenarioEl = document.getElementById('grpcapi-scenario');
+
+    if (!featureEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioEl.dataset.featureName = featureName;
+                scenarioEl.value = '';
+                scenarioEl.dataset.selectedValue = '';
+            }
+        });
+    } else {
+        featureEl.value = '';
+        featureEl.dataset.selectedValue = '';
+    }
+
+    if (!scenarioEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    } else {
+        scenarioEl.value = '';
+        scenarioEl.dataset.selectedValue = '';
+        scenarioEl.dataset.featureName = '';
+    }
+
+    showModal('grpcapi-modal');
+}
+
+function editGRPCMock(mock) {
+    document.getElementById('grpcapi-id').value = mock.id;
+    document.getElementById('grpcapi-modal-title').textContent = 'Edit gRPC Mock';
+    document.getElementById('grpcapi-service').value = mock.service_name;
+    document.getElementById('grpcapi-method').value = mock.method_name;
+    
+    // Reset JSON modes to raw
+    resetJsonTreeMode('grpcapi-input');
+    resetJsonTreeMode('grpcapi-output');
+    
+    // Populate input if it exists
+    try {
+        if (mock.input && mock.input !== null) {
+            document.getElementById('grpcapi-input').value =
+                typeof mock.input === 'string' ? mock.input : JSON.stringify(mock.input, null, 2);
+        } else {
+            document.getElementById('grpcapi-input').value = '';
+        }
+    } catch (e) {
+        document.getElementById('grpcapi-input').value = '';
+    }
+    
+    // Populate output
+    try {
+        document.getElementById('grpcapi-output').value =
+            typeof mock.output === 'string' ? mock.output : JSON.stringify(mock.output, null, 2);
+    } catch (e) {
+        document.getElementById('grpcapi-output').value = '';
+    }
+    
+    document.getElementById('grpcapi-status-code').value = String(mock.status_code || 0);
+    document.getElementById('grpcapi-latency').value = String(mock.latency || 0);
+    document.getElementById('grpcapi-active').checked = mock.is_active;
+
+    const featureEl = document.getElementById('grpcapi-feature');
+    const scenarioEl = document.getElementById('grpcapi-scenario');
+
+    if (!featureEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioEl.dataset.featureName = featureName;
+                scenarioEl.value = '';
+                scenarioEl.dataset.selectedValue = '';
+            }
+        });
+    }
+    featureEl.value = mock.feature_name;
+    featureEl.dataset.selectedValue = mock.feature_name;
+    featureEl.dataset.selectedText = mock.feature_name;
+
+    if (!scenarioEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    }
+    scenarioEl.dataset.featureName = mock.feature_name;
+    scenarioEl.value = mock.scenario_name;
+    scenarioEl.dataset.selectedValue = mock.scenario_name;
+    scenarioEl.dataset.selectedText = mock.scenario_name;
+
+    showModal('grpcapi-modal');
+}
+
+async function saveGRPCMock() {
+    const id = document.getElementById('grpcapi-id').value;
+    const featureEl = document.getElementById('grpcapi-feature');
+    const scenarioEl = document.getElementById('grpcapi-scenario');
+    const featureName = featureEl.dataset.selectedValue || featureEl.value.trim();
+    const scenarioName = scenarioEl.dataset.selectedValue || scenarioEl.value.trim();
+    const serviceName = document.getElementById('grpcapi-service').value.trim();
+    const methodName = document.getElementById('grpcapi-method').value.trim();
+    const inputStr = getJsonFieldValue('grpcapi-input').trim();
+    const outputStr = getJsonFieldValue('grpcapi-output').trim();
+    const statusCode = parseInt(document.getElementById('grpcapi-status-code').value, 10) || 0;
+    const latency = parseInt(document.getElementById('grpcapi-latency').value, 10) || 0;
+
+    if (!featureName) return showError('Feature name is required');
+    if (!scenarioName) return showError('Scenario name is required');
+    if (!serviceName) return showError('Service name is required');
+    if (!methodName) return showError('Method name is required');
+    if (!outputStr) return showError('Output JSON is required');
+
+    let output;
+    try { output = JSON.parse(outputStr); } catch { return showError('Output must be valid JSON'); }
+
+    let input = null;
+    if (inputStr) {
+        try { input = JSON.parse(inputStr); } catch { return showError('Input must be valid JSON'); }
+    }
+
+    const body = { feature_name: featureName, scenario_name: scenarioName, service_name: serviceName,
+        method_name: methodName, output, status_code: statusCode, latency };
+    if (input !== null) body.input = input;
+
+    try {
+        const url = id ? `${API_BASE_URL}/grpc/apis/${id}` : `${API_BASE_URL}/grpc/apis`;
+        const method = id ? 'PUT' : 'POST';
+        const resp = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            return showError(err.message || 'Failed to save gRPC mock');
+        }
+        closeModal('grpcapi-modal');
+        showSuccess(id ? 'gRPC mock updated' : 'gRPC mock created');
+        const featureFilter = document.getElementById('grpcapi-feature-filter').dataset.selectedValue || featureName;
+        const scenarioFilter = document.getElementById('grpcapi-scenario-filter').dataset.selectedValue || scenarioName;
+        loadGRPCMocks(featureFilter, scenarioFilter);
+    } catch (err) {
+        console.error('Error saving gRPC mock:', err);
+        showError('Failed to save gRPC mock');
+    }
+}
+
+async function deleteGRPCMock(id) {
+    if (!confirm('Delete this gRPC mock?')) return;
+    try {
+        const resp = await fetch(`${API_BASE_URL}/grpc/apis/${id}`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error('Failed to delete');
+        showSuccess('gRPC mock deleted');
+        const featureName = document.getElementById('grpcapi-feature-filter').dataset.selectedValue || '';
+        const scenarioName = document.getElementById('grpcapi-scenario-filter').dataset.selectedValue || '';
+        loadGRPCMocks(featureName, scenarioName);
+    } catch (err) {
+        console.error('Error deleting gRPC mock:', err);
+        showError('Failed to delete gRPC mock');
     }
 }

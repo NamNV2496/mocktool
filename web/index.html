@@ -21,6 +21,8 @@
             <button class="tab-btn active" data-tab="features" data-i18n="tab.features">Features</button>
             <button class="tab-btn" data-tab="scenarios" data-i18n="tab.scenarios">Scenarios</button>
             <button class="tab-btn" data-tab="mockapis" data-i18n="tab.mockapis">Mock APIs</button>
+            <button class="tab-btn" data-tab="grpcapis">gRPC APIs</button>
+            <button class="tab-btn" data-tab="stats">Stats</button>
         </div>
 
         <!-- Features Tab -->
@@ -126,6 +128,83 @@
                 </table>
             </div>
             <div id="mockapis-pagination" class="pagination-container"></div>
+        </div>
+
+        <!-- gRPC APIs Tab -->
+        <div id="grpcapis" class="tab-content">
+            <div class="section-header">
+                <h2>gRPC APIs</h2>
+                <div class="filter-group">
+                    <input type="text" id="grpcapi-feature-filter" class="filter-select" placeholder="Search features...">
+                    <input type="text" id="grpcapi-scenario-filter" class="filter-select" placeholder="Search scenarios...">
+                    <button class="btn btn-primary" onclick="showCreateGRPCMockModal()">+ New gRPC Mock</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Scenario</th>
+                            <th>Service</th>
+                            <th>Method</th>
+                            <th>Status Code</th>
+                            <th>Latency (ms)</th>
+                            <th>Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grpcapis-table-body">
+                        <tr>
+                            <td colspan="8" class="loading">Select a feature to view gRPC mocks</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="stats" class="tab-content">
+            <div class="section-header">
+                <h2>Stats <span style="font-size:0.75rem;font-weight:400;color:#a0aec0;">(resets per hour)</span></h2>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span id="stats-last-updated" style="font-size:0.8rem;color:#a0aec0;"></span>
+                    <button class="btn btn-outline" onclick="loadStats()" style="padding:6px 14px;">↻ Refresh</button>
+                </div>
+            </div>
+            <div class="stats-cards" id="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-card-value" id="stats-total-hits">—</div>
+                    <div class="stat-card-label">Total Hits</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value" id="stats-cache-rate">—</div>
+                    <div class="stat-card-label">Cache Hit Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-value" id="stats-avg-latency">—</div>
+                    <div class="stat-card-label">Avg Latency</div>
+                </div>
+            </div>
+            <div class="table-container" style="margin-top:24px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>Scenario</th>
+                            <th>Method</th>
+                            <th>Path</th>
+                            <th>Hits</th>
+                            <th>Cache Hits</th>
+                            <th>Cache Hit %</th>
+                            <th>Avg Latency (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stats-table-body">
+                        <tr><td colspan="8" class="loading">Select the Stats tab to load data</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Load Test Tool Tab -->
@@ -575,6 +654,95 @@ curl --location 'https://api.example.com/login' \
             </div>
         </div>
     </template>
+
+    <!-- Modal for Creating/Editing gRPC Mock -->
+    <div id="grpcapi-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="grpcapi-modal-title">Create gRPC Mock</h3>
+                <span class="close" onclick="closeModal('grpcapi-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="grpcapi-id">
+                <div class="form-group">
+                    <label for="grpcapi-feature">Feature</label>
+                    <input type="text" id="grpcapi-feature" placeholder="Search features..." required>
+                </div>
+                <div class="form-group">
+                    <label for="grpcapi-scenario">Scenario</label>
+                    <input type="text" id="grpcapi-scenario" placeholder="Search scenarios..." required>
+                </div>
+                <div class="form-group">
+                    <label for="grpcapi-service">Service Name</label>
+                    <input type="text" id="grpcapi-service" placeholder="com.example.UserService" required>
+                </div>
+                <div class="form-group">
+                    <label for="grpcapi-method">Method Name</label>
+                    <input type="text" id="grpcapi-method" placeholder="GetUser" required>
+                </div>
+                <div class="form-group">
+                    <div class="json-field-header">
+                        <label for="grpcapi-input">Request Input — JSON (Optional, for body matching)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-format" onclick="formatJson('grpcapi-input')" title="Format JSON"><span>⚡ Format</span></button>
+                            <div class="json-mode-toggle">
+                                <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('grpcapi-input', 'raw')">Raw</button>
+                                <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('grpcapi-input', 'tree')">Tree</button>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="grpcapi-input" rows="4" placeholder='{"id": 1}'></textarea>
+                    <div id="grpcapi-input-tree" class="json-tree" style="display: none;"></div>
+                    <small style="color:#718096;font-size:0.85rem">Leave empty to match all requests to this method.</small>
+                </div>
+                <div class="form-group">
+                    <div class="json-field-header">
+                        <label for="grpcapi-output">Response Output — JSON (Required)</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-format" onclick="formatJson('grpcapi-output')" title="Format JSON"><span>⚡ Format</span></button>
+                            <div class="json-mode-toggle">
+                                <button class="mode-btn active" data-mode="raw" onclick="switchJsonMode('grpcapi-output', 'raw')">Raw</button>
+                                <button class="mode-btn" data-mode="tree" onclick="switchJsonMode('grpcapi-output', 'tree')">Tree</button>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="grpcapi-output" rows="5" placeholder='{"name": "Alice"}' required></textarea>
+                    <div id="grpcapi-output-tree" class="json-tree" style="display: none;"></div>
+                </div>
+                <div class="form-group" style="display:flex;gap:12px;">
+                    <div style="flex:1">
+                        <label for="grpcapi-status-code">gRPC Status Code</label>
+                        <select id="grpcapi-status-code">
+                            <option value="0">0 — OK</option>
+                            <option value="1">1 — Cancelled</option>
+                            <option value="2">2 — Unknown</option>
+                            <option value="3">3 — InvalidArgument</option>
+                            <option value="4">4 — DeadlineExceeded</option>
+                            <option value="5">5 — NotFound</option>
+                            <option value="7">7 — PermissionDenied</option>
+                            <option value="13">13 — Internal</option>
+                            <option value="16">16 — Unauthenticated</option>
+                        </select>
+                    </div>
+                    <div style="flex:1">
+                        <label for="grpcapi-latency">Latency (ms)</label>
+                        <input type="number" id="grpcapi-latency" placeholder="0" min="0" value="0">
+                        <small style="color:#718096;font-size:0.85rem;">Delay response by this many milliseconds. 0 = no delay.</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="grpcapi-active" checked>
+                        <span>Active</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('grpcapi-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveGRPCMock()">Save</button>
+            </div>
+        </div>
+    </div>
 
     <script src="i18n.js"></script>
     <script src="app.js"></script>

@@ -17,16 +17,7 @@ var (
 )
 
 // InitTracing initializes OpenTelemetry tracing
-func InitTracing(serviceName, serviceVersion string) (func(), error) {
-	// Create stdout exporter for development
-	// In production, replace with Jaeger, Zipkin, or OTLP exporter
-	exporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint(),
-	)
-	if err != nil {
-		return nil, err
-	}
-
+func InitTracing(serviceName, serviceVersion string, enabled bool) (func(), error) {
 	// Create resource with service information
 	res, err := resource.New(
 		context.Background(),
@@ -39,23 +30,41 @@ func InitTracing(serviceName, serviceVersion string) (func(), error) {
 		return nil, err
 	}
 
-	// Create trace provider
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
+	var tp *sdktrace.TracerProvider
+
+	if enabled {
+		// Create stdout exporter for development
+		// In production, replace with Jaeger, Zipkin, or OTLP exporter
+		exporter, err := stdouttrace.New(
+			stdouttrace.WithPrettyPrint(),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create trace provider with exporter
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		)
+		slog.Info("OpenTelemetry tracing initialized",
+			"service", serviceName,
+			"version", serviceVersion,
+		)
+	} else {
+		// Create noop trace provider when tracing is disabled
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithResource(res),
+		)
+		slog.Info("OpenTelemetry tracing disabled")
+	}
 
 	// Set global trace provider
 	otel.SetTracerProvider(tp)
 
 	// Get tracer
 	tracer = tp.Tracer("mocktool")
-
-	slog.Info("OpenTelemetry tracing initialized",
-		"service", serviceName,
-		"version", serviceVersion,
-	)
 
 	// Return cleanup function
 	cleanup := func() {

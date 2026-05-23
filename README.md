@@ -350,6 +350,23 @@ forwardReq.Header.Set("X-Feature-Name", "feature2")
 forwardReq.Header.Set("X-Account-Id", accountId)
 ```
 
+### curl
+
+```bash
+curl -L -X GET 'http://localhost:8082/forward/api/v1/test' -H 'Content-Type: application/json' -H 'X-Feature-Name: test_feature_1' -H 'X-Account-Id: test-account' -d '{"id":1}'
+```
+### grpcurl
+
+```bash
+grpcurl \
+	-plaintext \
+	-H 'x-feature-name':'InsertAd' \
+	-H 'x-account-id':'1' \
+	-emit-defaults \
+	-d '{"id":"1"}' \
+	'localhost:9090' \
+	UserService.getUser
+```
 ![doc/1.png](doc/1.png)
 
 ## 2. Only 1 active scenario for each feature for each accountId
@@ -396,7 +413,7 @@ response with headers
 ![doc/12.png](doc/12.png)
 ![doc/13.png](doc/13.png)
 
-## 4. Load test feature (Bonus)
+<!-- ## 4. Load test feature (Bonus)
 
 ![doc/17.png](doc/17.png)
 
@@ -417,7 +434,18 @@ Example:
 
 result
 
-![doc/19.png](doc/19.png)
+![doc/19.png](doc/19.png) -->
+
+## 5. Grpc mock API
+
+![alt text](doc/21.png)
+### result
+
+![alt text](doc/22.png)
+
+## 6. AI assitant through MCP
+
+![alt text](doc/23.png)
 
 # How to start
 

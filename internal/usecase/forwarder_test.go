@@ -265,7 +265,7 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 			scenarioRepo = mocks.NewMockIScenarioRepository(ctrl)
 			accountScenarioRepo = mocks.NewMockIAccountScenarioRepository(ctrl)
 			cacheRepo = repositoryMocks.NewMockICache(ctrl)
-			uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+			uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 			// Request + context
 			e := echo.New()
@@ -303,7 +303,7 @@ func TestForwardUC_ResponsePublicMockData(t *testing.T) {
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
 	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 	tests := []struct {
 		name           string
@@ -411,7 +411,7 @@ func TestForwardUC_WithQueryParameters(t *testing.T) {
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
 	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 	t.Run("request with query parameters", func(t *testing.T) {
 		body := map[string]interface{}{"field1": "value1"}
@@ -483,7 +483,7 @@ func TestForwardUC_WithCustomHeaders(t *testing.T) {
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
 	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 	t.Run("response with custom headers", func(t *testing.T) {
 		body := map[string]interface{}{"field1": "value1"}
@@ -566,7 +566,7 @@ func TestForwardUC_HeaderSanitization(t *testing.T) {
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
 	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 	tests := []struct {
 		name            string
@@ -709,7 +709,7 @@ func TestNewForwardUC(t *testing.T) {
 	accountScenarioRepo := mocks.NewMockIAccountScenarioRepository(ctrl)
 	cacheRepo := repositoryMocks.NewMockICache(ctrl)
 
-	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo)
+	uc := NewForwardUC(mockAPIRepo, scenarioRepo, accountScenarioRepo, cacheRepo, NewStatsStore())
 
 	assert.NotNil(t, uc)
 	assert.Implements(t, (*IForwardUC)(nil), uc)

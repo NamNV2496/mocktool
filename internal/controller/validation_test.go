@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/configs"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	controllerMocks "github.com/namnv2496/mocktool/mocks/controller"
 	repositoryMocks "github.com/namnv2496/mocktool/mocks/repository"
 	customValidator "github.com/namnv2496/mocktool/pkg/validator"
@@ -34,9 +35,11 @@ func TestValidation_CreateNewFeature(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo
 		loadTestController,
 		cacheRepo,
-		nil,
+		nil,                     // chatHandler
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	tests := []struct {
@@ -129,9 +132,11 @@ func TestValidation_CreateNewScenario(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo
 		loadTestController,
 		cacheRepo,
-		nil,
+		nil,                     // chatHandler
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	tests := []struct {
@@ -224,9 +229,11 @@ func TestValidation_CreateMockAPI(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo
 		loadTestController,
 		cacheRepo,
-		nil,
+		nil,                     // chatHandler
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	tests := []struct {

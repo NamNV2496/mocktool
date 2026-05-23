@@ -114,21 +114,6 @@ func (mr *MockIMockAPIRepositoryMockRecorder) FindByFeatureScenarioPathMethodAnd
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByFeatureScenarioPathMethodAndHash", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByFeatureScenarioPathMethodAndHash), ctx, featureName, scenarioName, path, method, hashInput)
 }
 
-// FindCandidatesByFeatureScenarioAndMethod mocks base method.
-func (m *MockIMockAPIRepository) FindCandidatesByFeatureScenarioAndMethod(ctx context.Context, featureName, scenarioName, method string) ([]domain.MockAPI, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindCandidatesByFeatureScenarioAndMethod", ctx, featureName, scenarioName, method)
-	ret0, _ := ret[0].([]domain.MockAPI)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindCandidatesByFeatureScenarioAndMethod indicates an expected call of FindCandidatesByFeatureScenarioAndMethod.
-func (mr *MockIMockAPIRepositoryMockRecorder) FindCandidatesByFeatureScenarioAndMethod(ctx, featureName, scenarioName, method any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindCandidatesByFeatureScenarioAndMethod", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindCandidatesByFeatureScenarioAndMethod), ctx, featureName, scenarioName, method)
-}
-
 // FindByNameAndFeatureAndScenario mocks base method.
 func (m *MockIMockAPIRepository) FindByNameAndFeatureAndScenario(ctx context.Context, mockName, featureName, sceanrioName string) (*domain.MockAPI, error) {
 	m.ctrl.T.Helper()
@@ -157,6 +142,21 @@ func (m *MockIMockAPIRepository) FindByObjectID(ctx context.Context, id primitiv
 func (mr *MockIMockAPIRepositoryMockRecorder) FindByObjectID(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByObjectID", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindByObjectID), ctx, id)
+}
+
+// FindCandidatesByFeatureScenarioAndMethod mocks base method.
+func (m *MockIMockAPIRepository) FindCandidatesByFeatureScenarioAndMethod(ctx context.Context, featureName, scenarioName, method string) ([]domain.MockAPI, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindCandidatesByFeatureScenarioAndMethod", ctx, featureName, scenarioName, method)
+	ret0, _ := ret[0].([]domain.MockAPI)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindCandidatesByFeatureScenarioAndMethod indicates an expected call of FindCandidatesByFeatureScenarioAndMethod.
+func (mr *MockIMockAPIRepositoryMockRecorder) FindCandidatesByFeatureScenarioAndMethod(ctx, featureName, scenarioName, method any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindCandidatesByFeatureScenarioAndMethod", reflect.TypeOf((*MockIMockAPIRepository)(nil).FindCandidatesByFeatureScenarioAndMethod), ctx, featureName, scenarioName, method)
 }
 
 // ListActiveAPIsByScenario mocks base method.

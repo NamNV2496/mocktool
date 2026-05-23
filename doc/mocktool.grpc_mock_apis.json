@@ -1,0 +1,28 @@
+[{
+  "_id": {
+    "$oid": "6a11a44f1266ea10a1a3f707"
+  },
+  "feature_name": "InsertAd",
+  "scenario_name": "test",
+  "service_name": "UserService",
+  "method_name": "GetUser",
+  "hash_input": "037c9214eef74cc3887f3a4f085b4e17d76280dafd273b0ee160c09c4ba1cfd4",
+  "input": {
+    "id": 1
+  },
+  "output": {
+    "id": 1,
+    "name": "nam"
+  },
+  "latency": {
+    "$numberLong": "0"
+  },
+  "is_active": true,
+  "created_at": {
+    "$date": "2026-05-23T12:57:51.164Z"
+  },
+  "updated_at": {
+    "$date": "2026-05-23T13:34:06.438Z"
+  },
+  "status_code": 0
+}]

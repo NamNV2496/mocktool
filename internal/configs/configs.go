@@ -7,9 +7,10 @@ import (
 )
 
 type AppConfig struct {
-	HTTPPort string `env:"http_port" envDefault:":8081"`
-
+	HTTPPort       string `env:"http_port" envDefault:":8081"`
 	FowardHTTPPort string `env:"foward_http_port" envDefault:":8082"`
+
+	GRPCPort string `env:"grpc_port" envDefault:":9090"`
 }
 
 type MongoDB struct {
@@ -44,6 +45,10 @@ type OpenAIConfig struct {
 	APIEndpoint string `env:"OPENAI_API_ENDPOINT" envDefault:"https://openrouter.ai/api/v1"`
 }
 
+type TracingConfig struct {
+	Enabled bool `env:"TRACING_ENABLED" envDefault:"false"`
+}
+
 type Config struct {
 	AppConfig       AppConfig
 	MongoDB         MongoDB
@@ -51,6 +56,7 @@ type Config struct {
 	RateLimiterCfg  RateLimiterCfg
 	LoadSheddingCfg LoadSheddingCfg
 	OpenAIConfig    OpenAIConfig
+	TracingConfig   TracingConfig
 }
 
 func LoadConfig() *Config {

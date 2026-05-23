@@ -9,7 +9,7 @@ import (
 )
 
 func TestInitTracing(t *testing.T) {
-	cleanup, err := InitTracing("test-service", "1.0.0")
+	cleanup, err := InitTracing("test-service", "1.0.0", false)
 
 	assert.NoError(t, err, "InitTracing should not return error")
 	assert.NotNil(t, cleanup, "cleanup function should not be nil")
@@ -22,7 +22,7 @@ func TestInitTracing(t *testing.T) {
 
 func TestGetTracer(t *testing.T) {
 	// Initialize tracing first
-	cleanup, err := InitTracing("test-service", "1.0.0")
+	cleanup, err := InitTracing("test-service", "1.0.0", false)
 	assert.NoError(t, err)
 	defer cleanup()
 
@@ -38,7 +38,7 @@ func TestGetTracerWithoutInit(t *testing.T) {
 
 func TestStartSpan(t *testing.T) {
 	// Initialize tracing
-	cleanup, err := InitTracing("test-service", "1.0.0")
+	cleanup, err := InitTracing("test-service", "1.0.0", false)
 	assert.NoError(t, err)
 	defer cleanup()
 
@@ -56,7 +56,7 @@ func TestStartSpan(t *testing.T) {
 }
 
 func TestStartSpanCreatesValidSpan(t *testing.T) {
-	cleanup, err := InitTracing("test-service", "1.0.0")
+	cleanup, err := InitTracing("test-service", "1.0.0", false)
 	assert.NoError(t, err)
 	defer cleanup()
 
@@ -85,7 +85,7 @@ func TestStartSpanCreatesValidSpan(t *testing.T) {
 }
 
 func TestNestedSpans(t *testing.T) {
-	cleanup, err := InitTracing("test-service", "1.0.0")
+	cleanup, err := InitTracing("test-service", "1.0.0", false)
 	assert.NoError(t, err)
 	defer cleanup()
 

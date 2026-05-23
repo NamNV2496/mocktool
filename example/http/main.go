@@ -90,23 +90,6 @@ func forwardRequest(c echo.Context) error {
 	for k, v := range resp.Header {
 		c.Response().Header()[k] = v
 	}
-	// respBody, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	return status.Errorf(codes.Internal, "read response failed: %v", err)
-	// }
-
-	// var errResp errorcustome.ErrorResponse
-	// json.Unmarshal(respBody, &errResp)
-
-	// // Reconstruct gRPC status error with details
-	// st := status.New(errResp.GrpcCode, errResp.ErrorMessage)
-	// stWithDetails, _ := st.WithDetails(&pb.ErrorDetail{
-	// 	ErrorCode: errResp.ErrorCode,
-	// 	Metadata:  errResp.Details,
-	// })
-
-	// return c.Stream(resp.StatusCode, resp.Header.Get("Content-Type"), stWithDetails.Err())
-
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return status.Errorf(codes.Internal, "read response failed: %v", err)

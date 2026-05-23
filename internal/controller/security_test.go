@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/configs"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	controllerMocks "github.com/namnv2496/mocktool/mocks/controller"
 	repositoryMocks "github.com/namnv2496/mocktool/mocks/repository"
 	customValidator "github.com/namnv2496/mocktool/pkg/validator"
@@ -34,9 +35,11 @@ func TestSecurity_HeaderSanitization(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo
 		loadTestController,
 		cacheRepo,
-		nil,
+		nil,                     // chatHandler
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	tests := []struct {
@@ -203,9 +206,11 @@ func TestSecurity_ValidationPreventsInjection(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo
 		loadTestController,
 		cacheRepo,
-		nil,
+		nil,                     // chatHandler
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	tests := []struct {

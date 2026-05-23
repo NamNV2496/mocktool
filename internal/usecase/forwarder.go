@@ -45,6 +45,7 @@ type ForwardUC struct {
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
 	cacheRepo           repository.ICache
+	stats               *StatsStore
 	sfGroup             singleflight.Group
 }
 
@@ -53,12 +54,14 @@ func NewForwardUC(
 	ScenarioRepo repository.IScenarioRepository,
 	AccountScenarioRepo repository.IAccountScenarioRepository,
 	cacheRepo repository.ICache,
+	stats *StatsStore,
 ) IForwardUC {
 	return &ForwardUC{
 		MockAPIRepo:         MockAPIRepo,
 		ScenarioRepo:        ScenarioRepo,
 		AccountScenarioRepo: AccountScenarioRepo,
 		cacheRepo:           cacheRepo,
+		stats:               stats,
 	}
 }
 
@@ -188,6 +191,15 @@ func (_self *ForwardUC) forward(
 			}
 			c.Response().WriteHeader(sc)
 			_, err := c.Response().Write([]byte(entry.Output))
+			fn := entry.FeatureName
+			sn := entry.ScenarioName
+			if fn == "" {
+				fn = featureName
+			}
+			if sn == "" {
+				sn = scenarioName
+			}
+			_self.stats.Record(fn, sn, path, method, true, float64(time.Since(start).Milliseconds()))
 			return err
 		}
 	}
@@ -236,7 +248,13 @@ func (_self *ForwardUC) forward(
 		if err != nil {
 			return nil, echo.NewHTTPError(http.StatusInternalServerError, "failed to parse output")
 		}
-		entry := entity.CachedEntry{Output: string(outputBytes), Latency: mockAPI.Latency, StatusCode: mockAPI.StatusCode}
+		entry := entity.CachedEntry{
+			Output:       string(outputBytes),
+			Latency:      mockAPI.Latency,
+			StatusCode:   mockAPI.StatusCode,
+			FeatureName:  mockAPI.FeatureName,
+			ScenarioName: mockAPI.ScenarioName,
+		}
 		if entryBytes, err := json.Marshal(entry); err == nil {
 			_self.cacheRepo.Set(fetchCtx, cacheKey, string(entryBytes))
 		}
@@ -332,6 +350,7 @@ func (_self *ForwardUC) forward(
 	}
 	observability.MockAPICacheHits.WithLabelValues("miss").Inc()
 	observability.MockAPILookupDuration.Observe(time.Since(start).Seconds())
+	_self.stats.Record(featureName, scenarioName, path, method, false, float64(time.Since(start).Milliseconds()))
 
 	return nil
 }

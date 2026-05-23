@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/namnv2496/mocktool/internal/configs"
 	"github.com/namnv2496/mocktool/internal/domain"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	controllerMocks "github.com/namnv2496/mocktool/mocks/controller"
 	repositoryMocks "github.com/namnv2496/mocktool/mocks/repository"
 	customValidator "github.com/namnv2496/mocktool/pkg/validator"
@@ -43,9 +44,11 @@ func setupTestController(t *testing.T) (*MockController, *gomock.Controller, *re
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo not needed in unit tests
 		loadTestController,
 		cacheRepo,
-		nil, // chatHandler not needed in unit tests
+		nil,                    // chatHandler not needed in unit tests
+		usecase.NewStatsStore(), // stats
 	).(*MockController)
 
 	return controller, ctrl, featureRepo, scenarioRepo, accountScenarioRepo, mockAPIRepo
@@ -498,9 +501,11 @@ func TestNewMockController(t *testing.T) {
 		scenarioRepo,
 		accountScenarioRepo,
 		mockAPIRepo,
+		nil, // grpcMockAPIRepo not needed in unit tests
 		loadTestController,
 		cacheRepo,
-		nil, // chatHandler not needed in unit tests
+		nil,                    // chatHandler not needed in unit tests
+		usecase.NewStatsStore(), // stats
 	)
 
 	assert.NotNil(t, controller)

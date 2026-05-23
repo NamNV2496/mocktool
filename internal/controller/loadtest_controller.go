@@ -33,15 +33,15 @@ func NewLoadTestController(
 
 func (c *LoadTestController) RegisterRoutes(g *echo.Group) {
 	// Scenario endpoints
-	g.GET("/loadtest/scenarios", c.ListScenarios)
-	g.GET("/loadtest/scenarios/search", c.SearchScenarios)
-	g.GET("/loadtest/scenarios/:scenario_id", c.GetScenario)
-	g.POST("/loadtest/scenarios", c.CreateScenario)
-	g.PUT("/loadtest/scenarios/:scenario_id", c.UpdateScenario)
-	g.DELETE("/loadtest/scenarios/:scenario_id", c.DeleteScenario)
+	// g.GET("/loadtest/scenarios", c.ListScenarios)
+	// g.GET("/loadtest/scenarios/search", c.SearchScenarios)
+	// g.GET("/loadtest/scenarios/:scenario_id", c.GetScenario)
+	// g.POST("/loadtest/scenarios", c.CreateScenario)
+	// g.PUT("/loadtest/scenarios/:scenario_id", c.UpdateScenario)
+	// g.DELETE("/loadtest/scenarios/:scenario_id", c.DeleteScenario)
 
-	// Run endpoint
-	g.POST("/loadtest/scenarios/:scenario_id/run", c.RunLoadTest)
+	// // Run endpoint
+	// g.POST("/loadtest/scenarios/:scenario_id/run", c.RunLoadTest)
 }
 
 /* ---------- GET /loadtest/scenarios ---------- */

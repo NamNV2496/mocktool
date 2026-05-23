@@ -55,10 +55,14 @@ func InvokeServer(invokers ...any) *fx.App {
 			fx.Annotate(repository.NewScenarioRepository, fx.As(new(repository.IScenarioRepository))),
 			fx.Annotate(repository.NewAccountScenarioRepository, fx.As(new(repository.IAccountScenarioRepository))),
 			fx.Annotate(repository.NewMockAPIRepository, fx.As(new(repository.IMockAPIRepository))),
+			fx.Annotate(repository.NewGRPCMockAPIRepository, fx.As(new(repository.IGRPCMockAPIRepository))),
 
+			usecase.NewStatsStore,
 			fx.Annotate(controller.NewMockController, fx.As(new(controller.IMockController))),
 			fx.Annotate(controller.NewFowardController, fx.As(new(controller.IForwardController))),
 			fx.Annotate(usecase.NewForwardUC, fx.As(new(usecase.IForwardUC))),
+			fx.Annotate(usecase.NewGRPCForwardUC, fx.As(new(usecase.IGRPCForwardUC))),
+			fx.Annotate(controller.NewGRPCController, fx.As(new(controller.IGRPCController))),
 			// load test
 			fx.Annotate(controller.NewLoadTestController, fx.As(new(controller.ILoadTestController))),
 			fx.Annotate(repository.NewLoadTestScenarioRepository, fx.As(new(repository.ILoadTestScenarioRepository))),
@@ -90,15 +94,27 @@ func startServer(
 	lc fx.Lifecycle,
 	forwardController controller.IForwardController,
 	mockController controller.IMockController,
+	grpcController controller.IGRPCController,
+	stats *usecase.StatsStore,
 ) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			slog.Info("Starting mocktool servers...")
 
+			// Start stats reset worker
+			stats.StartResetWorker(ctx)
+
 			// Start forward controller in background
 			go func() {
 				if err := forwardController.StartMockServer(); err != nil {
 					slog.Error("Forward server error", "error", err)
+				}
+			}()
+
+			// Start gRPC mock server in background
+			go func() {
+				if err := grpcController.StartGRPCServer(); err != nil {
+					slog.Error("gRPC mock server error", "error", err)
 				}
 			}()
 
@@ -112,6 +128,10 @@ func startServer(
 		},
 		OnStop: func(ctx context.Context) error {
 			slog.Info("Shutting down mocktool servers gracefully...")
+
+			// Stop stats reset worker
+			stats.StopResetWorker()
+
 			// Give servers time to finish processing requests
 			time.Sleep(2 * time.Second)
 			slog.Info("Mocktool servers stopped")

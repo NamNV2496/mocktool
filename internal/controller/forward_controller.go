@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -96,7 +97,7 @@ func (_self *ForwardController) StartMockServer() error {
 		}
 		return _self.responseMockData(c)
 	})
-
+	fmt.Println("Start http response server")
 	if err := c.Start(_self.config.AppConfig.FowardHTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err

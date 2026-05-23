@@ -22,6 +22,7 @@ import (
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
+	"github.com/namnv2496/mocktool/internal/usecase"
 	"github.com/namnv2496/mocktool/pkg/observability"
 	"github.com/namnv2496/mocktool/pkg/security"
 	"github.com/namnv2496/mocktool/pkg/utils"
@@ -41,9 +42,11 @@ type MockController struct {
 	ScenarioRepo        repository.IScenarioRepository
 	AccountScenarioRepo repository.IAccountScenarioRepository
 	MockAPIRepo         repository.IMockAPIRepository
+	GRPCMockAPIRepo     repository.IGRPCMockAPIRepository
 	loadTestController  ILoadTestController
 	cacheRepo           repository.ICache
 	chatHandler         *chat.Handler
+	stats               *usecase.StatsStore
 }
 
 func NewMockController(
@@ -52,9 +55,11 @@ func NewMockController(
 	scenarioRepo repository.IScenarioRepository,
 	accountScenarioRepo repository.IAccountScenarioRepository,
 	mockAPIRepo repository.IMockAPIRepository,
+	grpcMockAPIRepo repository.IGRPCMockAPIRepository,
 	loadTestController ILoadTestController,
 	cacheRepo repository.ICache,
 	chatHandler *chat.Handler,
+	stats *usecase.StatsStore,
 ) IMockController {
 
 	return &MockController{
@@ -63,9 +68,11 @@ func NewMockController(
 		ScenarioRepo:        scenarioRepo,
 		AccountScenarioRepo: accountScenarioRepo,
 		MockAPIRepo:         mockAPIRepo,
+		GRPCMockAPIRepo:     grpcMockAPIRepo,
 		loadTestController:  loadTestController,
 		cacheRepo:           cacheRepo,
 		chatHandler:         chatHandler,
+		stats:               stats,
 	}
 }
 
@@ -74,12 +81,14 @@ func (_self *MockController) StartHttpServer() error {
 	c.Static("/", "web")
 	c.Validator = customValidator.NewValidator()
 
-	cleanup, err := observability.InitTracing("mocktool", "1.0.0")
+	cleanup, err := observability.InitTracing("mocktool", "1.0.0", _self.config.TracingConfig.Enabled)
 	if err != nil {
 		slog.Error("Failed to initialize tracing", "error", err)
 	} else {
 		defer cleanup()
-		slog.Info("OpenTelemetry tracing initialized")
+		if _self.config.TracingConfig.Enabled {
+			slog.Info("OpenTelemetry tracing initialized")
+		}
 	}
 
 	observability.AppInfo.WithLabelValues("1.0.0", runtime.Version()).Set(1)
@@ -128,12 +137,23 @@ func (_self *MockController) StartHttpServer() error {
 	v1.POST("/mockapis/:api_id/reset-counter", _self.ResetSequenceCounter)  // reset sequence counter
 	v1.POST("/mockapis/:api_id/test-real", _self.TestRealData)              // test real API and compare with mock responses
 
+	// gRPC mock admin
+	v1.POST("/grpc/apis", _self.CreateGRPCMockAPI)
+	v1.GET("/grpc/apis", _self.ListGRPCMockAPIs)
+	v1.PUT("/grpc/apis/:api_id", _self.UpdateGRPCMockAPI)
+	v1.DELETE("/grpc/apis/:api_id", _self.DeleteGRPCMockAPI)
+
+	// Analytics
+	v1.GET("/stats", _self.GetStats)
+
 	// AI chat assistant
 	v1.POST("/chat", _self.HandleChat)
 	v1.POST("/chat/clear", _self.HandleChatClear)
 
 	// Load test scenarios - delegate to LoadTestController
+	fmt.Println("Start main server")
 	_self.loadTestController.RegisterRoutes(v1)
+	fmt.Println("Start main server")
 	if err := c.Start(_self.config.AppConfig.HTTPPort); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("failed to start server", "error", err)
 		return err
@@ -1118,8 +1138,6 @@ func (_self *MockController) UpdateMockAPIByScenario(c echo.Context) error {
 			}
 		}
 		update["output"] = outputJSON
-	} else if len(reqBody.Responses) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "output is required")
 	}
 
 	update["status_code"] = reqBody.StatusCode
@@ -1493,4 +1511,250 @@ func (_self *MockController) HandleChatClear(c echo.Context) error {
 	// This endpoint is a notification endpoint that the frontend calls
 	// when the user clears the conversation. No server-side state to clear.
 	return c.JSON(http.StatusOK, map[string]string{"status": "cleared"})
+}
+
+/* ---------- Analytics ---------- */
+
+func (_self *MockController) GetStats(c echo.Context) error {
+	snap := _self.stats.Snapshot()
+
+	var totalHits, totalCacheHits int64
+	var totalLatMs float64
+
+	apis := make([]entity.APIStatDTO, 0, len(snap))
+	for _, s := range snap {
+		var cacheHitRate, avgLat float64
+		if s.Hits > 0 {
+			cacheHitRate = float64(s.CacheHits) / float64(s.Hits) * 100
+			avgLat = s.TotalLatMs / float64(s.Hits)
+		}
+		apis = append(apis, entity.APIStatDTO{
+			Feature:      s.Feature,
+			Scenario:     s.Scenario,
+			Path:         s.Path,
+			Method:       s.Method,
+			Hits:         s.Hits,
+			CacheHits:    s.CacheHits,
+			CacheHitRate: cacheHitRate,
+			AvgLatencyMs: avgLat,
+		})
+		totalHits += s.Hits
+		totalCacheHits += s.CacheHits
+		totalLatMs += s.TotalLatMs
+	}
+
+	var globalCacheHitRate, globalAvgLat float64
+	if totalHits > 0 {
+		globalCacheHitRate = float64(totalCacheHits) / float64(totalHits) * 100
+		globalAvgLat = totalLatMs / float64(totalHits)
+	}
+
+	return c.JSON(http.StatusOK, entity.StatsResponse{
+		TotalHits:    totalHits,
+		CacheHitRate: globalCacheHitRate,
+		AvgLatencyMs: globalAvgLat,
+		APIs:         apis,
+	})
+}
+
+/* ---------- gRPC Mock Admin ---------- */
+
+func (_self *MockController) CreateGRPCMockAPI(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var req entity.GRPCMockAPIRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := c.Validate(&req); err != nil {
+		return err
+	}
+
+	var outputData any
+	if err := json.Unmarshal(req.Output, &outputData); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+	}
+	outputBSON, err := bson.Marshal(outputData)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+	}
+
+	hashInput := ""
+	var inputBsonData []byte
+	if len(req.Input) > 0 && string(req.Input) != "null" {
+		var inputData any
+		if err := json.Unmarshal(req.Input, &inputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
+		}
+		if inputStr, ok := inputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(inputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in input: "+err.Error())
+			}
+			inputData = parsedData
+		}
+		inputBsonData, err = bson.Marshal(inputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert input to BSON: "+err.Error())
+		}
+		hashInput = utils.HashInputConsistent(inputBsonData)
+	}
+
+	m := &domain.GRPCMockAPI{
+		FeatureName:  req.FeatureName,
+		ScenarioName: req.ScenarioName,
+		ServiceName:  req.ServiceName,
+		MethodName:   req.MethodName,
+		Input:        inputBsonData,
+		HashInput:    hashInput,
+		Output:       outputBSON,
+		StatusCode:   req.StatusCode,
+		Latency:      req.Latency,
+	}
+	if err := _self.GRPCMockAPIRepo.Create(ctx, m); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusCreated, map[string]string{"id": m.ID.Hex()})
+}
+
+func (_self *MockController) ListGRPCMockAPIs(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	featureName := c.QueryParam("feature_name")
+	if featureName == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "feature_name is required")
+	}
+	scenarioName := c.QueryParam("scenario_name")
+
+	apis, err := _self.GRPCMockAPIRepo.ListByFeatureAndScenario(ctx, featureName, scenarioName)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	result := make([]entity.GRPCMockAPIResponse, 0, len(apis))
+	for _, a := range apis {
+		var outputJSON json.RawMessage
+		if len(a.Output) > 0 {
+			var m bson.M
+			if err := bson.Unmarshal(a.Output, &m); err == nil {
+				outputJSON, _ = json.Marshal(m)
+			}
+		}
+		var inputJSON any = nil
+		if len(a.Input) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(a.Input, &result); err == nil {
+				inputJSON = result
+			}
+		}
+		result = append(result, entity.GRPCMockAPIResponse{
+			ID:           a.ID.Hex(),
+			FeatureName:  a.FeatureName,
+			ScenarioName: a.ScenarioName,
+			ServiceName:  a.ServiceName,
+			MethodName:   a.MethodName,
+			Input:        inputJSON,
+			Output:       outputJSON,
+			StatusCode:   a.StatusCode,
+			Latency:      a.Latency,
+			IsActive:     a.IsActive,
+		})
+	}
+	return c.JSON(http.StatusOK, result)
+}
+
+func (_self *MockController) UpdateGRPCMockAPI(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+
+	var req entity.GRPCMockAPIRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	update := bson.M{}
+	if req.ServiceName != "" {
+		update["service_name"] = req.ServiceName
+	}
+	if req.MethodName != "" {
+		update["method_name"] = req.MethodName
+	}
+	if req.StatusCode != 0 {
+		update["status_code"] = req.StatusCode
+	}
+	if req.Latency != 0 {
+		update["latency"] = req.Latency
+	}
+	update["status_code"] = req.StatusCode
+
+	if len(req.Input) > 0 && string(req.Input) != "null" {
+		var inputData any
+		if err := json.Unmarshal(req.Input, &inputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
+		}
+		if inputStr, ok := inputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(inputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in input: "+err.Error())
+			}
+			inputData = parsedData
+		}
+		inputBsonData, err := bson.Marshal(inputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert input to BSON: "+err.Error())
+		}
+		update["input"] = inputData
+		update["hash_input"] = utils.GenerateHashFromInput(inputBsonData)
+	}
+
+	if len(req.Output) > 0 && string(req.Output) != "null" && string(req.Output) != "" {
+		var outputData any
+		if err := json.Unmarshal(req.Output, &outputData); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+		}
+		if outputStr, ok := outputData.(string); ok {
+			var parsedData any
+			if err := json.Unmarshal([]byte(outputStr), &parsedData); err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in output: "+err.Error())
+			}
+			outputData = parsedData
+		}
+		bsonData, err := bson.Marshal(outputData)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		}
+		var outputJSON any
+		if len(bsonData) > 0 {
+			var result bson.M
+			if err := bson.Unmarshal(bsonData, &result); err == nil {
+				outputJSON = result
+			}
+		}
+		update["output"] = outputJSON
+	}
+
+	if err := _self.GRPCMockAPIRepo.UpdateByID(ctx, id, update); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (_self *MockController) DeleteGRPCMockAPI(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+
+	if err := _self.GRPCMockAPIRepo.DeleteByID(ctx, id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "deleted"})
 }

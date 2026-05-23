@@ -380,6 +380,11 @@ tr:hover {
     margin-bottom: 20px;
 }
 
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
 .form-group label {
     display: block;
     margin-bottom: 8px;
@@ -1642,3 +1647,46 @@ select.tree-value-input {
 
 .ai-proto-submit:hover { opacity: 0.88; transform: scale(1.03); }
 .ai-proto-submit:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+/* ==================== Stats Tab ==================== */
+
+.stats-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    flex: 1;
+    min-width: 180px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 24px 28px;
+    color: white;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+}
+
+.stat-card-value {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.stat-card-label {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.top-row {
+    background-color: #f0fff4;
+}
+
+.top-row:hover {
+    background-color: #e6ffed !important;
+}

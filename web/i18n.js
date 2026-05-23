@@ -12,7 +12,6 @@ const translations = {
         'tab.features': 'Features',
         'tab.scenarios': 'Scenarios',
         'tab.mockapis': 'Mock APIs',
-        // 'tab.loadtest': 'Load Test Tool',
 
         // Common
         'common.active': 'Active',
@@ -112,12 +111,11 @@ const translations = {
         'mockapi.search.placeholder': 'Search by name or path...',
         'mockapi.new': '+ New Mock API',
         'mockapi.parseProto': 'Parse .proto',
-        'mockapi.table.feature': 'Feature',
-        'mockapi.table.scenario': 'Scenario',
         'mockapi.table.name': 'Mock APIs Name',
         'mockapi.table.description': 'Description',
         'mockapi.table.method': 'Method',
         'mockapi.table.path': 'Path',
+        'mockapi.table.statusCode': 'Status_code',
         'mockapi.table.active': 'Active',
         'mockapi.table.createdAt': 'Created At',
         'mockapi.table.actions': 'Actions',
@@ -315,7 +313,6 @@ const translations = {
         'tab.features': 'Tính năng',
         'tab.scenarios': 'Kịch bản',
         'tab.mockapis': 'Mock API',
-        // 'tab.loadtest': 'Công cụ kiểm tra tải',
 
         // Common
         'common.active': 'Hoạt động',
@@ -415,12 +412,11 @@ const translations = {
         'mockapi.search.placeholder': 'Tìm kiếm theo tên hoặc đường dẫn...',
         'mockapi.new': '+ Mock API mới',
         'mockapi.parseProto': 'Phân tích .proto',
-        'mockapi.table.feature': 'Tính năng',
-        'mockapi.table.scenario': 'Kịch bản',
         'mockapi.table.name': 'Tên Mock API',
         'mockapi.table.description': 'Mô tả',
         'mockapi.table.method': 'Phương thức',
         'mockapi.table.path': 'Đường dẫn',
+        'mockapi.table.statusCode': 'Status_code',
         'mockapi.table.active': 'Hoạt động',
         'mockapi.table.createdAt': 'Ngày tạo',
         'mockapi.table.actions': 'Thao tác',

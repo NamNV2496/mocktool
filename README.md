@@ -426,6 +426,11 @@ result
 
 docker compose up -d
 
+# Get api key from your AI system
+
+export OPENAI_API_KEY=sk-...
+# or you can add it into .env file
+
 # Start server
 go run main.go service
 

@@ -22,28 +22,87 @@ const pagination = {
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
-    loadFeatures();
     initProtoFileInput();
-    
+
     // Add event listener for accounts input to update count
     const accountsInput = document.getElementById('loadtest-accounts-input');
     if (accountsInput) {
         accountsInput.addEventListener('input', updateAccountCount);
     }
+
+    applyURLParams();
 });
+
+// ───────────── URL state ─────────────
+
+function getURLParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        tab:      params.get('tab'),
+        feature:  params.get('feature'),
+        scenario: params.get('scenario'),
+    };
+}
+
+function updateURL(params) {
+    const current = new URLSearchParams(window.location.search);
+    Object.entries(params).forEach(([k, v]) => {
+        if (v) current.set(k, v);
+        else current.delete(k);
+    });
+    const qs = current.toString();
+    history.pushState({}, '', qs ? '?' + qs : window.location.pathname);
+}
+
+function applyURLParams() {
+    const { tab, feature, scenario } = getURLParams();
+
+    const targetTab = tab || 'features';
+    switchTab(targetTab);
+
+    if (!feature) return;
+
+    setTimeout(() => {
+        if (targetTab === 'scenarios') {
+            const input = document.getElementById('scenario-feature-filter');
+            if (input) {
+                input.value = feature;
+                input.dataset.selectedValue = feature;
+                input.dataset.selectedText = feature;
+                loadScenarios(feature);
+            }
+        } else if (targetTab === 'mockapis') {
+            const featureInput = document.getElementById('mockapi-feature-filter');
+            const scenarioInput = document.getElementById('mockapi-scenario-filter');
+            if (featureInput) {
+                featureInput.value = feature;
+                featureInput.dataset.selectedValue = feature;
+                featureInput.dataset.selectedText = feature;
+                if (scenarioInput) scenarioInput.dataset.featureName = feature;
+            }
+            if (scenario && scenarioInput) {
+                scenarioInput.value = scenario;
+                scenarioInput.dataset.selectedValue = scenario;
+                scenarioInput.dataset.selectedText = scenario;
+                loadMockAPIs(scenario);
+            }
+        }
+    }, 150);
+}
 
 function initializeTabs() {
     const tabButtons = document.querySelectorAll('.tab-btn');
     tabButtons.forEach(button => {
         button.addEventListener('click', function() {
             const targetTab = this.getAttribute('data-tab');
+            updateURL({ tab: targetTab, feature: null, scenario: null });
             switchTab(targetTab);
         });
     });
 }
 
 function navigateToMockAPIs(featureName, scenarioName) {
-    // Switch to Mock APIs tab
+    updateURL({ tab: 'mockapis', feature: featureName, scenario: scenarioName });
     switchTab('mockapis');
 
     // Wait for filters to be populated, then set the values and load data
@@ -305,22 +364,41 @@ async function loadMockAPIs(scenarioName, page = 1, searchQuery = '') {
     }
 }
 
+function statusCodeColor(code) {
+    if (code >= 500) return { bg: '#fed7d7', color: '#742a2a' };
+    if (code >= 400) return { bg: '#feebc8', color: '#7b341e' };
+    if (code >= 300) return { bg: '#bee3f8', color: '#2a4365' };
+    return { bg: '#c6f6d5', color: '#22543d' };
+}
+
+function renderStatusCode(api) {
+    if (api.responses && api.responses.length > 0) {
+        const codes = [...new Set(api.responses.map(r => r.status_code || 200))];
+        return codes.map(code => {
+            const { bg, color } = statusCodeColor(code);
+            return `<span class="status-badge" style="background:${bg};color:${color};margin:1px">${code}</span>`;
+        }).join(' ');
+    }
+    const code = api.status_code || 200;
+    const { bg, color } = statusCodeColor(code);
+    return `<span class="status-badge" style="background:${bg};color:${color}">${code}</span>`;
+}
+
 function renderMockAPIsTable() {
     const tbody = document.getElementById('mockapis-table-body');
 
     if (!mockAPIs || mockAPIs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="loading">${t('mockapi.noResults')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="loading">${t('mockapi.noResults')}</td></tr>`;
         return;
     }
 
     tbody.innerHTML = mockAPIs.map(api => `
         <tr>
-            <td class="text-truncate" title="${api.feature_name || 'N/A'}">${api.feature_name || 'N/A'}</td>
-            <td class="text-truncate" title="${api.scenario_name || 'N/A'}">${api.scenario_name || 'N/A'}</td>
-            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong>${api.responses && api.responses.length > 0 ? '<span class="seq-badge">SEQ</span>' : ''}</td>
+            <td class="text-truncate" title="${api.name || 'N/A'}"><strong>${api.name || 'N/A'}</strong>${api.responses && api.responses.length > 0 ? '\n<span class="seq-badge">SEQ</span>' : ''}</td>
             <td class="text-truncate" title="${api.description || '-'}">${api.description || '-'}</td>
             <td><span class="status-badge" style="background-color: #4299e1; color: white;">${api.method || 'GET'}</span></td>
             <td class="text-truncate" title="${api.path || 'N/A'}"><code>${api.path || 'N/A'}</code></td>
+            <td>${renderStatusCode(api)}</td>
             <td><span class="status-badge ${api.is_active ? 'status-active' : 'status-inactive'}">
                 ${api.is_active ? t('common.active') : t('common.inactive')}
             </span></td>
@@ -552,6 +630,7 @@ async function populateFeatureFilters() {
             searchType: 'feature',
             placeholder: 'Search features...',
             onChange: (featureName) => {
+                updateURL({ tab: 'scenarios', feature: featureName, scenario: null });
                 loadScenarios(featureName);
             }
         });
@@ -584,6 +663,7 @@ async function populateMockAPIFilters() {
             searchType: 'feature',
             placeholder: 'Search features...',
             onChange: async (featureName) => {
+                updateURL({ tab: 'mockapis', feature: featureName, scenario: null });
                 // Update scenario filter to search within this feature
                 scenarioFilter.dataset.featureName = featureName;
                 scenarioFilter.value = '';
@@ -604,6 +684,9 @@ async function populateMockAPIFilters() {
             searchType: 'scenario',
             placeholder: 'Search scenarios...',
             onChange: (scenarioName) => {
+                const featureInput = document.getElementById('mockapi-feature-filter');
+                const featureName = featureInput ? (featureInput.dataset.selectedValue || featureInput.value) : null;
+                updateURL({ tab: 'mockapis', feature: featureName || null, scenario: scenarioName });
                 loadMockAPIs(scenarioName);
             }
         });

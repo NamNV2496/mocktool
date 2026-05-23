@@ -33,44 +33,35 @@
   let isOpen = false;
   let isThinking = false;
 
-  const CHAT_HISTORY_COOKIE = 'ai_chat_history';
-  const COOKIE_MAX_AGE = 604800; // 7 days in seconds
+  const CHAT_HISTORY_KEY = 'ai_chat_history';
 
-  // ───────────── Cookie helpers ─────────────
+  // ───────────── localStorage helpers ─────────────
 
-  function saveHistoryToCookie() {
+  function saveHistory() {
     try {
-      const jsonStr = JSON.stringify(history);
-      document.cookie = `${CHAT_HISTORY_COOKIE}=${encodeURIComponent(jsonStr)}; max-age=${COOKIE_MAX_AGE}; path=/`;
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(history));
     } catch (err) {
-      console.warn('Failed to save chat history to cookie:', err);
+      console.warn('Failed to save chat history:', err);
     }
   }
 
-  function loadHistoryFromCookie() {
+  function loadHistory() {
     try {
-      const name = CHAT_HISTORY_COOKIE + '=';
-      const decodedCookie = decodeURIComponent(document.cookie);
-      const cookieArray = decodedCookie.split(';');
-      for (let i = 0; i < cookieArray.length; i++) {
-        let cookie = cookieArray[i].trim();
-        if (cookie.indexOf(name) === 0) {
-          const jsonStr = cookie.substring(name.length);
-          const parsed = JSON.parse(decodeURIComponent(jsonStr));
-          if (Array.isArray(parsed)) {
-            history = parsed;
-            return true;
-          }
-        }
+      const raw = localStorage.getItem(CHAT_HISTORY_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        history = parsed;
+        return true;
       }
     } catch (err) {
-      console.warn('Failed to load chat history from cookie:', err);
+      console.warn('Failed to load chat history:', err);
     }
     return false;
   }
 
-  function clearHistoryCookie() {
-    document.cookie = `${CHAT_HISTORY_COOKIE}=; max-age=0; path=/`;
+  function clearHistory() {
+    localStorage.removeItem(CHAT_HISTORY_KEY);
   }
 
   // ───────────── DOM helpers ─────────────
@@ -347,7 +338,7 @@ Error:
       // Update client-side history for next turn
       history.push({ role: 'user', content: text });
       history.push({ role: 'assistant', content: reply });
-      saveHistoryToCookie();
+      saveHistory();
 
       // Keep history bounded at 20 turns to avoid huge payloads
       if (history.length > 40) history = history.slice(-40);
@@ -362,16 +353,20 @@ Error:
   }
 
   function expandSlashCommand(text) {
+    const { feature, scenario } = getURLContext();
+    const f  = feature  ? ` for feature "${feature}"`                                          : '';
+    const fs = feature  ? ` for feature "${feature}"${scenario ? `, scenario "${scenario}"` : ''}` : '';
+
     const map = {
-      '/list-features': 'List all features',
-      '/list-scenarios': 'List all scenarios',
-      '/list-apis': 'List all APIs',
-      '/curl': 'Give me the cURL command for mock API',
-      '/search': 'Search mock APIs',
-      '/activate': 'Activate a scenario',
-      '/create-api': 'Help me create a new mock API',
-      '/delete': 'Help me delete something',
-      '/help': 'What can you help me with?',
+      '/list-features':  'List all features',
+      '/list-scenarios': `List all scenarios${f}`,
+      '/list-apis':      `List all APIs${fs}`,
+      '/curl':           `Give me the cURL command for mock API${fs}`,
+      '/search':         `Search mock APIs${fs}`,
+      '/activate':       `Activate a scenario${f}`,
+      '/create-api':     `Help me create a new mock API${fs}`,
+      '/delete':         `Help me delete something${fs}`,
+      '/help':           'What can you help me with?',
     };
     for (const [cmd, expansion] of Object.entries(map)) {
       if (text === cmd) return expansion;
@@ -382,10 +377,21 @@ Error:
 
   // ───────────── Proto panel ─────────────
 
+  function getURLContext() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      feature:  params.get('feature')  || '',
+      scenario: params.get('scenario') || '',
+    };
+  }
+
   function showProtoPanel() {
     el('ai-mock-panel').style.display = 'none';
     el('ai-proto-panel').style.display = 'flex';
     el('ai-proto-hint').textContent = '';
+    const ctx = getURLContext();
+    if (ctx.feature  && !el('ai-proto-feature').value)  el('ai-proto-feature').value  = ctx.feature;
+    if (ctx.scenario && !el('ai-proto-scenario').value) el('ai-proto-scenario').value = ctx.scenario;
     el('ai-proto-feature').focus();
   }
 
@@ -491,8 +497,9 @@ Error:
   }
 
   function submitProto() {
-    const feature  = (el('ai-proto-feature').value  || '').trim();
-    const scenario = (el('ai-proto-scenario').value || '').trim();
+    const ctx      = getURLContext();
+    const feature  = (el('ai-proto-feature').value  || '').trim() || ctx.feature;
+    const scenario = (el('ai-proto-scenario').value || '').trim() || ctx.scenario;
     const proto    = (el('ai-proto-content').value  || '').trim();
 
     if (!feature)  { el('ai-proto-hint').textContent = '⚠ Feature name is required.';  return; }
@@ -517,10 +524,12 @@ Error:
   // ───────────── Mock panel ─────────────
 
   function showMockPanel() {
-    // Hide proto panel if open
     el('ai-proto-panel').style.display = 'none';
     el('ai-mock-panel').style.display = 'flex';
     el('ai-mock-hint').textContent = '';
+    const ctx = getURLContext();
+    if (ctx.feature  && !el('ai-mock-feature').value)  el('ai-mock-feature').value  = ctx.feature;
+    if (ctx.scenario && !el('ai-mock-scenario').value) el('ai-mock-scenario').value = ctx.scenario;
     el('ai-mock-feature').focus();
   }
 
@@ -575,8 +584,9 @@ Error:
   }
 
   function submitMock() {
-    const feature  = (el('ai-mock-feature').value  || '').trim();
-    const scenario = (el('ai-mock-scenario').value || '').trim();
+    const ctx      = getURLContext();
+    const feature  = (el('ai-mock-feature').value  || '').trim() || ctx.feature;
+    const scenario = (el('ai-mock-scenario').value || '').trim() || ctx.scenario;
     const contract = (el('ai-mock-content').value  || '').trim();
 
     if (!contract) {
@@ -596,7 +606,7 @@ Error:
   async function clearConversation() {
     // Clear local history
     history = [];
-    clearHistoryCookie();
+    clearHistory();
 
     // Call /clear endpoint on server
     try {
@@ -706,8 +716,8 @@ Error:
     populateCommands();
     bindInputEvents();
 
-    // Load chat history from cookie
-    if (loadHistoryFromCookie() && history.length > 0) {
+    // Restore chat history from localStorage
+    if (loadHistory() && history.length > 0) {
       // Restore messages to UI
       history.forEach(msg => {
         appendMessage(msg.role, msg.content);

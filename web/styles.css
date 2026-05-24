@@ -1690,3 +1690,25 @@ select.tree-value-input {
 .top-row:hover {
     background-color: #e6ffed !important;
 }
+
+.export-tab-btn {
+    padding: 8px 18px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #718096;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-weight: 500;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.export-tab-btn:hover {
+    color: #2d3748;
+}
+
+.export-tab-active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}

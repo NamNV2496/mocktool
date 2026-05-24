@@ -137,6 +137,11 @@
                 <div class="filter-group">
                     <input type="text" id="grpcapi-feature-filter" class="filter-select" placeholder="Search features...">
                     <input type="text" id="grpcapi-scenario-filter" class="filter-select" placeholder="Search scenarios...">
+                    <button class="btn btn-outline" onclick="exportGRPCMocksJSON()">Export JSON</button>
+                    <label class="btn btn-outline" style="cursor:pointer;margin:0">
+                        Import JSON
+                        <input type="file" id="grpcapi-import-file" accept=".json" style="display:none" onchange="importGRPCMocksJSON(event)">
+                    </label>
                     <button class="btn btn-primary" onclick="showCreateGRPCMockModal()">+ New gRPC Mock</button>
                 </div>
             </div>
@@ -144,8 +149,6 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Feature</th>
-                            <th>Scenario</th>
                             <th>Service</th>
                             <th>Method</th>
                             <th>Status Code</th>
@@ -156,7 +159,7 @@
                     </thead>
                     <tbody id="grpcapis-table-body">
                         <tr>
-                            <td colspan="8" class="loading">Select a feature to view gRPC mocks</td>
+                            <td colspan="6" class="loading">Select a feature to view gRPC mocks</td>
                         </tr>
                     </tbody>
                 </table>
@@ -740,6 +743,28 @@ curl --location 'https://api.example.com/login' \
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('grpcapi-modal')">Cancel</button>
                 <button class="btn btn-primary" onclick="saveGRPCMock()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- gRPC Client Export Modal -->
+    <div id="grpcapi-export-modal" class="modal">
+        <div class="modal-content" style="max-width:720px">
+            <div class="modal-header">
+                <h3>Export Client Code</h3>
+                <span class="close" onclick="closeModal('grpcapi-export-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:0">
+                    <button id="export-tab-proto"  class="export-tab-btn export-tab-active" onclick="switchExportTab('proto')">Proto</button>
+                    <button id="export-tab-go"     class="export-tab-btn" onclick="switchExportTab('go')">Go</button>
+                    <button id="export-tab-python" class="export-tab-btn" onclick="switchExportTab('python')">Python</button>
+                </div>
+                <textarea id="grpcapi-export-content" rows="22" style="width:100%;font-family:monospace;font-size:0.8rem;border:1px solid #e2e8f0;border-radius:6px;padding:12px;resize:vertical;background:#f7fafc;box-sizing:border-box" readonly></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('grpcapi-export-modal')">Close</button>
+                <button class="btn btn-primary" onclick="copyExportContent()">Copy to Clipboard</button>
             </div>
         </div>
     </div>

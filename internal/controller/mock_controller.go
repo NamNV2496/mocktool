@@ -140,8 +140,10 @@ func (_self *MockController) StartHttpServer() error {
 	// gRPC mock admin
 	v1.POST("/grpc/apis", _self.CreateGRPCMockAPI)
 	v1.GET("/grpc/apis", _self.ListGRPCMockAPIs)
+	v1.POST("/grpc/apis/import", _self.ImportGRPCMockAPIs)
 	v1.PUT("/grpc/apis/:api_id", _self.UpdateGRPCMockAPI)
 	v1.DELETE("/grpc/apis/:api_id", _self.DeleteGRPCMockAPI)
+	v1.PATCH("/grpc/apis/:api_id/toggle", _self.ToggleGRPCMockAPI)
 
 	// Analytics
 	v1.GET("/stats", _self.GetStats)
@@ -1570,13 +1572,48 @@ func (_self *MockController) CreateGRPCMockAPI(c echo.Context) error {
 		return err
 	}
 
+	m, err := _self.buildGRPCMockDomain(req)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := _self.GRPCMockAPIRepo.Create(ctx, m); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusCreated, map[string]string{"id": m.ID.Hex()})
+}
+
+func (_self *MockController) ImportGRPCMockAPIs(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	var reqs []entity.GRPCMockAPIRequest
+	if err := c.Bind(&reqs); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	created, skipped := 0, 0
+	for _, req := range reqs {
+		m, err := _self.buildGRPCMockDomain(req)
+		if err != nil {
+			skipped++
+			continue
+		}
+		if err := _self.GRPCMockAPIRepo.Create(ctx, m); err != nil {
+			skipped++
+			continue
+		}
+		created++
+	}
+	return c.JSON(http.StatusOK, map[string]int{"created": created, "skipped": skipped})
+}
+
+func (_self *MockController) buildGRPCMockDomain(req entity.GRPCMockAPIRequest) (*domain.GRPCMockAPI, error) {
 	var outputData any
 	if err := json.Unmarshal(req.Output, &outputData); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid output JSON: "+err.Error())
+		return nil, err
 	}
 	outputBSON, err := bson.Marshal(outputData)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert output to BSON: "+err.Error())
+		return nil, err
 	}
 
 	hashInput := ""
@@ -1584,23 +1621,23 @@ func (_self *MockController) CreateGRPCMockAPI(c echo.Context) error {
 	if len(req.Input) > 0 && string(req.Input) != "null" {
 		var inputData any
 		if err := json.Unmarshal(req.Input, &inputData); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid input JSON: "+err.Error())
+			return nil, err
 		}
 		if inputStr, ok := inputData.(string); ok {
 			var parsedData any
 			if err := json.Unmarshal([]byte(inputStr), &parsedData); err != nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid nested JSON in input: "+err.Error())
+				return nil, err
 			}
 			inputData = parsedData
 		}
 		inputBsonData, err = bson.Marshal(inputData)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to convert input to BSON: "+err.Error())
+			return nil, err
 		}
 		hashInput = utils.HashInputConsistent(inputBsonData)
 	}
 
-	m := &domain.GRPCMockAPI{
+	return &domain.GRPCMockAPI{
 		FeatureName:  req.FeatureName,
 		ScenarioName: req.ScenarioName,
 		ServiceName:  req.ServiceName,
@@ -1610,11 +1647,7 @@ func (_self *MockController) CreateGRPCMockAPI(c echo.Context) error {
 		Output:       outputBSON,
 		StatusCode:   req.StatusCode,
 		Latency:      req.Latency,
-	}
-	if err := _self.GRPCMockAPIRepo.Create(ctx, m); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-	}
-	return c.JSON(http.StatusCreated, map[string]string{"id": m.ID.Hex()})
+	}, nil
 }
 
 func (_self *MockController) ListGRPCMockAPIs(c echo.Context) error {
@@ -1757,4 +1790,27 @@ func (_self *MockController) DeleteGRPCMockAPI(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (_self *MockController) ToggleGRPCMockAPI(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	idStr := c.Param("api_id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid api_id")
+	}
+
+	existing, err := _self.GRPCMockAPIRepo.FindByID(ctx, id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "gRPC mock not found")
+	}
+
+	if err := _self.GRPCMockAPIRepo.UpdateByID(ctx, id, bson.M{
+		"is_active":  !existing.IsActive,
+		"updated_at": time.Now().UTC(),
+	}); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]bool{"is_active": !existing.IsActive})
 }

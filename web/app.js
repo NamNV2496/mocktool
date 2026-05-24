@@ -3572,13 +3572,11 @@ function grpcCodeBadge(code) {
 function renderGRPCMocksTable() {
     const tbody = document.getElementById('grpcapis-table-body');
     if (!grpcMocks || grpcMocks.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">No gRPC mocks found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No gRPC mocks found</td></tr>';
         return;
     }
     tbody.innerHTML = grpcMocks.map(m => `
         <tr>
-            <td>${m.feature_name}</td>
-            <td>${m.scenario_name}</td>
             <td style="font-family:monospace;font-size:0.85rem">${m.service_name}</td>
             <td style="font-family:monospace;font-size:0.85rem">${m.method_name}</td>
             <td>${grpcCodeBadge(m.status_code || 0)}</td>
@@ -3586,6 +3584,9 @@ function renderGRPCMocksTable() {
             <td><span class="status-badge" style="background:${m.is_active ? '#c6f6d5' : '#fed7d7'};color:${m.is_active ? '#22543d' : '#742a2a'}">${m.is_active ? 'Active' : 'Inactive'}</span></td>
             <td class="actions">
                 <button class="btn btn-edit" onclick='editGRPCMock(${JSON.stringify(m)})'>Edit</button>
+                <button class="btn btn-outline" onclick='exportGRPCMocksClient([${JSON.stringify(m)}])'>Export</button>
+                <button class="btn btn-duplicate" onclick='cloneGRPCMock(${JSON.stringify(m)})'>Clone</button>
+                <button class="btn ${m.is_active ? 'btn-delete' : 'btn-outline'}" style="${m.is_active ? '' : 'background:#e2e8f0;color:#4a5568;border-color:#cbd5e0;'}" onclick="toggleGRPCMock('${m.id}', ${m.is_active})">${m.is_active ? 'Deactivate' : 'Activate'}</button>
                 <button class="btn btn-delete" onclick="deleteGRPCMock('${m.id}')">Delete</button>
             </td>
         </tr>
@@ -3756,6 +3757,62 @@ async function saveGRPCMock() {
     }
 }
 
+async function toggleGRPCMock(id, currentIsActive) {
+    try {
+        const resp = await fetch(`${API_BASE_URL}/grpc/apis/${id}/toggle`, { method: 'PATCH' });
+        if (!resp.ok) throw new Error('Failed to toggle');
+        showSuccess(currentIsActive ? 'gRPC mock deactivated' : 'gRPC mock activated');
+        const featureName = document.getElementById('grpcapi-feature-filter').dataset.selectedValue || '';
+        const scenarioName = document.getElementById('grpcapi-scenario-filter').dataset.selectedValue || '';
+        loadGRPCMocks(featureName, scenarioName);
+    } catch (err) {
+        console.error('Error toggling gRPC mock:', err);
+        showError('Failed to toggle gRPC mock');
+    }
+}
+
+function cloneGRPCMock(mock) {
+    document.getElementById('grpcapi-id').value = '';
+    document.getElementById('grpcapi-modal-title').textContent = 'Clone gRPC Mock';
+    document.getElementById('grpcapi-service').value = mock.service_name;
+    document.getElementById('grpcapi-method').value = mock.method_name;
+    document.getElementById('grpcapi-input').value = '';
+    document.getElementById('grpcapi-output').value = mock.output ? JSON.stringify(mock.output, null, 2) : '';
+    document.getElementById('grpcapi-status-code').value = String(mock.status_code || 0);
+    document.getElementById('grpcapi-latency').value = String(mock.latency || 0);
+
+    const featureEl = document.getElementById('grpcapi-feature');
+    const scenarioEl = document.getElementById('grpcapi-scenario');
+
+    if (!featureEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-feature', {
+            searchType: 'feature',
+            placeholder: 'Search features...',
+            onChange: (featureName) => {
+                scenarioEl.dataset.featureName = featureName;
+                scenarioEl.value = '';
+                scenarioEl.dataset.selectedValue = '';
+            }
+        });
+    }
+    featureEl.value = mock.feature_name;
+    featureEl.dataset.selectedValue = mock.feature_name;
+    featureEl.dataset.selectedText = mock.feature_name;
+
+    if (!scenarioEl.classList.contains('searchable-select-input')) {
+        createSearchableSelect('grpcapi-scenario', {
+            searchType: 'scenario',
+            placeholder: 'Search scenarios...'
+        });
+    }
+    scenarioEl.dataset.featureName = mock.feature_name;
+    scenarioEl.value = mock.scenario_name;
+    scenarioEl.dataset.selectedValue = mock.scenario_name;
+    scenarioEl.dataset.selectedText = mock.scenario_name;
+
+    showModal('grpcapi-modal');
+}
+
 async function deleteGRPCMock(id) {
     if (!confirm('Delete this gRPC mock?')) return;
     try {
@@ -3769,4 +3826,361 @@ async function deleteGRPCMock(id) {
         console.error('Error deleting gRPC mock:', err);
         showError('Failed to delete gRPC mock');
     }
+}
+
+/* ============================================================
+   gRPC Mock — Export JSON / Import JSON / Export .proto
+   ============================================================ */
+
+function exportGRPCMocksJSON() {
+    if (!grpcMocks || grpcMocks.length === 0) {
+        showError('No gRPC mocks loaded. Select a feature first.');
+        return;
+    }
+    const exportData = grpcMocks.map(m => ({
+        feature_name:  m.feature_name,
+        scenario_name: m.scenario_name,
+        service_name:  m.service_name,
+        method_name:   m.method_name,
+        input:         m.input  || null,
+        output:        m.output,
+        status_code:   m.status_code || 0,
+        latency:       m.latency     || 0,
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `grpc-mocks-${Date.now()}.json`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showSuccess(`Exported ${exportData.length} gRPC mock(s)`);
+}
+
+async function importGRPCMocksJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.value = '';
+    try {
+        const text = await file.text();
+        const mocks = JSON.parse(text);
+        if (!Array.isArray(mocks)) throw new Error('File must contain a JSON array of gRPC mocks');
+
+        const resp = await fetch(`${API_BASE_URL}/grpc/apis/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mocks),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.message || 'Import failed');
+        }
+        const result = await resp.json();
+        showSuccess(`Import complete — ${result.created} created, ${result.skipped} skipped`);
+
+        const featureName  = document.getElementById('grpcapi-feature-filter').dataset.selectedValue  || '';
+        const scenarioName = document.getElementById('grpcapi-scenario-filter').dataset.selectedValue || '';
+        if (featureName) loadGRPCMocks(featureName, scenarioName);
+    } catch (err) {
+        console.error('Error importing gRPC mocks:', err);
+        showError('Import failed: ' + err.message);
+    }
+}
+
+let _exportTabCurrent = 'proto';
+let _exportTabContents = {};
+
+function exportGRPCMocksClient(mocks) {
+    const data = mocks || grpcMocks;
+    if (!data || data.length === 0) {
+        showError('No gRPC mocks loaded. Select a feature first.');
+        return;
+    }
+    _exportTabContents = {
+        proto:  generateProtoFromMocks(data),
+        go:     generateGoClient(data),
+        python: generatePythonClient(data),
+    };
+    _exportTabCurrent = 'proto';
+    document.querySelectorAll('.export-tab-btn').forEach(b => b.classList.remove('export-tab-active'));
+    document.getElementById('export-tab-proto').classList.add('export-tab-active');
+    document.getElementById('grpcapi-export-content').value = _exportTabContents.proto;
+    showModal('grpcapi-export-modal');
+}
+
+function switchExportTab(tab) {
+    _exportTabCurrent = tab;
+    document.querySelectorAll('.export-tab-btn').forEach(b => b.classList.remove('export-tab-active'));
+    document.getElementById(`export-tab-${tab}`).classList.add('export-tab-active');
+    document.getElementById('grpcapi-export-content').value = _exportTabContents[tab] || '';
+}
+
+function copyExportContent() {
+    const ta = document.getElementById('grpcapi-export-content');
+    navigator.clipboard.writeText(ta.value)
+        .then(() => showSuccess('Copied to clipboard'))
+        .catch(() => {
+            ta.select();
+            document.execCommand('copy');
+            showSuccess('Copied to clipboard');
+        });
+}
+
+function generateProtoFromMocks(mocks) {
+    const services = groupMocksByService(mocks);
+
+    // Derive package from first service that has a dot-qualified name
+    let pkg = '';
+    for (const svcFull of Object.keys(services)) {
+        const lastDot = svcFull.lastIndexOf('.');
+        if (lastDot > 0) { pkg = svcFull.slice(0, lastDot); break; }
+    }
+
+    const lines = [];
+    lines.push('syntax = "proto3";');
+    lines.push('');
+    if (pkg) { lines.push(`package ${pkg};`); lines.push(''); }
+    lines.push('// Generated by mocktool — edit field names/types as needed before running protoc/buf.');
+    lines.push('');
+
+    const messages = {};  // name → lines[]
+
+    for (const [svcFull, methods] of Object.entries(services)) {
+        const lastDot = svcFull.lastIndexOf('.');
+        const svcName = lastDot >= 0 ? svcFull.slice(lastDot + 1) : svcFull;
+
+        lines.push(`service ${svcName} {`);
+        for (const [method] of Object.entries(methods)) {
+            lines.push(`  rpc ${method} (${method}Request) returns (${method}Response);`);
+        }
+        lines.push('}');
+        lines.push('');
+
+        for (const [method, shapes] of Object.entries(methods)) {
+            collectMessage(`${method}Request`,  shapes.input,  messages);
+            collectMessage(`${method}Response`, shapes.output, messages);
+        }
+    }
+
+    // Emit messages (top-level first, nested last to avoid forward-ref confusion)
+    for (const [name, msgLines] of Object.entries(messages)) {
+        lines.push(...msgLines);
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function collectMessage(msgName, jsonObj, messages) {
+    if (messages[msgName]) return;
+    const fields = [];
+    let fieldNum = 1;
+
+    if (jsonObj && typeof jsonObj === 'object' && !Array.isArray(jsonObj)) {
+        for (const [key, val] of Object.entries(jsonObj)) {
+            const { protoType, nestedName } = inferProtoType(key, val, msgName);
+            fields.push(`  ${protoType} ${key} = ${fieldNum++};`);
+            if (nestedName && val && typeof val === 'object' && !Array.isArray(val)) {
+                collectMessage(nestedName, val, messages);
+            }
+            if (nestedName && Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+                collectMessage(nestedName, val[0], messages);
+            }
+        }
+    }
+
+    const msgLines = [`message ${msgName} {`];
+    if (fields.length === 0) msgLines.push('  // empty');
+    msgLines.push(...fields);
+    msgLines.push('}');
+    messages[msgName] = msgLines;
+}
+
+function inferProtoType(fieldName, val, parentName) {
+    if (val === null || val === undefined) return { protoType: 'string' };
+    if (typeof val === 'boolean') return { protoType: 'bool' };
+    if (typeof val === 'string')  return { protoType: 'string' };
+    if (typeof val === 'number') {
+        return { protoType: Number.isInteger(val) ? 'int64' : 'double' };
+    }
+    if (Array.isArray(val)) {
+        if (val.length === 0) return { protoType: 'repeated string' };
+        const elem = val[0];
+        if (typeof elem === 'object' && elem !== null) {
+            const nestedName = capitalize(fieldName) + 'Item';
+            return { protoType: `repeated ${nestedName}`, nestedName };
+        }
+        const { protoType: inner } = inferProtoType(fieldName, elem, parentName);
+        return { protoType: `repeated ${inner}` };
+    }
+    if (typeof val === 'object') {
+        const nestedName = capitalize(fieldName);
+        return { protoType: nestedName, nestedName };
+    }
+    return { protoType: 'string' };
+}
+
+function capitalize(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function generateGoClient(mocks) {
+    const services = groupMocksByService(mocks);
+    const structs = {}; // preserves insertion order (nested before parent)
+
+    for (const [, methods] of Object.entries(services)) {
+        for (const [method, shapes] of Object.entries(methods)) {
+            collectGoStruct(`${method}Request`,  shapes.input,  structs);
+            collectGoStruct(`${method}Response`, shapes.output, structs);
+        }
+    }
+
+    const lines = [];
+    lines.push('// Generated by mocktool');
+    lines.push('');
+    lines.push('package main');
+    lines.push('');
+
+    for (const [name, fields] of Object.entries(structs)) {
+        lines.push(`type ${name} struct {`);
+        if (fields.length === 0) {
+            lines.push('\t// no fields');
+        } else {
+            for (const f of fields) lines.push(`\t${f}`);
+        }
+        lines.push('}');
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function collectGoStruct(name, jsonObj, structs) {
+    if (structs[name] !== undefined) return;
+    structs[name] = []; // mark visited to prevent cycles
+    const fields = [];
+
+    if (jsonObj && typeof jsonObj === 'object' && !Array.isArray(jsonObj)) {
+        for (const [key, val] of Object.entries(jsonObj)) {
+            const { goType, nestedName } = inferGoType(key, val);
+            const goField = capitalize(toCamelCase(key));
+            fields.push(`${goField} ${goType} \`json:"${key}"\``);
+            if (nestedName) {
+                const nested = Array.isArray(val) && val.length > 0 ? val[0] : val;
+                if (nested && typeof nested === 'object') collectGoStruct(nestedName, nested, structs);
+            }
+        }
+    }
+
+    structs[name] = fields;
+}
+
+function inferGoType(fieldName, val) {
+    if (val === null || val === undefined) return { goType: 'interface{}' };
+    if (typeof val === 'boolean') return { goType: 'bool' };
+    if (typeof val === 'string')  return { goType: 'string' };
+    if (typeof val === 'number')  return { goType: Number.isInteger(val) ? 'int64' : 'float64' };
+    if (Array.isArray(val)) {
+        if (val.length === 0) return { goType: '[]interface{}' };
+        const elem = val[0];
+        if (elem && typeof elem === 'object') {
+            const nestedName = capitalize(fieldName) + 'Item';
+            return { goType: `[]${nestedName}`, nestedName };
+        }
+        const { goType: inner } = inferGoType(fieldName, elem);
+        return { goType: `[]${inner}` };
+    }
+    if (typeof val === 'object') {
+        const nestedName = capitalize(fieldName);
+        return { goType: nestedName, nestedName };
+    }
+    return { goType: 'string' };
+}
+
+function generatePythonClient(mocks) {
+    const services = groupMocksByService(mocks);
+    const classes = {}; // preserves insertion order (nested before parent)
+
+    for (const [, methods] of Object.entries(services)) {
+        for (const [method, shapes] of Object.entries(methods)) {
+            collectPythonClass(`${method}Request`,  shapes.input,  classes);
+            collectPythonClass(`${method}Response`, shapes.output, classes);
+        }
+    }
+
+    const lines = [];
+    lines.push('# Generated by mocktool');
+    lines.push('');
+    lines.push('from __future__ import annotations');
+    lines.push('from dataclasses import dataclass, field');
+    lines.push('from typing import List, Optional, Any');
+    lines.push('');
+
+    for (const [name, fields] of Object.entries(classes)) {
+        lines.push('@dataclass');
+        lines.push(`class ${name}:`);
+        if (fields.length === 0) {
+            lines.push('    pass');
+        } else {
+            for (const f of fields) lines.push(`    ${f}`);
+        }
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function collectPythonClass(name, jsonObj, classes) {
+    if (classes[name] !== undefined) return;
+    classes[name] = []; // mark visited
+    const fields = [];
+
+    if (jsonObj && typeof jsonObj === 'object' && !Array.isArray(jsonObj)) {
+        for (const [key, val] of Object.entries(jsonObj)) {
+            const { pyType, defaultVal, nestedName } = inferPyType(key, val);
+            fields.push(`${key}: ${pyType} = ${defaultVal}`);
+            if (nestedName) {
+                const nested = Array.isArray(val) && val.length > 0 ? val[0] : val;
+                if (nested && typeof nested === 'object') collectPythonClass(nestedName, nested, classes);
+            }
+        }
+    }
+
+    classes[name] = fields;
+}
+
+function inferPyType(fieldName, val) {
+    if (val === null || val === undefined) return { pyType: 'Optional[Any]', defaultVal: 'None' };
+    if (typeof val === 'boolean') return { pyType: 'bool', defaultVal: String(val) === 'true' ? 'True' : 'False' };
+    if (typeof val === 'string')  return { pyType: 'str',  defaultVal: '""' };
+    if (typeof val === 'number')  return { pyType: Number.isInteger(val) ? 'int' : 'float', defaultVal: '0' };
+    if (Array.isArray(val)) {
+        if (val.length === 0) return { pyType: 'List[Any]', defaultVal: 'field(default_factory=list)' };
+        const elem = val[0];
+        if (elem && typeof elem === 'object') {
+            const nestedName = capitalize(fieldName) + 'Item';
+            return { pyType: `List[${nestedName}]`, defaultVal: 'field(default_factory=list)', nestedName };
+        }
+        const { pyType: inner } = inferPyType(fieldName, elem);
+        return { pyType: `List[${inner}]`, defaultVal: 'field(default_factory=list)' };
+    }
+    if (typeof val === 'object') {
+        const nestedName = capitalize(fieldName);
+        return { pyType: nestedName, defaultVal: `field(default_factory=${nestedName})`, nestedName };
+    }
+    return { pyType: 'str', defaultVal: '""' };
+}
+
+function toCamelCase(s) {
+    return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function groupMocksByService(mocks) {
+    const services = {};
+    for (const m of mocks) {
+        if (!services[m.service_name]) services[m.service_name] = {};
+        services[m.service_name][m.method_name] = { input: m.input, output: m.output };
+    }
+    return services;
 }

@@ -13,20 +13,17 @@ import (
 
 	"log"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/namnv2496/mocktool/internal/domain"
 	"github.com/namnv2496/mocktool/internal/entity"
 	"github.com/namnv2496/mocktool/internal/repository"
-	"github.com/namnv2496/mocktool/pkg/errorcustome"
 	"github.com/namnv2496/mocktool/pkg/observability"
 	"github.com/namnv2496/mocktool/pkg/security"
 	"github.com/namnv2496/mocktool/pkg/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -218,27 +215,27 @@ func (_self *ForwardUC) forward(
 			hash,
 		)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				// Exact path miss — try pattern matching (e.g. /api/users/:id).
-				mockAPI, err = findByPathPattern(fetchCtx, _self.MockAPIRepo, featureName, scenarioName, path, method, hash)
-			}
-			if err != nil {
-				// Negative cache: store sentinel so subsequent waves skip the DB.
-				_self.cacheRepo.SetWithTTL(fetchCtx, cacheKey, notFoundSentinel, notFoundCacheTTL)
-				if err == mongo.ErrNoDocuments {
-					metadata := map[string]string{
-						"x-trace-id": uuid.NewString(),
-					}
-					return nil, errorcustome.NewError(
-						codes.Internal,
-						"ERR.001",
-						"Mock API not found: %s",
-						metadata,
-						"not found",
-					)
-				}
-				return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-			}
+			// if err == mongo.ErrNoDocuments {
+			// 	// Exact path miss — try pattern matching (e.g. /api/users/:id).
+			// 	mockAPI, err = findByPathPattern(fetchCtx, _self.MockAPIRepo, featureName, scenarioName, path, method, hash)
+			// }
+			// if err != nil {
+			// 	// Negative cache: store sentinel so subsequent waves skip the DB.
+			// 	_self.cacheRepo.SetWithTTL(fetchCtx, cacheKey, notFoundSentinel, notFoundCacheTTL)
+			// 	if err == mongo.ErrNoDocuments {
+			// 		metadata := map[string]string{
+			// 			"x-trace-id": uuid.NewString(),
+			// 		}
+			// 		return nil, errorcustome.NewError(
+			// 			codes.Internal,
+			// 			"ERR.001",
+			// 			"Mock API not found: %s",
+			// 			metadata,
+			// 			"not found",
+			// 		)
+			// 	}
+			// }
+			return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
 		if len(mockAPI.Responses) > 0 {

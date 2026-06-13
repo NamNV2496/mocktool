@@ -181,19 +181,6 @@ func TestForwardUC_ResponseMockData(t *testing.T) {
 						gomock.Any(),
 					).
 					Return(nil, mongo.ErrNoDocuments)
-
-				mockAPIRepo.EXPECT().
-					FindCandidatesByFeatureScenarioAndMethod(
-						gomock.Any(),
-						"test-feature",
-						"test-scenario",
-						"POST",
-					).
-					Return(nil, mongo.ErrNoDocuments)
-
-				cacheRepo.EXPECT().
-					SetWithTTL(gomock.Any(), gomock.Any(), notFoundSentinel, notFoundCacheTTL).
-					Return(nil)
 			},
 			expectedStatus: http.StatusInternalServerError,
 			wantErr:        true,

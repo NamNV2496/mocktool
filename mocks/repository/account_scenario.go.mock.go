@@ -112,3 +112,18 @@ func (mr *MockIAccountScenarioRepositoryMockRecorder) GetActiveScenario(ctx, fea
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveScenario", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).GetActiveScenario), ctx, featureName, accountId)
 }
+
+// GetActiveScenarioByName mocks base method.
+func (m *MockIAccountScenarioRepository) GetActiveScenarioByName(ctx context.Context, featureName string, scenario *string) (*domain.AccountScenario, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveScenarioByName", ctx, featureName, scenario)
+	ret0, _ := ret[0].(*domain.AccountScenario)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveScenarioByName indicates an expected call of GetActiveScenarioByName.
+func (mr *MockIAccountScenarioRepositoryMockRecorder) GetActiveScenarioByName(ctx, featureName, scenario any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveScenarioByName", reflect.TypeOf((*MockIAccountScenarioRepository)(nil).GetActiveScenarioByName), ctx, featureName, scenario)
+}

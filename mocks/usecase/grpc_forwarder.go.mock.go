@@ -43,9 +43,9 @@ func (m *MockIGRPCForwardUC) EXPECT() *MockIGRPCForwardUCMockRecorder {
 }
 
 // HandleCall mocks base method.
-func (m *MockIGRPCForwardUC) HandleCall(ctx context.Context, fullMethod string, reqBytes []byte, featureName string, accountID *string) (*structpb.Struct, codes.Code, error) {
+func (m *MockIGRPCForwardUC) HandleCall(ctx context.Context, fullMethod string, reqBytes []byte, featureName, scenario string) (*structpb.Struct, codes.Code, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HandleCall", ctx, fullMethod, reqBytes, featureName, accountID)
+	ret := m.ctrl.Call(m, "HandleCall", ctx, fullMethod, reqBytes, featureName, scenario)
 	ret0, _ := ret[0].(*structpb.Struct)
 	ret1, _ := ret[1].(codes.Code)
 	ret2, _ := ret[2].(error)
@@ -53,7 +53,7 @@ func (m *MockIGRPCForwardUC) HandleCall(ctx context.Context, fullMethod string, 
 }
 
 // HandleCall indicates an expected call of HandleCall.
-func (mr *MockIGRPCForwardUCMockRecorder) HandleCall(ctx, fullMethod, reqBytes, featureName, accountID any) *gomock.Call {
+func (mr *MockIGRPCForwardUCMockRecorder) HandleCall(ctx, fullMethod, reqBytes, featureName, scenario any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleCall", reflect.TypeOf((*MockIGRPCForwardUC)(nil).HandleCall), ctx, fullMethod, reqBytes, featureName, accountID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HandleCall", reflect.TypeOf((*MockIGRPCForwardUC)(nil).HandleCall), ctx, fullMethod, reqBytes, featureName, scenario)
 }

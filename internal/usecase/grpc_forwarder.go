@@ -20,7 +20,7 @@ import (
 
 //go:generate mockgen -source=$GOFILE -destination=../../mocks/usecase/$GOFILE.mock.go -package=$GOPACKAGE
 type IGRPCForwardUC interface {
-	HandleCall(ctx context.Context, fullMethod string, reqBytes []byte, featureName string, accountID *string) (*structpb.Struct, codes.Code, error)
+	HandleCall(ctx context.Context, fullMethod string, reqBytes []byte, featureName string, scenario string) (*structpb.Struct, codes.Code, error)
 }
 
 type GRPCForwardUC struct {
@@ -46,20 +46,9 @@ func (_self *GRPCForwardUC) HandleCall(
 	fullMethod string,
 	reqBytes []byte,
 	featureName string,
-	accountID *string,
+	scenario string,
 ) (*structpb.Struct, codes.Code, error) {
 	serviceName, methodName := splitFullMethod(fullMethod)
-
-	// Resolve active scenario
-	accountScenario, err := _self.accountScenarioRepo.GetActiveScenario(ctx, featureName, accountID)
-	if err != nil {
-		return nil, codes.Internal, status.Errorf(codes.Internal, "resolve scenario: %v", err)
-	}
-	scenario, err := _self.scenarioRepo.GetByObjectID(ctx, accountScenario.ScenarioID)
-	if err != nil {
-		return nil, codes.Internal, status.Errorf(codes.Internal, "get scenario: %v", err)
-	}
-	scenarioName := scenario.Name
 
 	// Hash request for body-based matching.
 	// Decode proto bytes as Struct → canonical JSON → sha256 so the hash
@@ -68,11 +57,11 @@ func (_self *GRPCForwardUC) HandleCall(
 
 	// Exact match first; fall back to match-all (empty hash) if needed
 	mock, err := _self.grpcMockRepo.FindByFeatureScenarioServiceMethodAndHash(
-		ctx, featureName, scenarioName, serviceName, methodName, hashInput,
+		ctx, featureName, scenario, serviceName, methodName, hashInput,
 	)
 	if err == mongo.ErrNoDocuments && hashInput != "" {
 		mock, err = _self.grpcMockRepo.FindByFeatureScenarioServiceMethodAndHash(
-			ctx, featureName, scenarioName, serviceName, methodName, "",
+			ctx, featureName, scenario, serviceName, methodName, "",
 		)
 	}
 	if err != nil {

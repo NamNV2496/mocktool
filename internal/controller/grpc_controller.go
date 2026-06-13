@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/namnv2496/mocktool/internal/configs"
@@ -117,10 +117,9 @@ func (_self *GRPCController) unknownServiceHandler(_ any, stream grpc.ServerStre
 		return status.Error(codes.InvalidArgument, "x-feature-name metadata is required")
 	}
 
-	var accountID *string
-	if vals := md.Get("x-account-id"); len(vals) > 0 {
-		v := vals[0]
-		accountID = &v
+	scenario := firstMDValue(md, "x-scenario")
+	if scenario == "" {
+		return status.Error(codes.InvalidArgument, "x-scenario metadata is required")
 	}
 
 	var reqBytes []byte
@@ -133,7 +132,7 @@ func (_self *GRPCController) unknownServiceHandler(_ any, stream grpc.ServerStre
 		fullMethod,
 		reqBytes,
 		featureName,
-		accountID,
+		scenario,
 	)
 	if err != nil {
 		return err

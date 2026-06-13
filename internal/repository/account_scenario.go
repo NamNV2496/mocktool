@@ -14,6 +14,7 @@ import (
 type IAccountScenarioRepository interface {
 	Create(ctx context.Context, as *domain.AccountScenario) error
 	GetActiveScenario(ctx context.Context, featureName string, accountId *string) (*domain.AccountScenario, error)
+	GetActiveScenarioByName(ctx context.Context, featureName string, scenario *string) (*domain.AccountScenario, error)
 	DeactivateByFeatureAndAccount(ctx context.Context, featureName string, accountId *string) error
 	DeactivateAllAccountSpecificMappings(ctx context.Context, featureName string) error
 	DeleteByScenarioId(ctx context.Context, scenarioId primitive.ObjectID) error
@@ -86,6 +87,23 @@ func (r *AccountScenarioRepository) GetActiveScenario(
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (r *AccountScenarioRepository) GetActiveScenarioByName(ctx context.Context, featureName string, scenario *string) (*domain.AccountScenario, error) {
+	var result domain.AccountScenario
+	// If accountId is provided, try to find account-specific mapping
+	if scenario != nil {
+		err := r.repo.FindOne(ctx, bson.M{
+			"feature_name": featureName,
+			"scenario":     *scenario,
+		}, &result)
+
+		// If found, return it
+		if err == nil {
+			return &result, nil
+		}
+	}
+	return nil, nil
 }
 
 // DeactivateByFeatureAndAccount deletes the active scenario mapping for a feature and account

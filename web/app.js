@@ -529,8 +529,14 @@ function getSelectedExportHeaders(api) {
     if (featureName && !headers['X-Feature-Name'] && !headers['x-feature-name']) {
         headers['X-Feature-Name'] = featureName;
     }
-    headers['X-Account-Id'] = 'default';
-    
+    if (accountId) {
+        if (!headers['X-Account-Id'] && !headers['x-account-id']) {
+            headers['X-Account-Id'] = accountId;
+        }
+    } else if (!headers['X-Account-Id'] && !headers['x-account-id']) {
+        headers['X-Account-Id'] = 'default';
+    }
+
     if (!headers['Content-Type'] && !headers['content-type']) {
         headers['Content-Type'] = 'application/json';
     }

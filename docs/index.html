@@ -73,6 +73,32 @@
             </ul>
           </div>
         </div>
+
+        <section class="section compare">
+          <h2>Mocktool vs. current mock tools</h2>
+          <p>Most tools focus on simple URL-based mocks or API contract playback. Mocktool adds scenario-driven state, account-aware selection, and request body hash matching for more realistic development and QA workflows.</p>
+          <div class="compare-grid">
+            <div class="card">
+              <h3>Typical mock tools</h3>
+              <ul>
+                <li>Match responses by URL or method only</li>
+                <li>Limited or no request body criteria</li>
+                <li>Standalone mocks, not scenario-based</li>
+                <li>Often HTTP-only (few support gRPC)</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>Mocktool</h3>
+              <ul>
+                <li>Scenario-based response selection with active feature state</li>
+                <li>Request payload hash matching for precise request routing</li>
+                <li>Account-specific mock activation and feature context headers</li>
+                <li>Supports HTTP and gRPC with a web-based management UI</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
       </section>
 
       <section class="section features-grid">

@@ -420,14 +420,363 @@ function renderMockAPIsTable() {
             </span></td>
             <td>${formatDate(api.created_at)}</td>
             <td class="actions">
-                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api)})'>${t('common.edit')}</button>
-                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api)})'>${t('common.duplicate')}</button>
+                <button class="btn btn-outline" onclick='exportMockAPI(${JSON.stringify(api).replace(/'/g, "&#39;")})'>${t('common.export') || 'Export'}</button>
+                <button class="btn btn-edit" onclick='editMockAPI(${JSON.stringify(api).replace(/'/g, "&#39;")})'>${t('common.edit')}</button>
+                <button class="btn btn-duplicate" onclick='duplicateMockAPI(${JSON.stringify(api).replace(/'/g, "&#39;")})'>${t('common.duplicate')}</button>
                 ${api.responses && api.responses.length > 0 ? `<button class="btn-reset-counter" onclick="resetSequenceCounter('${api.id}')">Reset Counter</button>` : ''}
                 ${api.is_active && api.base_url ? `<button class="btn btn-outline" style="background:#ebf8ff;color:#2b6cb0;border-color:#bee3f8;" onclick="testRealData('${api.id}')">Test Real</button>` : ''}
                 <button class="btn btn-delete" onclick="deleteMockAPI('${api.id}')">${t('common.delete')}</button>
             </td>
         </tr>
     `).join('');
+}
+
+function exportMockAPI(api) {
+    const mock = normalizeMockApiForExport(api);
+    _mockapiExportTabContents = {
+        curl: generateMockAPIExportCurl(mock),
+        go: generateMockAPIExportGo(mock),
+        python: generateMockAPIExportPython(mock),
+        js: generateMockAPIExportJS(mock),
+    };
+    _mockapiExportTabCurrent = 'curl';
+    document.querySelectorAll('.mockapi-export-tab-btn').forEach(b => b.classList.remove('export-tab-active'));
+    document.getElementById('mockapi-export-tab-curl').classList.add('export-tab-active');
+    document.getElementById('mockapi-export-content').value = _mockapiExportTabContents.curl;
+    showModal('mockapi-export-modal');
+}
+
+function switchMockAPIExportTab(tab) {
+    _mockapiExportTabCurrent = tab;
+    document.querySelectorAll('.mockapi-export-tab-btn').forEach(b => b.classList.remove('export-tab-active'));
+    document.getElementById(`mockapi-export-tab-${tab}`).classList.add('export-tab-active');
+    document.getElementById('mockapi-export-content').value = _mockapiExportTabContents[tab] || '';
+}
+
+function copyMockAPIExportContent() {
+    const ta = document.getElementById('mockapi-export-content');
+    navigator.clipboard.writeText(ta.value)
+        .then(() => showSuccess('Copied to clipboard'))
+        .catch(() => {
+            ta.select();
+            document.execCommand('copy');
+            showSuccess('Copied to clipboard');
+        });
+}
+
+function normalizeMockApiForExport(api) {
+    return {
+        name: api.name || '',
+        method: api.method || 'GET',
+        path: api.path || '/',
+        base_url: api.base_url || 'http://localhost:8082/forward',
+        status_code: api.status_code || (api.responses && api.responses.length > 0 ? api.responses[0].status_code || 200 : 200),
+        headers: getMockApiJsonValue(api.headers),
+        request_body: getMockApiJsonValue(api.input),
+        response_body: getMockApiJsonValue(api.output),
+        feature_name: api.feature_name || api.featureName || '',
+        scenario_name: api.scenario_name || api.scenarioName || '',
+    };
+}
+
+function getMockApiJsonValue(value) {
+    if (typeof value === 'string') {
+        try {
+            return JSON.parse(value);
+        } catch {
+            return value;
+        }
+    }
+    if (value === undefined || value === null) return {};
+    return value;
+}
+
+function safeJsonString(value) {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value || '');
+    }
+}
+
+function isObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getUrl(api) {
+    return `${api.base_url.replace(/\/$/, '')}${api.path.startsWith('/') ? api.path : `/${api.path}`}`;
+}
+
+function curlEscapeBody(body) {
+    return String(body).replace(/'/g, "'\\''");
+}
+
+function formatCurlHeaders(headers) {
+    const formatted = [];
+    if (!isObject(headers)) return formatted;
+    Object.entries(headers).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formatted.push(`  -H "${key}: ${value}"`);
+    });
+    return formatted;
+}
+
+function getSelectedExportHeaders(api) {
+    const headers = isObject(api.headers) ? { ...api.headers } : {};
+    const featureName = api.feature_name || document.getElementById('mockapi-feature-filter')?.dataset.selectedValue || document.getElementById('mockapi-feature-filter')?.value;
+    const accountId = document.getElementById('scenario-account-id-filter')?.value.trim();
+
+    if (featureName && !headers['X-Feature-Name'] && !headers['x-feature-name']) {
+        headers['X-Feature-Name'] = featureName;
+    }
+    headers['X-Account-Id'] = 'default';
+    
+    if (!headers['Content-Type'] && !headers['content-type']) {
+        headers['Content-Type'] = 'application/json';
+    }
+    if (!headers['Accept'] && !headers['accept']) {
+        headers['Accept'] = 'application/json';
+    }
+    return headers;
+}
+
+function exportNameFromApi(api) {
+    const baseName = api.name ? String(api.name) : api.path || '';
+    const cleaned = baseName
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join('');
+    return cleaned || 'MockAPI';
+}
+
+function generateMockAPIExportCurl(api) {
+    const hasRequestBody = api.request_body !== undefined && api.request_body !== null && (
+        typeof api.request_body === 'string'
+            ? api.request_body.trim() !== ''
+            : (Array.isArray(api.request_body) ? api.request_body.length > 0 : Object.keys(api.request_body).length > 0)
+    );
+    const requestBody = hasRequestBody
+        ? (typeof api.request_body === 'string' ? api.request_body : JSON.stringify(api.request_body))
+        : '';
+    const url = getUrl(api);
+    const headers = getSelectedExportHeaders(api);
+
+    const lines = [`curl -L -X ${api.method.toUpperCase()} "${url}"`];
+    lines.push(...formatCurlHeaders(headers));
+
+    if (requestBody) {
+        const escapedBody = curlEscapeBody(requestBody);
+        lines.push(`  -d '${escapedBody}'`);
+    }
+    return lines.join('\n');
+}
+
+function generateMockAPIExportGo(api) {
+    const structs = {};
+    const baseName = exportNameFromApi(api);
+
+    const collectMockApiGoStruct = (name, jsonObj) => {
+        if (structs[name] !== undefined) return;
+        structs[name] = [];
+
+        if (jsonObj && typeof jsonObj === 'object' && !Array.isArray(jsonObj)) {
+            for (const [key, value] of Object.entries(jsonObj)) {
+                const fieldName = capitalize(toCamelCase(key));
+                const { goType, nestedName } = inferMockApiType(key, value);
+                structs[name].push(`${fieldName} ${goType} \`json:"${key}"\``);
+                if (nestedName) {
+                    const nestedValue = Array.isArray(value) ? value[0] : value;
+                    if (nestedValue && typeof nestedValue === 'object') {
+                        collectMockApiGoStruct(nestedName, nestedValue);
+                    }
+                }
+            }
+        }
+    };
+
+    const inferMockApiType = (fieldName, value) => {
+        if (value === null || value === undefined) return { goType: 'interface{}' };
+        if (typeof value === 'boolean') return { goType: 'bool' };
+        if (typeof value === 'number') return { goType: Number.isInteger(value) ? 'int64' : 'float64' };
+        if (typeof value === 'string') return { goType: 'string' };
+        if (Array.isArray(value)) {
+            if (value.length === 0) return { goType: '[]interface{}' };
+            const item = value[0];
+            if (item && typeof item === 'object') {
+                const nestedName = `${capitalize(fieldName)}Item`;
+                return { goType: `[]${nestedName}`, nestedName };
+            }
+            const { goType } = inferMockApiType(fieldName, item);
+            return { goType: `[]${goType}` };
+        }
+        if (typeof value === 'object') {
+            const nestedName = capitalize(fieldName);
+            return { goType: nestedName, nestedName };
+        }
+        return { goType: 'string' };
+    };
+
+    if (isObject(api.request_body) && Object.keys(api.request_body).length) {
+        collectMockApiGoStruct(`${baseName}Request`, api.request_body);
+    } else {
+        structs[`${baseName}Request`] = [];
+    }
+
+    if (isObject(api.response_body) && Object.keys(api.response_body).length) {
+        collectMockApiGoStruct(`${baseName}Response`, api.response_body);
+    } else {
+        structs[`${baseName}Response`] = [];
+    }
+
+    const lines = ['// Generated by mocktool', 'package main', ''];
+    for (const [name, fields] of Object.entries(structs)) {
+        lines.push(`type ${name} struct {`);
+        if (fields.length === 0) {
+            lines.push('\t// no fields');
+        } else {
+            for (const f of fields) lines.push(`\t${f}`);
+        }
+        lines.push('}');
+        lines.push('');
+    }
+
+    return lines.join('\n').trim();
+}
+
+function inferGoType(key, value, parentName) {
+    if (value === null || value === undefined) return { type: 'interface{}' };
+    if (typeof value === 'boolean') return { type: 'bool' };
+    if (typeof value === 'number') return { type: Number.isInteger(value) ? 'int64' : 'float64' };
+    if (typeof value === 'string') return { type: 'string' };
+    if (Array.isArray(value)) {
+        if (value.length === 0) return { type: '[]string' };
+        const item = value[0];
+        if (isObject(item)) {
+            const nestedName = `${capitalize(key)}Item`;
+            return { type: `[]${nestedName}`, nestedName };
+        }
+        const innerType = inferGoType(key, item, parentName).type;
+        return { type: `[]${innerType}` };
+    }
+    if (isObject(value)) {
+        const nestedName = `${capitalize(key)}`;
+        return { type: nestedName, nestedName };
+    }
+    return { type: 'string' };
+}
+
+function generateMockAPIExportPython(api) {
+    const classes = {};
+    const imports = new Set(['from dataclasses import dataclass']);
+
+    function collectPythonClass(name, jsonObj) {
+        if (classes[name]) return;
+        const fields = [];
+        for (const [key, value] of Object.entries(jsonObj)) {
+            const fieldName = key;
+            const { type, nestedName, imports: nestedImports } = inferPythonType(key, value);
+            nestedImports?.forEach(i => imports.add(i));
+            fields.push(`    ${fieldName}: ${type}`);
+            if (nestedName) collectPythonClass(nestedName, Array.isArray(value) ? value[0] : value);
+        }
+        if (fields.length === 0) fields.push('    pass');
+        classes[name] = `@dataclass\nclass ${name}:\n${fields.join('\n')}`;
+    }
+
+    const baseName = exportNameFromApi(api);
+    if (isObject(api.request_body) && Object.keys(api.request_body).length) {
+        collectPythonClass(`${baseName}Request`, api.request_body);
+    } else {
+        classes[`${baseName}Request`] = `@dataclass\nclass ${baseName}Request:\n    pass`;
+    }
+    if (isObject(api.response_body) && Object.keys(api.response_body).length) {
+        collectPythonClass(`${baseName}Response`, api.response_body);
+    } else {
+        classes[`${baseName}Response`] = `@dataclass\nclass ${baseName}Response:\n    pass`;
+    }
+
+    const lines = ['# Generated by mocktool — request/response structures only'];
+    if (imports.size) lines.push(...Array.from(imports).sort());
+    lines.push('');
+    Object.values(classes).forEach(cls => lines.push(cls, ''));
+    return lines.join('\n').trim();
+}
+
+function inferPythonType(key, value) {
+    const imports = new Set();
+    if (value === null || value === undefined) {
+        imports.add('from typing import Any');
+        return { type: 'Any', imports };
+    }
+    if (typeof value === 'boolean') return { type: 'bool', imports };
+    if (typeof value === 'number') return { type: Number.isInteger(value) ? 'int' : 'float', imports };
+    if (typeof value === 'string') return { type: 'str', imports };
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            imports.add('from typing import Any, List');
+            return { type: 'List[Any]', imports };
+        }
+        const item = value[0];
+        if (isObject(item)) {
+            const nestedName = `${capitalize(key)}Item`;
+            imports.add('from typing import List');
+            return { type: `List[${nestedName}]`, nestedName, imports };
+        }
+        const itemType = inferPythonType(key, item).type;
+        imports.add('from typing import List');
+        return { type: `List[${itemType}]`, imports };
+    }
+    if (isObject(value)) {
+        const nestedName = capitalize(key);
+        return { type: nestedName, nestedName, imports };
+    }
+    imports.add('from typing import Any');
+    return { type: 'Any', imports };
+}
+
+function generateMockAPIExportJS(api) {
+    const classes = {};
+
+    function collectJSClass(name, jsonObj) {
+        if (classes[name]) return;
+        const lines = [`class ${name} {`, '  constructor(data = {}) {'];
+        for (const [key, value] of Object.entries(jsonObj)) {
+            const fieldName = key;
+            if (isObject(value)) {
+                const nestedName = capitalize(key);
+                collectJSClass(nestedName, value);
+                lines.push(`    this.${fieldName} = data.${fieldName} ? new ${nestedName}(data.${fieldName}) : null;`);
+            } else if (Array.isArray(value)) {
+                if (value.length > 0 && isObject(value[0])) {
+                    const nestedName = `${capitalize(key)}Item`;
+                    collectJSClass(nestedName, value[0]);
+                    lines.push(`    this.${fieldName} = Array.isArray(data.${fieldName}) ? data.${fieldName}.map(item => new ${nestedName}(item)) : [];`);
+                } else {
+                    lines.push(`    this.${fieldName} = Array.isArray(data.${fieldName}) ? data.${fieldName} : [];`);
+                }
+            } else {
+                lines.push(`    this.${fieldName} = data.${fieldName};`);
+            }
+        }
+        lines.push('  }', '}');
+        classes[name] = lines.join('\n');
+    }
+
+    const baseName = exportNameFromApi(api);
+    if (isObject(api.request_body) && Object.keys(api.request_body).length) {
+        collectJSClass(`${baseName}Request`, api.request_body);
+    } else {
+        classes[`${baseName}Request`] = `class ${baseName}Request {\n  constructor(data = {}) {}\n}`;
+    }
+    if (isObject(api.response_body) && Object.keys(api.response_body).length) {
+        collectJSClass(`${baseName}Response`, api.response_body);
+    } else {
+        classes[`${baseName}Response`] = `class ${baseName}Response {\n  constructor(data = {}) {}\n}`;
+    }
+
+    return Object.values(classes).join('\n\n');
 }
 
 function renderScenariosTable() {
@@ -3890,6 +4239,8 @@ async function importGRPCMocksJSON(event) {
 
 let _exportTabCurrent = 'proto';
 let _exportTabContents = {};
+let _mockapiExportTabCurrent = 'curl';
+let _mockapiExportTabContents = {};
 
 function exportGRPCMocksClient(mocks) {
     const data = mocks || grpcMocks;

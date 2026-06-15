@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mocktool | API Mock Manager</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Open-source development tool</p>
+          <h1>Mocktool</h1>
+          <p>Control API responses using features, scenarios, account contexts, and request payload hash matching.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/NamNV2496/mocktool">View source</a>
+            <a class="button secondary" href="https://github.com/NamNV2496/mocktool/issues">Report issue</a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="images/architecture.png" alt="Mocktool architecture diagram" />
+        </div>
+      </div>
+      <div class="hero-notes">
+        <div class="note">
+          <strong>Go backend</strong>
+          <span>Echo + gRPC + MongoDB + Redis</span>
+        </div>
+        <div class="note">
+          <strong>Web UI</strong>
+          <span>Feature, Scenario, Mock API management</span>
+        </div>
+        <div class="note">
+          <strong>Use cases</strong>
+          <span>Frontend testing, QA, integration, edge-case mocking</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section intro">
+        <h2>Why Mocktool?</h2>
+        <p>During software development, teams often face bottlenecks where frontend developers and testers must wait for backend developers to provide APIs or finalize responses.</p>
+        <p>When backend APIs change during development, frontend code must also be updated, causing delays. Most existing mock tools only hardcode responses by URL path and cannot filter requests by body content.</p>
+
+        <div class="problem-block">
+          <h3>Problem statement</h3>
+          <ul>
+            <li>Frontend developers and testers must wait for backend developers to provide APIs or finalize responses.</li>
+            <li>Backend APIs change during development, requiring frontend code updates.</li>
+            <li>Mocking solutions are limited to hardcoding responses by URL path, without request body filtering.</li>
+            <li>Multiple stakeholders cannot work in parallel on edge cases and test data.</li>
+          </ul>
+        </div>
+
+        <div class="pros-cons-grid">
+          <div class="card">
+            <h3>Pros</h3>
+            <ul>
+              <li>Frontend code does not need to change to use mock behavior.</li>
+              <li>Multiple stakeholders can work in parallel.</li>
+              <li>Supports multiple active scenarios based on account ID.</li>
+              <li>Dynamic responses based on path, method, and request body hash.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Cons</h3>
+            <ul>
+              <li>Requires defining the API contract correctly up front.</li>
+              <li>Some require headers</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section features-grid">
+        <article class="feature-card">
+          <h3>Scenario-driven mocking</h3>
+          <p>Define multiple scenarios inside features and switch behavior without changing client code.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Request payload hash matching</h3>
+          <p>Match requests by normalized JSON body hash to handle variations in request ordering.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Runtime control</h3>
+          <p>Activate or deactivate mocks dynamically, and manage mock APIs through the web interface.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Multi-protocol support</h3>
+          <p>Mock both HTTP and gRPC services to support modern backend and microservice ecosystems.</p>
+        </article>
+      </section>
+
+      <section class="section how-it-works">
+        <h2>How it works</h2>
+        <div class="workflow">
+          <div>
+            <h4>1. Request enters service</h4>
+            <p>The client sends an API call to your service. If mocking is enabled, request routing forwards to Mocktool.</p>
+          </div>
+          <div>
+            <h4>2. Scenario lookup</h4>
+            <p>Mocktool selects an active scenario by feature and account context, then matches the path, method, and payload hash.</p>
+          </div>
+          <div>
+            <h4>3. Response delivered</h4>
+            <p>The matching mock configuration is returned immediately or the request falls back to the real backend.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section diagrams">
+        <h2>Visual overview</h2>
+        <div class="diagram-grid">
+          <article class="diagram-card">
+            <div class="diagram-image">
+              <img src="images/ui.png" alt="Admin UI screenshot" data-image="images/ui.png" data-title="Admin UI" />
+            </div>
+            <div class="diagram-body">
+              <h3>Admin UI</h3>
+              <p>Configure features, scenarios, and mock APIs from the web interface in one place.</p>
+            </div>
+          </article>
+          <article class="diagram-card">
+            <div class="diagram-image">
+              <img src="images/architecture.png" alt="Architecture diagram" data-image="images/architecture.png" data-title="Architecture" />
+            </div>
+            <div class="diagram-body">
+              <h3>Architecture</h3>
+              <p>See how Mocktool routes requests through Redis and MongoDB for fast scenario-based lookup.</p>
+            </div>
+          </article>
+          <article class="diagram-card">
+            <div class="diagram-image">
+              <img src="images/sequence_diagram.png" alt="Sequence diagram" data-image="images/sequence_diagram.png" data-title="Runtime flow" />
+            </div>
+            <div class="diagram-body">
+              <h3>Runtime flow</h3>
+              <p>Follow the request lifecycle from client to mock decision and response delivery.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section usage">
+        <h2>Get started</h2>
+        <p>Run the backend, then open the web manager to configure features, scenarios, and mock endpoints.</p>
+        <pre><code>go run main.go service</code></pre>
+        <p>Open <code>web/index.html</code> in your browser and connect it to the running backend.</p>
+      </section>
+
+      <section class="section tech-stack">
+        <h2>Technology stack</h2>
+        <div class="stack-list">
+          <span>Go</span>
+          <span>Echo</span>
+          <span>gRPC</span>
+          <span>MongoDB</span>
+          <span>Redis</span>
+          <span>Prometheus</span>
+          <span>Vanilla JS</span>
+        </div>
+      </section>
+
+      <section class="section details">
+        <h2>Project structure</h2>
+        <p>The repository contains the backend API server, mock management domain logic, repository adapters, and a lightweight web UI.</p>
+        <ul>
+          <li><strong>internal/</strong> application use cases, controllers, and service logic</li>
+          <li><strong>web/</strong> UI interface for managing mocks</li>
+          <li><strong>doc/</strong> architecture and scenario diagrams</li>
+          <li><strong>cmd/</strong> entry points for local development and server startup</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <p>Mocktool is designed to help developers, testers, and QA teams mock APIs with scenario-based control and payload-aware matching.</p>
+    </footer>
+  </div>
+
+  <div class="image-modal" id="image-modal" aria-hidden="true">
+    <div class="modal-backdrop" onclick="closeImageModal()"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="modal-close" type="button" onclick="closeImageModal()" aria-label="Close">×</button>
+      <div class="modal-actions">
+        <button class="zoom-control" type="button" onclick="zoomOut()">−</button>
+        <button class="zoom-control" type="button" onclick="zoomIn()">+</button>
+      </div>
+      <div class="modal-content">
+        <img id="modal-image" src="" alt="" />
+      </div>
+      <div class="modal-caption" id="modal-title"></div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('image-modal');
+    const modalImage = document.getElementById('modal-image');
+    const modalTitle = document.getElementById('modal-title');
+    let currentScale = 1;
+
+    function openImageModal(src, title) {
+      currentScale = 1;
+      modalImage.src = src;
+      modalImage.alt = title;
+      modalImage.style.transform = `scale(${currentScale})`;
+      modalTitle.textContent = title;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeImageModal() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalImage.src = '';
+    }
+
+    function zoomIn() {
+      currentScale = Math.min(currentScale + 0.25, 3);
+      modalImage.style.transform = `scale(${currentScale})`;
+    }
+
+    function zoomOut() {
+      currentScale = Math.max(currentScale - 0.25, 0.5);
+      modalImage.style.transform = `scale(${currentScale})`;
+    }
+
+    document.querySelectorAll('.diagram-image img').forEach(image => {
+      image.style.cursor = 'pointer';
+      image.addEventListener('click', () => {
+        openImageModal(image.dataset.image, image.dataset.title);
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (!modal.classList.contains('open')) return;
+      if (event.key === 'Escape') closeImageModal();
+      if (event.key === '+' || event.key === '=') zoomIn();
+      if (event.key === '-' || event.key === '_') zoomOut();
+    });
+  </script>
+</body>
+</html>

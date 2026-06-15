@@ -769,6 +769,29 @@ curl --location 'https://api.example.com/login' \
         </div>
     </div>
 
+    <!-- Mock API Export Modal -->
+    <div id="mockapi-export-modal" class="modal">
+        <div class="modal-content" style="max-width:720px">
+            <div class="modal-header">
+                <h3>Export Mock API</h3>
+                <span class="close" onclick="closeModal('mockapi-export-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid #e2e8f0;padding-bottom:0">
+                    <button id="mockapi-export-tab-curl" class="export-tab-btn export-tab-active mockapi-export-tab-btn" onclick="switchMockAPIExportTab('curl')">curl</button>
+                    <button id="mockapi-export-tab-go" class="export-tab-btn mockapi-export-tab-btn" onclick="switchMockAPIExportTab('go')">Go</button>
+                    <button id="mockapi-export-tab-python" class="export-tab-btn mockapi-export-tab-btn" onclick="switchMockAPIExportTab('python')">Python</button>
+                    <button id="mockapi-export-tab-js" class="export-tab-btn mockapi-export-tab-btn" onclick="switchMockAPIExportTab('js')">JS</button>
+                </div>
+                <textarea id="mockapi-export-content" rows="22" style="width:100%;font-family:monospace;font-size:0.8rem;border:1px solid #e2e8f0;border-radius:6px;padding:12px;resize:vertical;background:#f7fafc;box-sizing:border-box" readonly></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mockapi-export-modal')">Close</button>
+                <button class="btn btn-primary" onclick="copyMockAPIExportContent()">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
     <script src="i18n.js"></script>
     <script src="app.js"></script>
     <script src="ai-sidebar.js"></script>

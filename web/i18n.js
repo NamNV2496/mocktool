@@ -25,6 +25,7 @@ const translations = {
         'common.search': 'Search',
         'common.createdAt': 'Created At',
         'common.description': 'Description',
+        'common.export': 'Export',
         'common.active.checkbox': 'Active',
 
         // Features tab
@@ -324,6 +325,7 @@ const translations = {
         'common.cancel': 'Hủy',
         'common.search': 'Tìm kiếm',
         'common.actions': 'Thao tác',
+        'common.export': 'Export',
         'common.createdAt': 'Ngày tạo',
         'common.description': 'Mô tả',
         'common.active.checkbox': 'Hoạt động',
